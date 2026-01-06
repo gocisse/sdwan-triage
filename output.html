@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Network Triage Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+               background: #f5f7fa; padding: 20px; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; 
+                     border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #34495e; margin-top: 30px; margin-bottom: 15px; padding-left: 10px; 
+             border-left: 4px solid #3498db; }
+        .summary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 25px; border-radius: 8px; margin-bottom: 30px; }
+        .summary h2 { color: white; border-left: 4px solid white; margin-top: 0; }
+        .health-status { font-size: 24px; font-weight: bold; padding: 15px; 
+                        border-radius: 5px; text-align: center; margin: 20px 0; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+                gap: 15px; margin-top: 20px; }
+        .stat-card { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 5px; }
+        .stat-card h3 { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .stat-card .number { font-size: 32px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background: #3498db; color: white; padding: 12px; text-align: left; font-weight: 600; }
+        td { padding: 10px 12px; border-bottom: 1px solid #ecf0f1; }
+        tr:hover { background: #f8f9fa; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; 
+                font-size: 12px; font-weight: 600; }
+        .badge-critical { background: #dc3545; color: white; }
+        .badge-warning { background: #ffc107; color: #000; }
+        .badge-info { background: #17a2b8; color: white; }
+        .section { margin-bottom: 40px; }
+        .empty-state { text-align: center; padding: 40px; color: #95a5a6; font-style: italic; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ecf0f1; 
+                 text-align: center; color: #7f8c8d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 SD-WAN Network Triage Report</h1>
+        
+        <div class="summary">
+            <h2>Executive Summary</h2>
+            <div class="health-status" style="background-color: #ffc107;">
+                Network Status: WARNING
+            </div>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Critical Issues</h3>
+                    <div class="number">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Performance Issues</h3>
+                    <div class="number">37</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Security Concerns</h3>
+                    <div class="number">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Traffic</h3>
+                    <div class="number">32.8 MB</div>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <h2>⚡ TCP Retransmissions</h2>
+            <p>Total retransmissions detected: <strong>23</strong> (showing first 20)</p>
+            <table>
+                <tr><th>Source</th><th>Destination</th><th>Impact</th></tr>
+                <tr><td>34.120.208.123:443</td><td>192.168.100.203:51406</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>151.101.130.27:443</td><td>192.168.100.203:51465</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>35.244.232.184:443</td><td>192.168.100.203:51458</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>151.101.2.27:443</td><td>192.168.100.203:51461</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>35.71.131.137:443</td><td>192.168.100.203:51501</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>151.101.2.27:443</td><td>192.168.100.203:51461</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.149.50.64:443</td><td>192.168.100.203:51517</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.36.209.34:443</td><td>192.168.100.203:51515</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>192.168.100.203:51519</td><td>23.192.95.113:443</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>76.223.111.18:443</td><td>192.168.100.203:51548</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.36.137.203:443</td><td>192.168.100.203:51408</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>103.231.98.106:443</td><td>192.168.100.203:51524</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.98.64.218:443</td><td>192.168.100.203:51522</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>142.251.36.66:443</td><td>192.168.100.203:51529</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.120.208.123:443</td><td>192.168.100.203:51406</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.149.50.64:443</td><td>192.168.100.203:51517</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>35.71.131.137:443</td><td>192.168.100.203:51501</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>76.223.111.18:443</td><td>192.168.100.203:51548</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>34.98.64.218:443</td><td>192.168.100.203:51521</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+                <tr><td>178.250.7.4:443</td><td>192.168.100.203:51627</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+            </table>
+            <p><strong>⚠️ Action Required:</strong> Check network links and QoS settings for congestion.</p>
+        </div>
+        <div class="section">
+            <h2>📊 Top Bandwidth Consumers</h2>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Data Transferred</th><th>% of Total</th><th>Status</th></tr>
+                <tr><td>199.232.194.27:443 → 192.168.100.203:51502</td><td>TCP</td><td>14.56 MB</td><td>44.4%</td><td><span class="badge badge-warning">Bandwidth Hog</span></td></tr>
+                <tr><td>87.248.119.252:443 → 192.168.100.203:51428</td><td>TCP</td><td>4.79 MB</td><td>14.6%</td><td><span class="badge badge-warning">Bandwidth Hog</span></td></tr>
+                <tr><td>146.75.120.158:443 → 192.168.100.203:51784</td><td>TCP</td><td>1.54 MB</td><td>4.7%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>151.101.130.27:443 → 192.168.100.203:51451</td><td>TCP</td><td>0.82 MB</td><td>2.5%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>178.250.7.19:443 → 192.168.100.203:51644</td><td>TCP</td><td>0.81 MB</td><td>2.5%</td><td><span class="badge badge-info">Normal</span></td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>🐌 High Latency Flows</h2>
+            <table>
+                <tr><th>Flow</th><th>Avg RTT</th><th>Min RTT</th><th>Max RTT</th><th>Samples</th></tr>
+                <tr><td>167.172.12.110:443 → 192.168.100.203:51790</td><td>102.9 ms</td><td>102.9 ms</td><td>102.9 ms</td><td>1</td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:54863</td><td>124.8 ms</td><td>124.8 ms</td><td>124.8 ms</td><td>1</td></tr>
+                <tr><td>100.52.105.180:443 → 192.168.100.203:51618</td><td>108.5 ms</td><td>108.5 ms</td><td>108.5 ms</td><td>1</td></tr>
+                <tr><td>44.223.243.189:443 → 192.168.100.203:51525</td><td>113.0 ms</td><td>113.0 ms</td><td>113.0 ms</td><td>1</td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:60510</td><td>125.2 ms</td><td>125.2 ms</td><td>125.2 ms</td><td>1</td></tr>
+                <tr><td>216.19.192.2:443 → 192.168.100.203:51560</td><td>101.7 ms</td><td>92.9 ms</td><td>110.5 ms</td><td>2</td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:54679</td><td>115.1 ms</td><td>104.1 ms</td><td>126.1 ms</td><td>2</td></tr>
+                <tr><td>146.190.187.27:443 → 192.168.100.203:51543</td><td>134.3 ms</td><td>134.3 ms</td><td>134.3 ms</td><td>1</td></tr>
+                <tr><td>100.52.105.180:443 → 192.168.100.203:51622</td><td>118.7 ms</td><td>118.7 ms</td><td>118.7 ms</td><td>1</td></tr>
+                <tr><td>98.137.11.163:443 → 192.168.100.203:51427</td><td>149.3 ms</td><td>149.3 ms</td><td>149.3 ms</td><td>1</td></tr>
+            </table>
+            <p><strong>⚠️ Action Required:</strong> Investigate routing paths and WAN links for latency issues.</p>
+        </div>
+        <div class="section">
+            <h2>📱 Application Breakdown</h2>
+            <table>
+                <tr><th>Application</th><th>Port</th><th>Protocol</th><th>Packets</th><th>Data</th></tr>
+                <tr><td>HTTPS</td><td>443</td><td>TCP</td><td>10248</td><td>2.59 MB</td></tr>
+                <tr><td>Ephemeral</td><td>51732</td><td>TCP</td><td>11</td><td>0.00 MB</td></tr>
+                <tr><td>HTTP</td><td>80</td><td>TCP</td><td>26</td><td>0.00 MB</td></tr>
+                <tr><td>DNS</td><td>53</td><td>UDP</td><td>12</td><td>0.00 MB</td></tr>
+                <tr><td>Registered</td><td>9956</td><td>UDP</td><td>4</td><td>0.00 MB</td></tr>
+                <tr><td>Unknown</td><td>137</td><td>UDP</td><td>4</td><td>0.00 MB</td></tr>
+                <tr><td>IMAPS</td><td>993</td><td>TCP</td><td>6</td><td>0.00 MB</td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>💻 Identified Devices</h2>
+            <table>
+                <tr><th>IP Address</th><th>Device Type</th><th>OS Guess</th><th>Confidence</th></tr>
+                <tr><td>192.168.100.203</td><td>Linux</td><td>Linux 2.6+/Ubuntu/Debian</td><td>Medium</td></tr>
+            </table>
+        </div>
+        <div class="footer">
+            <p>Generated by SD-WAN Network Triage Tool | 2026-01-06 17:14:20</p>
+            <p>This report provides comprehensive network analysis including security threats, performance issues, and traffic patterns.</p>
+        </div>
+    </div>
+</body>
+</html>

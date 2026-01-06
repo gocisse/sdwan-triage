@@ -1,4 +1,4 @@
-module sdwan-triage
+module github.com/gocisse/sdwan-triage
 
 go 1.23.3
 
