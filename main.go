@@ -637,17 +637,84 @@ func resolveServiceToPort(service string) (uint16, bool) {
 
 // === Main ===
 func main() {
+	// Define custom usage function
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stdout, `SD-WAN Network Triage: Analyze PCAP files for network issues, security threats, and traffic patterns.
+
+USAGE:
+    sdwan-triage [options] <capture.pcap>
+
+OPTIONS:
+  Filtering Options:
+    -src-ip <IP>              Analyze traffic only from this source IP address
+    -dst-ip <IP>              Analyze traffic only to this destination IP address
+    -service <port_or_name>   Analyze traffic for this service (e.g., 'https', 'ssh', '80', '443')
+    -protocol <tcp|udp>       Analyze traffic using this protocol (tcp or udp)
+
+  Export Options:
+    -json                     Output results in JSON format to stdout
+    -csv <filename>           Export results to a CSV file (default: output.csv)
+    -html <filename>          Export results to an HTML report file (default: output.html)
+
+  Help:
+    -h, --help                Show this help message
+
+EXAMPLES:
+    # Full analysis with interactive terminal output
+    ./sdwan-triage TestFile.pcap
+
+    # Filter by source IP address
+    ./sdwan-triage -src-ip 192.168.100.203 TestFile.pcap
+
+    # Filter by service name
+    ./sdwan-triage -service https TestFile.pcap
+
+    # Filter by protocol and port number
+    ./sdwan-triage -protocol tcp -service 443 TestFile.pcap
+
+    # Combine filters for precise analysis
+    ./sdwan-triage -src-ip 192.168.100.203 -protocol tcp -service ssh TestFile.pcap
+
+    # Export to HTML with custom filename
+    ./sdwan-triage -html network-report.html TestFile.pcap
+
+    # Filter and export to CSV
+    ./sdwan-triage -csv ssh-traffic.csv -service ssh TestFile.pcap
+
+    # Export to JSON for programmatic processing
+    ./sdwan-triage -json TestFile.pcap > results.json
+
+DESCRIPTION:
+    This tool performs comprehensive network analysis on PCAP capture files to identify:
+    - Security threats (DNS poisoning, ARP spoofing, suspicious ports)
+    - Performance issues (TCP retransmissions, high latency, failed connections)
+    - Traffic patterns (bandwidth hogs, application breakdown, device fingerprinting)
+
+    The analysis includes detailed explanations and actionable recommendations for
+    network engineers and IT administrators.
+
+VERSION:
+    SD-WAN Triage v2.0.0
+
+`)
+	}
+
 	var jsonOutput = flag.Bool("json", false, "Output in JSON format")
-	var csvOutput = flag.Bool("csv", false, "Export findings to CSV file (output.csv)")
-	var htmlOutput = flag.Bool("html", false, "Export findings to HTML report (output.html)")
+	var csvOutput = flag.String("csv", "", "Export findings to CSV file")
+	var htmlOutput = flag.String("html", "", "Export findings to HTML report")
 	var srcIP = flag.String("src-ip", "", "Filter by source IP address")
 	var dstIP = flag.String("dst-ip", "", "Filter by destination IP address")
-	var service = flag.String("service", "", "Filter by service port or name (e.g., 80, http, https)")
+	var service = flag.String("service", "", "Filter by service port or name")
 	var protocol = flag.String("protocol", "", "Filter by protocol (tcp or udp)")
+	var showHelp = flag.Bool("help", false, "Show help message")
 	flag.Parse()
 
-	if flag.NArg() != 1 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [-json|-csv|-html] [-src-ip IP] [-dst-ip IP] [-service PORT] [-protocol tcp|udp] <capture.pcap>\n", os.Args[0])
+	// Show help if requested or no arguments provided
+	if *showHelp || flag.NArg() != 1 {
+		flag.Usage()
+		if *showHelp {
+			os.Exit(0)
+		}
 		os.Exit(1)
 	}
 
@@ -843,18 +910,26 @@ func main() {
 	if *jsonOutput {
 		data, _ := json.MarshalIndent(report, "", "  ")
 		fmt.Println(string(data))
-	} else if *csvOutput {
-		if err := exportToCSV(report); err != nil {
+	} else if *csvOutput != "" {
+		filename := *csvOutput
+		if filename == "" {
+			filename = "output.csv"
+		}
+		if err := exportToCSV(report, filename); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to CSV: %v\n", err)
 			os.Exit(1)
 		}
-		color.Green("✓ Findings exported to output.csv")
-	} else if *htmlOutput {
-		if err := exportToHTML(report); err != nil {
+		color.Green("✓ Findings exported to %s", filename)
+	} else if *htmlOutput != "" {
+		filename := *htmlOutput
+		if filename == "" {
+			filename = "output.html"
+		}
+		if err := exportToHTML(report, filename); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to HTML: %v\n", err)
 			os.Exit(1)
 		}
-		color.Green("✓ Report exported to output.html")
+		color.Green("✓ Report exported to %s", filename)
 	} else {
 		printExecutiveSummary(report)
 		fmt.Println()
@@ -1305,38 +1380,42 @@ func analyzePacket(
 }
 
 // === Export Functions ===
-func exportToCSV(r *TriageReport) error {
-	file, err := os.Create("output.csv")
+func exportToCSV(r *TriageReport, filename string) error {
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Write header
-	file.WriteString("Category,Type,Source,Destination,Details,Severity,Action\n")
+	// Write header with plain-language column names
+	file.WriteString("Finding Type,Plain Language Description,Source IP,Source Port,Destination IP,Destination Port,Severity Level,Recommended Action\n")
 
 	// DNS Anomalies
 	for _, d := range r.DNSAnomalies {
-		file.WriteString(fmt.Sprintf("Security,DNS Poisoning,%s,%s,\"Domain '%s' resolved to private IP %s via DNS server %s [%s]\",Critical,\"Verify DNS configuration and check for malware\"\n",
-			d.ServerIP, d.AnswerIP, d.Query, d.AnswerIP, d.ServerIP, d.ServerMAC))
+		description := fmt.Sprintf("Suspicious Redirect: Requests for website '%s' were directed to a local/private address (%s) instead of the real server. This is a strong indicator of DNS poisoning where an attacker or misconfigured device is attempting to intercept traffic.", d.Query, d.AnswerIP)
+		file.WriteString(fmt.Sprintf("DNS Poisoning,%s,%s,53,%s,53,Critical,Verify DNS server configuration and check all devices for malware or unauthorized DNS settings\n",
+			description, d.ServerIP, d.AnswerIP))
 	}
 
 	// TCP Retransmissions
 	for _, t := range r.TCPRetransmissions {
-		file.WriteString(fmt.Sprintf("Performance,TCP Retransmission,%s:%d,%s:%d,\"Packet retransmitted indicating network congestion or packet loss\",Warning,\"Check network links and QoS settings\"\n",
-			t.SrcIP, t.SrcPort, t.DstIP, t.DstPort))
+		description := fmt.Sprintf("High Network Latency: Packets sent from device %s experienced delays reaching %s. The same data had to be sent multiple times indicating network congestion or connection problems between these points.", t.SrcIP, t.DstIP)
+		file.WriteString(fmt.Sprintf("Network Congestion,%s,%s,%d,%s,%d,Warning,Check network links and Quality of Service (QoS) settings between these devices\n",
+			description, t.SrcIP, t.SrcPort, t.DstIP, t.DstPort))
 	}
 
 	// Failed Handshakes
 	for _, t := range r.FailedHandshakes {
-		file.WriteString(fmt.Sprintf("Performance,Failed TCP Handshake,%s:%d,%s:%d,\"Connection attempt failed - destination unreachable or blocking\",Warning,\"Check firewall rules and service status\"\n",
-			t.SrcIP, t.SrcPort, t.DstIP, t.DstPort))
+		description := fmt.Sprintf("Connection Failed: Device %s attempted to connect to %s but the connection could not be established. The destination might be down, unreachable, or blocking the connection.", t.SrcIP, t.DstIP)
+		file.WriteString(fmt.Sprintf("Failed Connection,%s,%s,%d,%s,%d,Warning,Check if destination service is running and verify firewall rules allow this connection\n",
+			description, t.SrcIP, t.SrcPort, t.DstIP, t.DstPort))
 	}
 
 	// ARP Conflicts
 	for _, a := range r.ARPConflicts {
-		file.WriteString(fmt.Sprintf("Security,ARP Spoofing,%s,%s,\"IP claimed by multiple MACs: %s vs %s\",Critical,\"Investigate for man-in-the-middle attack\"\n",
-			a.IP, a.IP, a.MAC1, a.MAC2))
+		description := fmt.Sprintf("Duplicate Device Found: The network address %s appears to be used by two different physical devices (MAC addresses: %s and %s). This is often a sign of an unauthorized device or network misconfiguration potentially leading to Man-in-the-Middle attacks.", a.IP, a.MAC1, a.MAC2)
+		file.WriteString(fmt.Sprintf("ARP Spoofing,%s,%s,N/A,%s,N/A,Critical,Immediately investigate network for unauthorized devices and potential security breach\n",
+			description, a.IP, a.IP))
 	}
 
 	// HTTP Errors
@@ -1347,24 +1426,29 @@ func exportToCSV(r *TriageReport) error {
 
 	// Suspicious Traffic
 	for _, s := range r.SuspiciousTraffic {
-		file.WriteString(fmt.Sprintf("Security,Suspicious Port,%s:%d,%s:%d,\"%s - %s\",Critical,\"Investigate for malware or unauthorized services\"\n",
-			s.SrcIP, s.SrcPort, s.DstIP, s.DstPort, s.Reason, s.Protocol))
+		description := fmt.Sprintf("Suspicious Activity Detected: Device %s is communicating on port %d which is commonly associated with: %s. This may indicate malware infection or unauthorized software.", s.SrcIP, s.DstPort, s.Reason)
+		file.WriteString(fmt.Sprintf("Suspicious Port Activity,%s,%s,%d,%s,%d,Critical,Immediately investigate source device for malware infection or unauthorized software\n",
+			description, s.SrcIP, s.SrcPort, s.DstIP, s.DstPort))
 	}
 
 	// Traffic Analysis
 	for _, f := range r.TrafficAnalysis {
 		severity := "Info"
+		action := "Monitor this connection for normal business activity"
 		if f.Percentage > 10 {
 			severity = "Warning"
+			action = "Investigate this high-bandwidth connection - could be legitimate data transfer or potential data exfiltration"
 		}
-		file.WriteString(fmt.Sprintf("Traffic,Bandwidth Consumer,%s:%d,%s:%d,\"%.2f MB (%.1f%% of total) - %s\","+severity+",\"Monitor for bandwidth hogs or data exfiltration\"\n",
-			f.SrcIP, f.SrcPort, f.DstIP, f.DstPort, float64(f.TotalBytes)/(1024*1024), f.Percentage, f.Protocol))
+		description := fmt.Sprintf("High Bandwidth Usage: Connection between %s and %s consumed %.2f MB of data (%.1f%% of all network traffic). This represents a significant portion of network capacity.", f.SrcIP, f.DstIP, float64(f.TotalBytes)/(1024*1024), f.Percentage)
+		file.WriteString(fmt.Sprintf("Bandwidth Consumer,%s,%s,%d,%s,%d,%s,%s\n",
+			description, f.SrcIP, f.SrcPort, f.DstIP, f.DstPort, severity, action))
 	}
 
 	// RTT Analysis
 	for _, rtt := range r.RTTAnalysis {
-		file.WriteString(fmt.Sprintf("Performance,High Latency,%s:%d,%s:%d,\"Avg RTT: %.1fms (Min: %.1fms Max: %.1fms Samples: %d)\",Warning,\"Investigate routing paths and WAN links\"\n",
-			rtt.SrcIP, rtt.SrcPort, rtt.DstIP, rtt.DstPort, rtt.AvgRTT, rtt.MinRTT, rtt.MaxRTT, rtt.SampleSize))
+		description := fmt.Sprintf("Slow Response Time: Communication between %s and %s is experiencing high latency (average delay: %.1f milliseconds). Even with good bandwidth, high delays severely impact application performance especially for interactive applications.", rtt.SrcIP, rtt.DstIP, rtt.AvgRTT)
+		file.WriteString(fmt.Sprintf("High Latency,%s,%s,%d,%s,%d,Warning,Investigate network routing paths and WAN links for latency issues between these locations\n",
+			description, rtt.SrcIP, rtt.SrcPort, rtt.DstIP, rtt.DstPort))
 	}
 
 	// TLS Certificates
@@ -1391,8 +1475,8 @@ func exportToCSV(r *TriageReport) error {
 	return nil
 }
 
-func exportToHTML(r *TriageReport) error {
-	file, err := os.Create("output.html")
+func exportToHTML(r *TriageReport, filename string) error {
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
@@ -1463,10 +1547,17 @@ func exportToHTML(r *TriageReport) error {
     <div class="container">
         <h1>🔍 SD-WAN Network Triage Report</h1>
         
+        <p style="margin-bottom: 30px; padding: 15px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+            <strong>About This Report:</strong> This report analyzes a network packet capture (PCAP) file to identify potential issues, 
+            security concerns, and traffic patterns. The analysis includes automated detection of common network problems, 
+            security threats, and performance bottlenecks. While this tool identifies potential issues, further investigation 
+            by network administrators may be required to confirm findings and implement solutions.
+        </p>
+        
         <div class="summary">
             <h2>Executive Summary</h2>
             <div class="health-status" style="background-color: ` + healthColor + `;">
-                Network Status: ` + healthStatus + `
+                Risk Level: ` + healthStatus + `
             </div>
             <div class="stats">
                 <div class="stat-card">
@@ -1492,16 +1583,22 @@ func exportToHTML(r *TriageReport) error {
 	// DNS Anomalies
 	if len(r.DNSAnomalies) > 0 {
 		html += `        <div class="section">
-            <h2>🚨 DNS Anomalies (Potential Poisoning)</h2>
+            <h2>🚨 Potential Security Threats - DNS Poisoning</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>What This Means:</strong> Requests for legitimate websites are being redirected to unexpected addresses. 
+                This is a strong indicator of DNS poisoning, where an attacker or misconfigured device is attempting to 
+                intercept your network traffic. This could be used for phishing attacks or to steal sensitive information.
+            </p>
             <table>
-                <tr><th>Domain</th><th>Resolved IP</th><th>DNS Server</th><th>MAC Address</th><th>Severity</th></tr>
+                <tr><th>Website Requested</th><th>Redirected To</th><th>DNS Server</th><th>Plain Language Explanation</th><th>Risk</th></tr>
 `
 		for _, d := range r.DNSAnomalies {
+			explanation := fmt.Sprintf("Requests for '%s' were sent to a local/private address (%s) instead of the real server", d.Query, d.AnswerIP)
 			html += fmt.Sprintf(`                <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class="badge badge-critical">CRITICAL</span></td></tr>
-`, d.Query, d.AnswerIP, d.ServerIP, d.ServerMAC)
+`, d.Query, d.AnswerIP, d.ServerIP, explanation)
 		}
 		html += `            </table>
-            <p><strong>⚠️ Action Required:</strong> Verify DNS server configuration and check for malware.</p>
+            <p><strong>⚠️ Recommended Action:</strong> Immediately verify your DNS server configuration and scan all network devices for malware or unauthorized DNS settings.</p>
         </div>
 `
 	}
@@ -1509,20 +1606,25 @@ func exportToHTML(r *TriageReport) error {
 	// TCP Retransmissions
 	if len(r.TCPRetransmissions) > 0 {
 		html += `        <div class="section">
-            <h2>⚡ TCP Retransmissions</h2>
+            <h2>⚡ Network Performance Indicators - Packet Loss</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>What This Means:</strong> Data packets had to be sent multiple times because they didn't arrive at their destination. 
+                This usually indicates network congestion or connection problems, which can severely slow down applications and user experience. 
+                Think of it like having to repeat yourself multiple times on a bad phone connection.
+            </p>
             <p>Total retransmissions detected: <strong>` + fmt.Sprintf("%d", len(r.TCPRetransmissions)) + `</strong> (showing first 20)</p>
             <table>
-                <tr><th>Source</th><th>Destination</th><th>Impact</th></tr>
+                <tr><th>From Device</th><th>To Device</th><th>Impact</th></tr>
 `
 		for i, t := range r.TCPRetransmissions {
 			if i >= 20 {
 				break
 			}
-			html += fmt.Sprintf(`                <tr><td>%s:%d</td><td>%s:%d</td><td><span class="badge badge-warning">Packet Loss</span></td></tr>
+			html += fmt.Sprintf(`                <tr><td>%s:%d</td><td>%s:%d</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
 `, t.SrcIP, t.SrcPort, t.DstIP, t.DstPort)
 		}
 		html += `            </table>
-            <p><strong>⚠️ Action Required:</strong> Check network links and QoS settings for congestion.</p>
+            <p><strong>⚠️ Recommended Action:</strong> Check network cables, switches, and routers between these devices. Consider reviewing Quality of Service (QoS) settings to prioritize important traffic.</p>
         </div>
 `
 	}
