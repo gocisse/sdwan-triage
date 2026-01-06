@@ -239,6 +239,23 @@ func (f *Filter) isEmpty() bool {
 	return f.srcIP == "" && f.dstIP == "" && f.service == "" && f.protocol == ""
 }
 
+// Path represents a communication path between two endpoints
+type Path struct {
+	SrcIP       string
+	DstIP       string
+	Protocols   map[string]bool
+	Ports       map[uint16]bool
+	PacketCount int
+	ByteCount   uint64
+	HasAnomaly  bool // Set to true if retransmissions or high latency detected
+}
+
+// PathStats holds all communication paths for diagram generation
+type PathStats struct {
+	Paths map[string]*Path // Key: "SrcIP->DstIP"
+	mu    sync.Mutex
+}
+
 // === Helper Functions ===
 func isPublicDomain(domain string) bool {
 	domain = strings.TrimRight(strings.ToLower(domain), ".")
@@ -635,6 +652,163 @@ func resolveServiceToPort(service string) (uint16, bool) {
 	return 0, false
 }
 
+// trackPath records communication paths for diagram generation
+func trackPath(pathStats *PathStats, srcIP, dstIP string, packet gopacket.Packet) {
+	if srcIP == "" || dstIP == "" {
+		return
+	}
+
+	pathStats.mu.Lock()
+	defer pathStats.mu.Unlock()
+
+	key := fmt.Sprintf("%s->%s", srcIP, dstIP)
+	path, exists := pathStats.Paths[key]
+	if !exists {
+		path = &Path{
+			SrcIP:     srcIP,
+			DstIP:     dstIP,
+			Protocols: make(map[string]bool),
+			Ports:     make(map[uint16]bool),
+		}
+		pathStats.Paths[key] = path
+	}
+
+	path.PacketCount++
+
+	// Track protocols
+	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		path.Protocols["TCP"] = true
+		tcp := tcpLayer.(*layers.TCP)
+		path.Ports[uint16(tcp.SrcPort)] = true
+		path.Ports[uint16(tcp.DstPort)] = true
+		if appLayer := packet.ApplicationLayer(); appLayer != nil {
+			path.ByteCount += uint64(len(appLayer.Payload()))
+		}
+	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		path.Protocols["UDP"] = true
+		udp := udpLayer.(*layers.UDP)
+		path.Ports[uint16(udp.SrcPort)] = true
+		path.Ports[uint16(udp.DstPort)] = true
+		if appLayer := packet.ApplicationLayer(); appLayer != nil {
+			path.ByteCount += uint64(len(appLayer.Payload()))
+		}
+	}
+
+	// Track total bytes from network layer
+	if netLayer := packet.NetworkLayer(); netLayer != nil {
+		if ip4, ok := netLayer.(*layers.IPv4); ok {
+			path.ByteCount += uint64(ip4.Length)
+		}
+	}
+}
+
+// markPathAnomaly marks a path as having an anomaly (retransmission, high latency, etc.)
+func markPathAnomaly(pathStats *PathStats, srcIP, dstIP string) {
+	pathStats.mu.Lock()
+	defer pathStats.mu.Unlock()
+
+	key := fmt.Sprintf("%s->%s", srcIP, dstIP)
+	if path, exists := pathStats.Paths[key]; exists {
+		path.HasAnomaly = true
+	}
+}
+
+// sanitizeMermaidID converts IP addresses to valid Mermaid node IDs
+func sanitizeMermaidID(ip string) string {
+	return strings.ReplaceAll(ip, ".", "_")
+}
+
+// generateMermaidDiagram creates a Mermaid.js diagram definition from collected paths
+func generateMermaidDiagram(pathStats *PathStats, filter *Filter) string {
+	pathStats.mu.Lock()
+	defer pathStats.mu.Unlock()
+
+	if len(pathStats.Paths) == 0 {
+		return ""
+	}
+
+	// Sort paths by packet count to show most significant flows
+	type pathEntry struct {
+		key  string
+		path *Path
+	}
+	var sortedPaths []pathEntry
+	for key, path := range pathStats.Paths {
+		sortedPaths = append(sortedPaths, pathEntry{key, path})
+	}
+
+	// Sort by packet count descending
+	for i := 0; i < len(sortedPaths); i++ {
+		for j := i + 1; j < len(sortedPaths); j++ {
+			if sortedPaths[j].path.PacketCount > sortedPaths[i].path.PacketCount {
+				sortedPaths[i], sortedPaths[j] = sortedPaths[j], sortedPaths[i]
+			}
+		}
+	}
+
+	// Limit to top 15 paths for readability
+	maxPaths := 15
+	if len(sortedPaths) > maxPaths {
+		sortedPaths = sortedPaths[:maxPaths]
+	}
+
+	mermaid := "graph LR\n"
+
+	// Add nodes and edges
+	for _, entry := range sortedPaths {
+		path := entry.path
+		srcID := sanitizeMermaidID(path.SrcIP)
+		dstID := sanitizeMermaidID(path.DstIP)
+
+		// Build protocol/port label
+		protocols := []string{}
+		for proto := range path.Protocols {
+			protocols = append(protocols, proto)
+		}
+		protocolStr := strings.Join(protocols, "/")
+
+		// Get primary port (most common)
+		var primaryPort uint16
+		for port := range path.Ports {
+			primaryPort = port
+			break
+		}
+
+		// Format bytes
+		var sizeStr string
+		if path.ByteCount > 1024*1024 {
+			sizeStr = fmt.Sprintf("%.1fMB", float64(path.ByteCount)/(1024*1024))
+		} else if path.ByteCount > 1024 {
+			sizeStr = fmt.Sprintf("%.1fKB", float64(path.ByteCount)/1024)
+		} else {
+			sizeStr = fmt.Sprintf("%dB", path.ByteCount)
+		}
+
+		label := fmt.Sprintf("%s:%d|%s", protocolStr, primaryPort, sizeStr)
+
+		// Add edge with label
+		if path.HasAnomaly {
+			mermaid += fmt.Sprintf("    %s[\"%s\"] -.->|%s| %s[\"%s\"]\n", srcID, path.SrcIP, label, dstID, path.DstIP)
+		} else {
+			mermaid += fmt.Sprintf("    %s[\"%s\"] -->|%s| %s[\"%s\"]\n", srcID, path.SrcIP, label, dstID, path.DstIP)
+		}
+	}
+
+	// Add styling for anomaly nodes
+	mermaid += "\n"
+	for _, entry := range sortedPaths {
+		path := entry.path
+		if path.HasAnomaly {
+			srcID := sanitizeMermaidID(path.SrcIP)
+			dstID := sanitizeMermaidID(path.DstIP)
+			mermaid += fmt.Sprintf("    style %s fill:#ffcccc,stroke:#ff0000,stroke-width:3px\n", srcID)
+			mermaid += fmt.Sprintf("    style %s fill:#ffcccc,stroke:#ff0000,stroke-width:3px\n", dstID)
+		}
+	}
+
+	return mermaid
+}
+
 // === Main ===
 func main() {
 	// Define custom usage function
@@ -753,6 +927,7 @@ VERSION:
 	tlsSNICache := make(map[string]string)
 	deviceFingerprints := make(map[string]*tcpFingerprint)
 	appStats := make(map[string]*AppCategory)
+	pathStats := &PathStats{Paths: make(map[string]*Path)}
 	var mu sync.Mutex
 
 	// Initialize ApplicationBreakdown map
@@ -760,7 +935,7 @@ VERSION:
 
 	packetSource := gopacket.NewPacketSource(reader, reader.LinkType())
 	for packet := range packetSource.Packets() {
-		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter)
+		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats)
 	}
 
 	// Finalize failed handshakes
@@ -880,6 +1055,8 @@ VERSION:
 							AvgRTT:     avg,
 							SampleSize: len(flow.rttSamples),
 						})
+						// Mark path with anomaly for diagram highlighting
+						markPathAnomaly(pathStats, srcParts[0], dstParts[0])
 					}
 				}
 			}
@@ -925,7 +1102,7 @@ VERSION:
 		if filename == "" {
 			filename = "output.html"
 		}
-		if err := exportToHTML(report, filename); err != nil {
+		if err := exportToHTML(report, filename, pathStats, filter); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to HTML: %v\n", err)
 			os.Exit(1)
 		}
@@ -952,6 +1129,7 @@ func analyzePacket(
 	report *TriageReport,
 	mu *sync.Mutex,
 	filter *Filter,
+	pathStats *PathStats,
 ) {
 	// Apply filters if specified
 	if !filter.isEmpty() {
@@ -967,6 +1145,9 @@ func analyzePacket(
 		} else {
 			return
 		}
+
+		// Track path for diagram generation
+		trackPath(pathStats, srcIP, dstIP, packet)
 
 		// Check source IP filter
 		if filter.srcIP != "" && srcIP != filter.srcIP {
@@ -1028,6 +1209,14 @@ func analyzePacket(
 			if !matched {
 				return
 			}
+		}
+	}
+
+	// Track all paths for diagram generation (after filters)
+	netLayer := packet.NetworkLayer()
+	if netLayer != nil {
+		if ip4, ok := netLayer.(*layers.IPv4); ok {
+			trackPath(pathStats, ip4.SrcIP.String(), ip4.DstIP.String(), packet)
 		}
 	}
 
@@ -1138,10 +1327,14 @@ func analyzePacket(
 			// Detect retransmission: same sequence number seen before with payload
 			if len(tcp.Payload) > 0 {
 				if flow.seqSeen[tcp.Seq] {
+					srcIP := ip4.SrcIP.String()
+					dstIP := ip4.DstIP.String()
 					report.TCPRetransmissions = append(report.TCPRetransmissions, TCPFlow{
-						SrcIP: ip4.SrcIP.String(), SrcPort: uint16(tcp.SrcPort),
-						DstIP: ip4.DstIP.String(), DstPort: uint16(tcp.DstPort),
+						SrcIP: srcIP, SrcPort: uint16(tcp.SrcPort),
+						DstIP: dstIP, DstPort: uint16(tcp.DstPort),
 					})
+					// Mark path with anomaly for diagram highlighting
+					markPathAnomaly(pathStats, srcIP, dstIP)
 				} else {
 					flow.seqSeen[tcp.Seq] = true
 				}
@@ -1475,7 +1668,7 @@ func exportToCSV(r *TriageReport, filename string) error {
 	return nil
 }
 
-func exportToHTML(r *TriageReport, filename string) error {
+func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter *Filter) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -1502,6 +1695,9 @@ func exportToHTML(r *TriageReport, filename string) error {
 		healthColor = "#ffc107"
 	}
 
+	// Generate Mermaid diagram
+	mermaidDiagram := generateMermaidDiagram(pathStats, filter)
+
 	// Write HTML
 	html := `<!DOCTYPE html>
 <html lang="en">
@@ -1509,6 +1705,10 @@ func exportToHTML(r *TriageReport, filename string) error {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SD-WAN Network Triage Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
@@ -1579,6 +1779,27 @@ func exportToHTML(r *TriageReport, filename string) error {
             </div>
         </div>
 `
+
+	// Traffic Flow Diagram
+	if mermaidDiagram != "" {
+		html += `        <div class="section">
+            <h2>🔀 Traffic Flow Diagram</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>About This Diagram:</strong> This visualization shows the communication paths detected in the analyzed traffic. 
+                Each arrow represents data flowing between two network endpoints. The label on each arrow shows the protocol, 
+                port number, and total data transferred. <strong style="color: #dc3545;">Red highlighted nodes and dashed lines</strong> 
+                indicate paths where issues were detected (packet loss, high latency, or retransmissions).
+            </p>
+            <div class="mermaid" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0;">
+` + mermaidDiagram + `
+            </div>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>⚠️ Investigation Tip:</strong> Focus on the red-highlighted nodes in the diagram. These represent devices 
+                experiencing network problems. Check the physical connections, network equipment, and routing between these points.
+            </p>
+        </div>
+`
+	}
 
 	// DNS Anomalies
 	if len(r.DNSAnomalies) > 0 {
