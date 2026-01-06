@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/binary"
@@ -10,7 +11,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -253,6 +256,20 @@ type Path struct {
 // PathStats holds all communication paths for diagram generation
 type PathStats struct {
 	Paths map[string]*Path // Key: "SrcIP->DstIP"
+	mu    sync.Mutex
+}
+
+// TracerouteHop represents a single hop in a traceroute path
+type TracerouteHop struct {
+	HopNumber int
+	IP        string
+	Hostname  string
+	RTT       string
+}
+
+// TracerouteData stores traceroute results for destinations
+type TracerouteData struct {
+	Paths map[string][]TracerouteHop // Key: destination IP
 	mu    sync.Mutex
 }
 
@@ -713,6 +730,158 @@ func markPathAnomaly(pathStats *PathStats, srcIP, dstIP string) {
 	}
 }
 
+// executeTraceroute runs traceroute command and parses the output
+func executeTraceroute(targetIP string) ([]TracerouteHop, error) {
+	// Determine OS and use appropriate command
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("tracert", "-h", "15", "-w", "1000", targetIP)
+	} else {
+		cmd = exec.Command("traceroute", "-m", "15", "-w", "1", targetIP)
+	}
+
+	// Set timeout for the entire traceroute operation
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd = exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Traceroute might return non-zero exit code even with partial results
+		if len(output) == 0 {
+			return nil, fmt.Errorf("traceroute failed: %v", err)
+		}
+	}
+
+	return parseTracerouteOutput(string(output), runtime.GOOS)
+}
+
+// parseTracerouteOutput extracts hop information from traceroute output
+func parseTracerouteOutput(output string, osType string) ([]TracerouteHop, error) {
+	var hops []TracerouteHop
+	lines := strings.Split(output, "\n")
+
+	// Regex patterns for different OS outputs
+	var hopRegex *regexp.Regexp
+	if osType == "windows" {
+		// Windows tracert format: "  1    <1 ms    <1 ms    <1 ms  192.168.1.1"
+		hopRegex = regexp.MustCompile(`^\s*(\d+)\s+.*?\s+([\d\.]+)\s*$`)
+	} else {
+		// Unix traceroute format: " 1  192.168.1.1 (192.168.1.1)  0.123 ms"
+		hopRegex = regexp.MustCompile(`^\s*(\d+)\s+(?:(\S+)\s+)?\(?([\d\.]+)\)?`)
+	}
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		matches := hopRegex.FindStringSubmatch(line)
+		if len(matches) >= 3 {
+			hopNum := 0
+			fmt.Sscanf(matches[1], "%d", &hopNum)
+
+			var ip, hostname string
+			if osType == "windows" {
+				ip = matches[2]
+				hostname = ""
+			} else {
+				if len(matches) >= 4 {
+					hostname = matches[2]
+					ip = matches[3]
+				} else {
+					ip = matches[2]
+				}
+			}
+
+			// Skip asterisks and timeouts
+			if ip == "*" || ip == "" {
+				continue
+			}
+
+			// Extract RTT if present
+			rttRegex := regexp.MustCompile(`([\d\.]+)\s*ms`)
+			rttMatches := rttRegex.FindStringSubmatch(line)
+			rtt := ""
+			if len(rttMatches) >= 2 {
+				rtt = rttMatches[1] + "ms"
+			}
+
+			hops = append(hops, TracerouteHop{
+				HopNumber: hopNum,
+				IP:        ip,
+				Hostname:  hostname,
+				RTT:       rtt,
+			})
+		}
+	}
+
+	return hops, nil
+}
+
+// collectTracerouteTargets identifies top destination IPs to trace
+func collectTracerouteTargets(pathStats *PathStats, report *TriageReport, maxTargets int) []string {
+	pathStats.mu.Lock()
+	defer pathStats.mu.Unlock()
+
+	// Prioritize destinations with anomalies
+	priorityTargets := make(map[string]int) // IP -> priority score
+
+	// High priority: destinations with anomalies
+	for _, path := range pathStats.Paths {
+		if path.HasAnomaly {
+			priorityTargets[path.DstIP] = 100
+		}
+	}
+
+	// Medium priority: destinations in DNS anomalies
+	for _, dns := range report.DNSAnomalies {
+		if _, exists := priorityTargets[dns.AnswerIP]; !exists {
+			priorityTargets[dns.AnswerIP] = 50
+		}
+	}
+
+	// Add high-traffic destinations
+	type pathScore struct {
+		ip    string
+		score int
+	}
+	var scored []pathScore
+	for _, path := range pathStats.Paths {
+		score := priorityTargets[path.DstIP]
+		if score == 0 {
+			// Score based on packet count for non-anomalous paths
+			score = path.PacketCount / 100
+		}
+		scored = append(scored, pathScore{path.DstIP, score})
+	}
+
+	// Sort by score descending
+	for i := 0; i < len(scored); i++ {
+		for j := i + 1; j < len(scored); j++ {
+			if scored[j].score > scored[i].score {
+				scored[i], scored[j] = scored[j], scored[i]
+			}
+		}
+	}
+
+	// Collect unique targets up to maxTargets
+	seen := make(map[string]bool)
+	var targets []string
+	for _, ps := range scored {
+		if !seen[ps.ip] && !isPrivateOrReservedIP(ps.ip) {
+			targets = append(targets, ps.ip)
+			seen[ps.ip] = true
+			if len(targets) >= maxTargets {
+				break
+			}
+		}
+	}
+
+	return targets
+}
+
 // sanitizeMermaidID converts IP addresses to valid Mermaid node IDs
 func sanitizeMermaidID(ip string) string {
 	return strings.ReplaceAll(ip, ".", "_")
@@ -822,7 +991,7 @@ func categorizeIP(ip string) string {
 }
 
 // generateVisJSData creates vis.js compatible nodes and edges data from paths
-func generateVisJSData(pathStats *PathStats, filter *Filter) (string, string) {
+func generateVisJSData(pathStats *PathStats, filter *Filter, traceData *TracerouteData) (string, string) {
 	pathStats.mu.Lock()
 	defer pathStats.mu.Unlock()
 
@@ -833,6 +1002,7 @@ func generateVisJSData(pathStats *PathStats, filter *Filter) (string, string) {
 	// Collect unique nodes
 	nodeMap := make(map[string]bool)
 	nodeAnomalies := make(map[string]bool)
+	hopNodes := make(map[string]bool) // Track traceroute hop nodes
 
 	// Sort paths by packet count
 	type pathEntry struct {
@@ -945,6 +1115,72 @@ func generateVisJSData(pathStats *PathStats, filter *Filter) (string, string) {
 		edgesJSON += fmt.Sprintf(`        {"from": "%s", "to": "%s", "label": "%s", "title": "%s", %s "dashes": %s, "arrows": "to"}`,
 			path.SrcIP, path.DstIP, label, title, edgeColor, dashes)
 	}
+
+	// Add traceroute hop nodes and edges if available
+	if traceData != nil && len(traceData.Paths) > 0 {
+		traceData.mu.Lock()
+		for destIP, hops := range traceData.Paths {
+			// Add hop nodes
+			for _, hop := range hops {
+				if !nodeMap[hop.IP] && !hopNodes[hop.IP] {
+					hopNodes[hop.IP] = true
+					nodesJSON = strings.TrimSuffix(nodesJSON, "\n    ]")
+					hopLabel := fmt.Sprintf("Hop %d\\n%s", hop.HopNumber, hop.IP)
+					if hop.Hostname != "" {
+						hopLabel = fmt.Sprintf("Hop %d\\n%s\\n(%s)", hop.HopNumber, hop.Hostname, hop.IP)
+					}
+					hopTitle := fmt.Sprintf("Traceroute Hop %d: %s", hop.HopNumber, hop.IP)
+					if hop.RTT != "" {
+						hopTitle += fmt.Sprintf(" - RTT: %s", hop.RTT)
+					}
+					nodesJSON += fmt.Sprintf(`,
+        {"id": "%s", "label": "%s", "group": "tracehop", "shape": "triangle", "title": "%s"}`,
+						hop.IP, hopLabel, hopTitle)
+				}
+			}
+
+			// Add edge chain through hops
+			if len(hops) > 0 {
+				edgesJSON = strings.TrimSuffix(edgesJSON, "\n    ]")
+
+				// Find source IP from paths
+				var srcIP string
+				for _, path := range pathStats.Paths {
+					if path.DstIP == destIP {
+						srcIP = path.SrcIP
+						break
+					}
+				}
+
+				// Create edge chain: Src -> Hop1 -> Hop2 -> ... -> Dest
+				prevIP := srcIP
+				for i, hop := range hops {
+					if prevIP != "" {
+						hopLabel := fmt.Sprintf("Hop %d", hop.HopNumber)
+						if hop.RTT != "" {
+							hopLabel += fmt.Sprintf("\\n%s", hop.RTT)
+						}
+						edgesJSON += fmt.Sprintf(`,
+        {"from": "%s", "to": "%s", "label": "%s", "title": "Traceroute path", "color": {"color": "#9C27B0"}, "width": 1, "arrows": "to"}`,
+							prevIP, hop.IP, hopLabel)
+					}
+					prevIP = hop.IP
+
+					// Last hop connects to destination
+					if i == len(hops)-1 && prevIP != destIP {
+						edgesJSON += fmt.Sprintf(`,
+        {"from": "%s", "to": "%s", "label": "Final", "title": "Traceroute path", "color": {"color": "#9C27B0"}, "width": 1, "arrows": "to"}`,
+							prevIP, destIP)
+					}
+				}
+			}
+		}
+		traceData.mu.Unlock()
+
+		// Close the arrays
+		nodesJSON += "\n    ]"
+	}
+
 	edgesJSON += "\n    ]"
 
 	return nodesJSON, edgesJSON
@@ -1021,6 +1257,7 @@ VERSION:
 	var dstIP = flag.String("dst-ip", "", "Filter by destination IP address")
 	var service = flag.String("service", "", "Filter by service port or name")
 	var protocol = flag.String("protocol", "", "Filter by protocol (tcp or udp)")
+	var tracePath = flag.Bool("trace-path", false, "Perform traceroute to discovered destinations (requires network access)")
 	var showHelp = flag.Bool("help", false, "Show help message")
 	flag.Parse()
 
@@ -1224,6 +1461,29 @@ VERSION:
 		report.ApplicationBreakdown[app.Name] = *app
 	}
 
+	// Perform traceroute if requested
+	traceData := &TracerouteData{Paths: make(map[string][]TracerouteHop)}
+	if *tracePath {
+		color.Yellow("⚡ Performing traceroute to discovered destinations...")
+		targets := collectTracerouteTargets(pathStats, report, 5) // Limit to top 5 targets
+
+		for i, target := range targets {
+			fmt.Printf("   [%d/%d] Tracing route to %s...\n", i+1, len(targets), target)
+			hops, err := executeTraceroute(target)
+			if err != nil {
+				fmt.Printf("   ⚠ Warning: traceroute to %s failed: %v\n", target, err)
+				continue
+			}
+			if len(hops) > 0 {
+				traceData.mu.Lock()
+				traceData.Paths[target] = hops
+				traceData.mu.Unlock()
+				fmt.Printf("   ✓ Discovered %d hops to %s\n", len(hops), target)
+			}
+		}
+		fmt.Println()
+	}
+
 	// Handle output formats
 	if *jsonOutput {
 		data, _ := json.MarshalIndent(report, "", "  ")
@@ -1243,7 +1503,7 @@ VERSION:
 		if filename == "" {
 			filename = "output.html"
 		}
-		if err := exportToHTML(report, filename, pathStats, filter); err != nil {
+		if err := exportToHTML(report, filename, pathStats, filter, traceData); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to HTML: %v\n", err)
 			os.Exit(1)
 		}
@@ -1809,7 +2069,7 @@ func exportToCSV(r *TriageReport, filename string) error {
 	return nil
 }
 
-func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter *Filter) error {
+func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter *Filter, traceData *TracerouteData) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -1839,8 +2099,8 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
 	// Generate Mermaid diagram
 	mermaidDiagram := generateMermaidDiagram(pathStats, filter)
 
-	// Generate vis.js data
-	visNodesJSON, visEdgesJSON := generateVisJSData(pathStats, filter)
+	// Generate vis.js data with traceroute information
+	visNodesJSON, visEdgesJSON := generateVisJSData(pathStats, filter, traceData)
 
 	// Write HTML
 	html := `<!DOCTYPE html>
@@ -1969,11 +2229,19 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
             <div id="interactive-diagram"></div>
             <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
                 <strong>Legend:</strong><br>
-                • <strong style="color: #4CAF50;">Green nodes</strong>: Internal network devices<br>
-                • <strong style="color: #2196F3;">Blue nodes</strong>: Potential gateways/routers<br>
-                • <strong style="color: #FF9800;">Orange nodes</strong>: External servers<br>
+                • <strong style="color: #4CAF50;">Green boxes</strong>: Internal network devices<br>
+                • <strong style="color: #2196F3;">Blue diamonds</strong>: Potential gateways/routers<br>
+                • <strong style="color: #FF9800;">Orange boxes</strong>: External servers<br>
+                • <strong style="color: #9C27B0;">Purple triangles</strong>: Traceroute hops (intermediate network devices)<br>
                 • <strong style="color: #dc3545;">Red nodes/dashed lines</strong>: Devices with detected issues<br>
-                • <strong>Arrow labels</strong>: Protocol, port, and data volume
+                • <strong style="color: #9C27B0;">Purple arrows</strong>: Discovered traceroute paths<br>
+                • <strong>Gray arrows</strong>: Direct traffic flows from PCAP<br>
+                • <strong>Arrow labels</strong>: Protocol, port, data volume, or hop number
+            </p>
+            <p style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+                <strong>ℹ️ About Traceroute Data:</strong> If traceroute was enabled (-trace-path flag), the purple paths show 
+                the route discovered at analysis time from this machine to the destinations. Note that the actual path taken by 
+                the historical PCAP traffic may have been different if network topology or routing changed between capture and analysis time.
             </p>
         </div>
 
@@ -2054,6 +2322,18 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
                                 border: '#F57C00'
                             }
                         }
+                    },
+                    tracehop: {
+                        color: {
+                            background: '#E1BEE7',
+                            border: '#9C27B0',
+                            highlight: {
+                                background: '#CE93D8',
+                                border: '#7B1FA2'
+                            }
+                        },
+                        shape: 'triangle',
+                        size: 20
                     }
                 },
                 physics: {
