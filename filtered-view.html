@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Network Triage Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+               background: #f5f7fa; padding: 20px; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; 
+                     border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #34495e; margin-top: 30px; margin-bottom: 15px; padding-left: 10px; 
+             border-left: 4px solid #3498db; }
+        .summary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 25px; border-radius: 8px; margin-bottom: 30px; }
+        .summary h2 { color: white; border-left: 4px solid white; margin-top: 0; }
+        .health-status { font-size: 24px; font-weight: bold; padding: 15px; 
+                        border-radius: 5px; text-align: center; margin: 20px 0; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+                gap: 15px; margin-top: 20px; }
+        .stat-card { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 5px; }
+        .stat-card h3 { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .stat-card .number { font-size: 32px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background: #3498db; color: white; padding: 12px; text-align: left; font-weight: 600; }
+        td { padding: 10px 12px; border-bottom: 1px solid #ecf0f1; }
+        tr:hover { background: #f8f9fa; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; 
+                font-size: 12px; font-weight: 600; }
+        .badge-critical { background: #dc3545; color: white; }
+        .badge-warning { background: #ffc107; color: #000; }
+        .badge-info { background: #17a2b8; color: white; }
+        .section { margin-bottom: 40px; }
+        .empty-state { text-align: center; padding: 40px; color: #95a5a6; font-style: italic; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ecf0f1; 
+                 text-align: center; color: #7f8c8d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 SD-WAN Network Triage Report</h1>
+        
+        <p style="margin-bottom: 30px; padding: 15px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+            <strong>About This Report:</strong> This report analyzes a network packet capture (PCAP) file to identify potential issues, 
+            security concerns, and traffic patterns. The analysis includes automated detection of common network problems, 
+            security threats, and performance bottlenecks. While this tool identifies potential issues, further investigation 
+            by network administrators may be required to confirm findings and implement solutions.
+        </p>
+        
+        <div class="summary">
+            <h2>Executive Summary</h2>
+            <div class="health-status" style="background-color: #ffc107;">
+                Risk Level: WARNING
+            </div>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Critical Issues</h3>
+                    <div class="number">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Performance Issues</h3>
+                    <div class="number">408</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Security Concerns</h3>
+                    <div class="number">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Traffic</h3>
+                    <div class="number">2.6 MB</div>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <h2>🔀 Traffic Flow Diagram</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>About This Diagram:</strong> This visualization shows the communication paths detected in the analyzed traffic. 
+                Each arrow represents data flowing between two network endpoints. The label on each arrow shows the protocol, 
+                port number, and total data transferred. <strong style="color: #dc3545;">Red highlighted nodes and dashed lines</strong> 
+                indicate paths where issues were detected (packet loss, high latency, or retransmissions).
+            </p>
+            <div class="mermaid" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0;">
+graph LR
+    199_232_194_27["199.232.194.27"] -->|TCP:443|28.4MB| 192_168_100_203["192.168.100.203"]
+    87_248_119_252["87.248.119.252"] -->|TCP:443|9.4MB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51576|1.1MB| 87_248_119_252["87.248.119.252"]
+    192_168_100_203["192.168.100.203"] -->|TCP:443|122.1KB| 199_232_194_27["199.232.194.27"]
+    146_75_120_158["146.75.120.158"] -->|TCP:443|3.0MB| 192_168_100_203["192.168.100.203"]
+    8_8_4_4["8.8.4.4"] -->|UDP:443|342.7KB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|UDP:443|150.5KB| 8_8_4_4["8.8.4.4"]
+    151_101_130_27["151.101.130.27"] -->|TCP:443|1.7MB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51553|597.0KB| 69_173_144_138["69.173.144.138"]
+    178_250_7_19["178.250.7.19"] -->|TCP:51643|1.6MB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|TCP:443|209.9KB| 35_223_238_178["35.223.238.178"]
+    146_75_116_157["146.75.116.157"] -->|TCP:443|1.3MB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51431|207.4KB| 87_248_119_251["87.248.119.251"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51438|377.7KB| 188_125_72_139["188.125.72.139"]
+    142_251_38_138["142.251.38.138"] -->|TCP:443|1008.6KB| 192_168_100_203["192.168.100.203"]
+
+
+            </div>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>⚠️ Investigation Tip:</strong> Focus on the red-highlighted nodes in the diagram. These represent devices 
+                experiencing network problems. Check the physical connections, network equipment, and routing between these points.
+            </p>
+        </div>
+        <div class="section">
+            <h2>⚡ Network Performance Indicators - Packet Loss</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>What This Means:</strong> Data packets had to be sent multiple times because they didn't arrive at their destination. 
+                This usually indicates network congestion or connection problems, which can severely slow down applications and user experience. 
+                Think of it like having to repeat yourself multiple times on a bad phone connection.
+            </p>
+            <p>Total retransmissions detected: <strong>2</strong> (showing first 20)</p>
+            <table>
+                <tr><th>From Device</th><th>To Device</th><th>Impact</th></tr>
+                <tr><td>192.168.100.203:51519</td><td>23.192.95.113:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:51531</td><td>69.173.156.138:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+            </table>
+            <p><strong>⚠️ Recommended Action:</strong> Check network cables, switches, and routers between these devices. Consider reviewing Quality of Service (QoS) settings to prioritize important traffic.</p>
+        </div>
+        <div class="section">
+            <h2>📊 Top Bandwidth Consumers</h2>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Data Transferred</th><th>% of Total</th><th>Status</th></tr>
+                <tr><td>192.168.100.203:51428 → 87.248.119.252:443</td><td>TCP</td><td>0.27 MB</td><td>10.5%</td><td><span class="badge badge-warning">Bandwidth Hog</span></td></tr>
+                <tr><td>192.168.100.203:51406 → 34.120.208.123:443</td><td>TCP</td><td>0.13 MB</td><td>5.1%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:51438 → 188.125.72.139:443</td><td>TCP</td><td>0.09 MB</td><td>3.5%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:51502 → 199.232.194.27:443</td><td>TCP</td><td>0.06 MB</td><td>2.4%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:51335 → 104.18.41.41:443</td><td>TCP</td><td>0.06 MB</td><td>2.1%</td><td><span class="badge badge-info">Normal</span></td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>📱 Application Breakdown</h2>
+            <table>
+                <tr><th>Application</th><th>Port</th><th>Protocol</th><th>Packets</th><th>Data</th></tr>
+                <tr><td>HTTPS</td><td>443</td><td>TCP</td><td>10248</td><td>2.59 MB</td></tr>
+                <tr><td>HTTP</td><td>80</td><td>TCP</td><td>26</td><td>0.00 MB</td></tr>
+                <tr><td>IMAPS</td><td>993</td><td>TCP</td><td>6</td><td>0.00 MB</td></tr>
+                <tr><td>Registered</td><td>7500</td><td>TCP</td><td>1</td><td>0.00 MB</td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>💻 Identified Devices</h2>
+            <table>
+                <tr><th>IP Address</th><th>Device Type</th><th>OS Guess</th><th>Confidence</th></tr>
+                <tr><td>192.168.100.203</td><td>Linux</td><td>Linux 2.6+/Ubuntu/Debian</td><td>Medium</td></tr>
+            </table>
+        </div>
+        <div class="footer">
+            <p>Generated by SD-WAN Network Triage Tool | 2026-01-06 18:28:39</p>
+            <p>This report provides comprehensive network analysis including security threats, performance issues, and traffic patterns.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SD-WAN Network Triage Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
@@ -74,6 +78,45 @@
             </div>
         </div>
         <div class="section">
+            <h2>🔀 Traffic Flow Diagram</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>About This Diagram:</strong> This visualization shows the communication paths detected in the analyzed traffic. 
+                Each arrow represents data flowing between two network endpoints. The label on each arrow shows the protocol, 
+                port number, and total data transferred. <strong style="color: #dc3545;">Red highlighted nodes and dashed lines</strong> 
+                indicate paths where issues were detected (packet loss, high latency, or retransmissions).
+            </p>
+            <div class="mermaid" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0;">
+graph LR
+    199_232_194_27["199.232.194.27"] -->|TCP:443|28.4MB| 192_168_100_203["192.168.100.203"]
+    87_248_119_252["87.248.119.252"] -->|TCP:51474|9.4MB| 192_168_100_203["192.168.100.203"]
+    146_75_120_158["146.75.120.158"] -.->|TCP:443|3.0MB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51625|542.5KB| 87_248_119_252["87.248.119.252"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51502|61.1KB| 199_232_194_27["199.232.194.27"]
+    8_8_4_4["8.8.4.4"] -->|UDP:443|342.7KB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|UDP:60966|150.5KB| 8_8_4_4["8.8.4.4"]
+    151_101_130_27["151.101.130.27"] -.->|TCP:51453|1.7MB| 192_168_100_203["192.168.100.203"]
+    178_250_7_19["178.250.7.19"] -->|TCP:51643|1.6MB| 192_168_100_203["192.168.100.203"]
+    146_75_116_157["146.75.116.157"] -->|TCP:443|1.3MB| 192_168_100_203["192.168.100.203"]
+    142_251_38_138["142.251.38.138"] -->|TCP:443|1008.6KB| 192_168_100_203["192.168.100.203"]
+    172_217_19_10["172.217.19.10"] -->|TCP:443|858.3KB| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -->|TCP:51718|298.5KB| 69_173_144_138["69.173.144.138"]
+    172_217_19_2["172.217.19.2"] -->|TCP:443|644.1KB| 192_168_100_203["192.168.100.203"]
+    35_223_238_178["35.223.238.178"] -.->|TCP:443|402.2KB| 192_168_100_203["192.168.100.203"]
+
+    style 146_75_120_158 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 151_101_130_27 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 35_223_238_178 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+
+            </div>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>⚠️ Investigation Tip:</strong> Focus on the red-highlighted nodes in the diagram. These represent devices 
+                experiencing network problems. Check the physical connections, network equipment, and routing between these points.
+            </p>
+        </div>
+        <div class="section">
             <h2>⚡ Network Performance Indicators - Packet Loss</h2>
             <p style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
                 <strong>What This Means:</strong> Data packets had to be sent multiple times because they didn't arrive at their destination. 
@@ -121,16 +164,16 @@
             <h2>🐌 High Latency Flows</h2>
             <table>
                 <tr><th>Flow</th><th>Avg RTT</th><th>Min RTT</th><th>Max RTT</th><th>Samples</th></tr>
-                <tr><td>44.223.243.189:443 → 192.168.100.203:51525</td><td>113.0 ms</td><td>113.0 ms</td><td>113.0 ms</td><td>1</td></tr>
-                <tr><td>35.223.238.178:443 → 192.168.100.203:60510</td><td>125.2 ms</td><td>125.2 ms</td><td>125.2 ms</td><td>1</td></tr>
-                <tr><td>146.190.187.27:443 → 192.168.100.203:51543</td><td>134.3 ms</td><td>134.3 ms</td><td>134.3 ms</td><td>1</td></tr>
-                <tr><td>100.52.105.180:443 → 192.168.100.203:51618</td><td>108.5 ms</td><td>108.5 ms</td><td>108.5 ms</td><td>1</td></tr>
-                <tr><td>35.223.238.178:443 → 192.168.100.203:54679</td><td>115.1 ms</td><td>104.1 ms</td><td>126.1 ms</td><td>2</td></tr>
-                <tr><td>98.137.11.163:443 → 192.168.100.203:51427</td><td>149.3 ms</td><td>149.3 ms</td><td>149.3 ms</td><td>1</td></tr>
-                <tr><td>167.172.12.110:443 → 192.168.100.203:51790</td><td>102.9 ms</td><td>102.9 ms</td><td>102.9 ms</td><td>1</td></tr>
+                <tr><td>100.52.105.180:443 → 192.168.100.203:51622</td><td>118.7 ms</td><td>118.7 ms</td><td>118.7 ms</td><td>1</td></tr>
                 <tr><td>35.223.238.178:443 → 192.168.100.203:54863</td><td>124.8 ms</td><td>124.8 ms</td><td>124.8 ms</td><td>1</td></tr>
                 <tr><td>216.19.192.2:443 → 192.168.100.203:51560</td><td>101.7 ms</td><td>92.9 ms</td><td>110.5 ms</td><td>2</td></tr>
-                <tr><td>100.52.105.180:443 → 192.168.100.203:51622</td><td>118.7 ms</td><td>118.7 ms</td><td>118.7 ms</td><td>1</td></tr>
+                <tr><td>100.52.105.180:443 → 192.168.100.203:51618</td><td>108.5 ms</td><td>108.5 ms</td><td>108.5 ms</td><td>1</td></tr>
+                <tr><td>98.137.11.163:443 → 192.168.100.203:51427</td><td>149.3 ms</td><td>149.3 ms</td><td>149.3 ms</td><td>1</td></tr>
+                <tr><td>167.172.12.110:443 → 192.168.100.203:51790</td><td>102.9 ms</td><td>102.9 ms</td><td>102.9 ms</td><td>1</td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:54679</td><td>115.1 ms</td><td>104.1 ms</td><td>126.1 ms</td><td>2</td></tr>
+                <tr><td>44.223.243.189:443 → 192.168.100.203:51525</td><td>113.0 ms</td><td>113.0 ms</td><td>113.0 ms</td><td>1</td></tr>
+                <tr><td>146.190.187.27:443 → 192.168.100.203:51543</td><td>134.3 ms</td><td>134.3 ms</td><td>134.3 ms</td><td>1</td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:60510</td><td>125.2 ms</td><td>125.2 ms</td><td>125.2 ms</td><td>1</td></tr>
             </table>
             <p><strong>⚠️ Action Required:</strong> Investigate routing paths and WAN links for latency issues.</p>
         </div>
@@ -138,13 +181,13 @@
             <h2>📱 Application Breakdown</h2>
             <table>
                 <tr><th>Application</th><th>Port</th><th>Protocol</th><th>Packets</th><th>Data</th></tr>
-                <tr><td>HTTPS</td><td>443</td><td>UDP</td><td>756</td><td>0.09 MB</td></tr>
-                <tr><td>Ephemeral</td><td>51656</td><td>TCP</td><td>8</td><td>0.00 MB</td></tr>
+                <tr><td>HTTPS</td><td>443</td><td>TCP</td><td>10248</td><td>2.59 MB</td></tr>
+                <tr><td>Ephemeral</td><td>51704</td><td>TCP</td><td>14</td><td>0.01 MB</td></tr>
                 <tr><td>HTTP</td><td>80</td><td>TCP</td><td>26</td><td>0.00 MB</td></tr>
                 <tr><td>DNS</td><td>53</td><td>UDP</td><td>12</td><td>0.00 MB</td></tr>
+                <tr><td>Registered</td><td>9956</td><td>UDP</td><td>4</td><td>0.00 MB</td></tr>
                 <tr><td>Unknown</td><td>137</td><td>UDP</td><td>4</td><td>0.00 MB</td></tr>
                 <tr><td>IMAPS</td><td>993</td><td>TCP</td><td>6</td><td>0.00 MB</td></tr>
-                <tr><td>Registered</td><td>24851</td><td>UDP</td><td>1</td><td>0.00 MB</td></tr>
             </table>
         </div>
         <div class="section">
@@ -155,7 +198,7 @@
             </table>
         </div>
         <div class="footer">
-            <p>Generated by SD-WAN Network Triage Tool | 2026-01-06 18:06:16</p>
+            <p>Generated by SD-WAN Network Triage Tool | 2026-01-06 18:28:38</p>
             <p>This report provides comprehensive network analysis including security threats, performance issues, and traffic patterns.</p>
         </div>
     </div>

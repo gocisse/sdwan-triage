@@ -784,13 +784,13 @@ func generateMermaidDiagram(pathStats *PathStats, filter *Filter) string {
 			sizeStr = fmt.Sprintf("%dB", path.ByteCount)
 		}
 
-		label := fmt.Sprintf("%s:%d|%s", protocolStr, primaryPort, sizeStr)
+		label := fmt.Sprintf("%s:%d %s", protocolStr, primaryPort, sizeStr)
 
 		// Add edge with label
 		if path.HasAnomaly {
-			mermaid += fmt.Sprintf("    %s[\"%s\"] -.->|%s| %s[\"%s\"]\n", srcID, path.SrcIP, label, dstID, path.DstIP)
+			mermaid += fmt.Sprintf("    %s[\"%s\"] -.->|\"%s\"| %s[\"%s\"]\n", srcID, path.SrcIP, label, dstID, path.DstIP)
 		} else {
-			mermaid += fmt.Sprintf("    %s[\"%s\"] -->|%s| %s[\"%s\"]\n", srcID, path.SrcIP, label, dstID, path.DstIP)
+			mermaid += fmt.Sprintf("    %s[\"%s\"] -->|\"%s\"| %s[\"%s\"]\n", srcID, path.SrcIP, label, dstID, path.DstIP)
 		}
 	}
 
@@ -807,6 +807,147 @@ func generateMermaidDiagram(pathStats *PathStats, filter *Filter) string {
 	}
 
 	return mermaid
+}
+
+// categorizeIP determines if an IP is internal, external, or a potential gateway
+func categorizeIP(ip string) string {
+	if isPrivateOrReservedIP(ip) {
+		// Check if it's a common gateway IP
+		if strings.HasSuffix(ip, ".1") || strings.HasSuffix(ip, ".254") {
+			return "router"
+		}
+		return "internal"
+	}
+	return "external"
+}
+
+// generateVisJSData creates vis.js compatible nodes and edges data from paths
+func generateVisJSData(pathStats *PathStats, filter *Filter) (string, string) {
+	pathStats.mu.Lock()
+	defer pathStats.mu.Unlock()
+
+	if len(pathStats.Paths) == 0 {
+		return "[]", "[]"
+	}
+
+	// Collect unique nodes
+	nodeMap := make(map[string]bool)
+	nodeAnomalies := make(map[string]bool)
+
+	// Sort paths by packet count
+	type pathEntry struct {
+		key  string
+		path *Path
+	}
+	var sortedPaths []pathEntry
+	for key, path := range pathStats.Paths {
+		sortedPaths = append(sortedPaths, pathEntry{key, path})
+		nodeMap[path.SrcIP] = true
+		nodeMap[path.DstIP] = true
+		if path.HasAnomaly {
+			nodeAnomalies[path.SrcIP] = true
+			nodeAnomalies[path.DstIP] = true
+		}
+	}
+
+	// Sort by packet count
+	for i := 0; i < len(sortedPaths); i++ {
+		for j := i + 1; j < len(sortedPaths); j++ {
+			if sortedPaths[j].path.PacketCount > sortedPaths[i].path.PacketCount {
+				sortedPaths[i], sortedPaths[j] = sortedPaths[j], sortedPaths[i]
+			}
+		}
+	}
+
+	// Limit to top 20 paths for interactive diagram
+	maxPaths := 20
+	if len(sortedPaths) > maxPaths {
+		sortedPaths = sortedPaths[:maxPaths]
+	}
+
+	// Generate nodes JSON
+	nodesJSON := "[\n"
+	first := true
+	for ip := range nodeMap {
+		if !first {
+			nodesJSON += ",\n"
+		}
+		first = false
+
+		category := categorizeIP(ip)
+		label := ip
+		group := category
+
+		// Customize label based on category
+		if category == "router" {
+			label = fmt.Sprintf("Gateway\\n%s", ip)
+		} else if category == "internal" {
+			label = fmt.Sprintf("Internal\\n%s", ip)
+		} else {
+			label = fmt.Sprintf("External\\n%s", ip)
+		}
+
+		color := ""
+		if nodeAnomalies[ip] {
+			color = `"color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}},`
+		}
+
+		nodesJSON += fmt.Sprintf(`        {"id": "%s", "label": "%s", "group": "%s", %s "title": "IP: %s"}`,
+			ip, label, group, color, ip)
+	}
+	nodesJSON += "\n    ]"
+
+	// Generate edges JSON
+	edgesJSON := "[\n"
+	first = true
+	for _, entry := range sortedPaths {
+		path := entry.path
+		if !first {
+			edgesJSON += ",\n"
+		}
+		first = false
+
+		// Build protocol/port label
+		protocols := []string{}
+		for proto := range path.Protocols {
+			protocols = append(protocols, proto)
+		}
+		protocolStr := strings.Join(protocols, "/")
+
+		// Get primary port
+		var primaryPort uint16
+		for port := range path.Ports {
+			primaryPort = port
+			break
+		}
+
+		// Format bytes
+		var sizeStr string
+		if path.ByteCount > 1024*1024 {
+			sizeStr = fmt.Sprintf("%.1fMB", float64(path.ByteCount)/(1024*1024))
+		} else if path.ByteCount > 1024 {
+			sizeStr = fmt.Sprintf("%.1fKB", float64(path.ByteCount)/1024)
+		} else {
+			sizeStr = fmt.Sprintf("%dB", path.ByteCount)
+		}
+
+		label := fmt.Sprintf("%s:%d\\n%s", protocolStr, primaryPort, sizeStr)
+		title := fmt.Sprintf("%s:%d - %d packets, %s transferred", protocolStr, primaryPort, path.PacketCount, sizeStr)
+
+		edgeColor := ""
+		dashes := "false"
+		if path.HasAnomaly {
+			edgeColor = `"color": {"color": "#ff0000", "highlight": "#cc0000"},`
+			dashes = "true"
+			title += " - ISSUES DETECTED"
+		}
+
+		edgesJSON += fmt.Sprintf(`        {"from": "%s", "to": "%s", "label": "%s", "title": "%s", %s "dashes": %s, "arrows": "to"}`,
+			path.SrcIP, path.DstIP, label, title, edgeColor, dashes)
+	}
+	edgesJSON += "\n    ]"
+
+	return nodesJSON, edgesJSON
 }
 
 // === Main ===
@@ -1698,6 +1839,9 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
 	// Generate Mermaid diagram
 	mermaidDiagram := generateMermaidDiagram(pathStats, filter)
 
+	// Generate vis.js data
+	visNodesJSON, visEdgesJSON := generateVisJSData(pathStats, filter)
+
 	// Write HTML
 	html := `<!DOCTYPE html>
 <html lang="en">
@@ -1706,9 +1850,19 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SD-WAN Network Triage Report</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script>
         mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
     </script>
+    <style>
+        #interactive-diagram {
+            height: 600px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            margin: 20px 0;
+        }
+    </style>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
@@ -1798,6 +1952,145 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
                 experiencing network problems. Check the physical connections, network equipment, and routing between these points.
             </p>
         </div>
+`
+	}
+
+	// Interactive vis.js diagram
+	if visNodesJSON != "[]" && visEdgesJSON != "[]" {
+		html += `        <div class="section">
+            <h2>🌐 Interactive Network Diagram</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>Interactive Features:</strong> This diagram allows you to explore the network topology interactively. 
+                <strong>Drag nodes</strong> to rearrange the layout, <strong>zoom</strong> with your mouse wheel, and <strong>hover</strong> 
+                over nodes and connections to see detailed information. 
+                <span style="color: #dc3545; font-weight: bold;">Red nodes and dashed lines</span> indicate devices and connections 
+                experiencing issues (retransmissions, packet loss, or high latency).
+            </p>
+            <div id="interactive-diagram"></div>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>Legend:</strong><br>
+                • <strong style="color: #4CAF50;">Green nodes</strong>: Internal network devices<br>
+                • <strong style="color: #2196F3;">Blue nodes</strong>: Potential gateways/routers<br>
+                • <strong style="color: #FF9800;">Orange nodes</strong>: External servers<br>
+                • <strong style="color: #dc3545;">Red nodes/dashed lines</strong>: Devices with detected issues<br>
+                • <strong>Arrow labels</strong>: Protocol, port, and data volume
+            </p>
+        </div>
+
+        <script type="text/javascript">
+            // Network data
+            var nodes = new vis.DataSet(` + visNodesJSON + `);
+            var edges = new vis.DataSet(` + visEdgesJSON + `);
+
+            // Create network
+            var container = document.getElementById('interactive-diagram');
+            var data = {
+                nodes: nodes,
+                edges: edges
+            };
+            var options = {
+                nodes: {
+                    shape: 'box',
+                    size: 25,
+                    font: {
+                        size: 14,
+                        face: 'Arial',
+                        color: '#333'
+                    },
+                    borderWidth: 2,
+                    shadow: true
+                },
+                edges: {
+                    width: 2,
+                    color: {
+                        color: '#848484',
+                        highlight: '#2B7CE9',
+                        hover: '#2B7CE9'
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.5
+                        }
+                    },
+                    font: {
+                        size: 11,
+                        align: 'middle'
+                    },
+                    smooth: {
+                        type: 'continuous'
+                    },
+                    shadow: true
+                },
+                groups: {
+                    internal: {
+                        color: {
+                            background: '#C8E6C9',
+                            border: '#4CAF50',
+                            highlight: {
+                                background: '#A5D6A7',
+                                border: '#388E3C'
+                            }
+                        }
+                    },
+                    router: {
+                        color: {
+                            background: '#BBDEFB',
+                            border: '#2196F3',
+                            highlight: {
+                                background: '#90CAF9',
+                                border: '#1976D2'
+                            }
+                        },
+                        shape: 'diamond',
+                        size: 30
+                    },
+                    external: {
+                        color: {
+                            background: '#FFE0B2',
+                            border: '#FF9800',
+                            highlight: {
+                                background: '#FFCC80',
+                                border: '#F57C00'
+                            }
+                        }
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -8000,
+                        centralGravity: 0.3,
+                        springLength: 200,
+                        springConstant: 0.04,
+                        damping: 0.09,
+                        avoidOverlap: 0.1
+                    },
+                    stabilization: {
+                        iterations: 200
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 100,
+                    zoomView: true,
+                    dragView: true
+                }
+            };
+            var network = new vis.Network(container, data, options);
+
+            // Stabilization progress
+            network.on("stabilizationProgress", function(params) {
+                var maxWidth = 496;
+                var minWidth = 20;
+                var widthFactor = params.iterations/params.total;
+                var width = Math.max(minWidth, maxWidth * widthFactor);
+            });
+
+            network.once("stabilizationIterationsDone", function() {
+                network.setOptions({ physics: false });
+            });
+        </script>
 `
 	}
 
