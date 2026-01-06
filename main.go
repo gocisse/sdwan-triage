@@ -1207,6 +1207,11 @@ OPTIONS:
     -csv <filename>           Export results to a CSV file (default: output.csv)
     -html <filename>          Export results to an HTML report file (default: output.html)
 
+  Network Path Discovery:
+    -trace-path               Perform traceroute to discovered destinations (requires network access)
+                              Discovers actual network paths and visualizes intermediate hops
+                              Limited to top 5 destinations prioritized by anomalies
+
   Help:
     -h, --help                Show this help message
 
@@ -1235,17 +1240,31 @@ EXAMPLES:
     # Export to JSON for programmatic processing
     ./sdwan-triage -json TestFile.pcap > results.json
 
+    # Discover network paths with traceroute (requires network access)
+    ./sdwan-triage -html report.html -trace-path TestFile.pcap
+
+    # Combine traceroute with filters
+    ./sdwan-triage -html https-paths.html -service https -trace-path TestFile.pcap
+
 DESCRIPTION:
     This tool performs comprehensive network analysis on PCAP capture files to identify:
     - Security threats (DNS poisoning, ARP spoofing, suspicious ports)
     - Performance issues (TCP retransmissions, high latency, failed connections)
     - Traffic patterns (bandwidth hogs, application breakdown, device fingerprinting)
+    - Network paths (traceroute to destinations showing intermediate hops)
 
     The analysis includes detailed explanations and actionable recommendations for
     network engineers and IT administrators.
 
+    Interactive HTML reports include:
+    - Static Mermaid.js flowchart diagrams for quick overview
+    - Interactive vis.js network diagrams with drag, zoom, and hover features
+    - Traceroute path visualization with intermediate hop discovery (optional)
+    - Color-coded nodes: green (internal), blue (routers), orange (external), purple (hops)
+    - Plain-language explanations suitable for non-technical stakeholders
+
 VERSION:
-    SD-WAN Triage v2.0.0
+    SD-WAN Triage v2.3.0
 
 `)
 	}
