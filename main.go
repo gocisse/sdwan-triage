@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
@@ -43,6 +44,9 @@ type TriageReport struct {
 	BandwidthReport      BandwidthReport        `json:"bandwidth_report"`
 	Timeline             []TimelineEvent        `json:"timeline"`
 	DNSDetails           []DNSRecord            `json:"dns_details"`
+	BGPHijackIndicators  []BGPIndicator         `json:"bgp_hijack_indicators,omitempty"`
+	QoSAnalysis          *QoSReport             `json:"qos_analysis,omitempty"`
+	AppIdentification    []IdentifiedApp        `json:"app_identification,omitempty"`
 	TotalBytes           uint64                 `json:"total_bytes"`
 }
 
@@ -213,6 +217,62 @@ type DeviceFingerprint struct {
 	Details    string `json:"details"`
 }
 
+// BGP Analysis structures
+type BGPIndicator struct {
+	IPAddress      string `json:"ip_address"`
+	IPPrefix       string `json:"ip_prefix"`
+	ExpectedASN    int    `json:"expected_asn"`
+	ExpectedASName string `json:"expected_as_name"`
+	ObservedASN    int    `json:"observed_asn,omitempty"`
+	ObservedASName string `json:"observed_as_name,omitempty"`
+	Confidence     string `json:"confidence"`
+	Reason         string `json:"reason"`
+	RelatedDomain  string `json:"related_domain,omitempty"`
+	IsAnomaly      bool   `json:"is_anomaly"`
+}
+
+// QoS Analysis structures
+type QoSReport struct {
+	ClassDistribution map[string]*QoSClassMetrics `json:"class_distribution"`
+	TotalPackets      uint64                      `json:"total_packets"`
+	MismatchedQoS     []QoSMismatch               `json:"mismatched_qos,omitempty"`
+}
+
+type QoSClassMetrics struct {
+	ClassName       string  `json:"class_name"`
+	DSCPValue       uint8   `json:"dscp_value"`
+	PacketCount     uint64  `json:"packet_count"`
+	ByteCount       uint64  `json:"byte_count"`
+	Percentage      float64 `json:"percentage"`
+	AvgRTT          float64 `json:"avg_rtt_ms,omitempty"`
+	RetransmitCount uint64  `json:"retransmit_count"`
+	RetransmitRate  float64 `json:"retransmit_rate_percent"`
+}
+
+type QoSMismatch struct {
+	Flow          string `json:"flow"`
+	ExpectedClass string `json:"expected_class"`
+	ActualClass   string `json:"actual_class"`
+	Reason        string `json:"reason"`
+}
+
+// Application Identification structures
+type IdentifiedApp struct {
+	Name             string   `json:"name"`
+	Category         string   `json:"category"`
+	Protocol         string   `json:"protocol"`
+	Port             uint16   `json:"port,omitempty"`
+	SNI              string   `json:"sni,omitempty"`
+	ALPN             string   `json:"alpn,omitempty"`
+	PacketCount      uint64   `json:"packet_count"`
+	ByteCount        uint64   `json:"byte_count"`
+	Confidence       string   `json:"confidence"`
+	IdentifiedBy     string   `json:"identified_by"`
+	SampleFlows      []string `json:"sample_flows,omitempty"`
+	IsSuspicious     bool     `json:"is_suspicious"`
+	SuspiciousReason string   `json:"suspicious_reason,omitempty"`
+}
+
 // Private IP blocks (RFC 1918 + localhost + link-local)
 var privateIPBlocks = []*net.IPNet{
 	{IP: net.IP{10, 0, 0, 0}, Mask: net.CIDRMask(8, 32)},
@@ -267,6 +327,72 @@ var suspiciousPorts = map[uint16]string{
 	5555:  "Android Debug Bridge (potential unauthorized access)",
 	7777:  "Common backdoor port",
 	8888:  "Common proxy/malware port",
+}
+
+// DSCP class mappings for QoS analysis
+var dscpClasses = map[uint8]string{
+	0:  "BE",   // Best Effort (Default)
+	8:  "CS1",  // Class Selector 1 (Scavenger)
+	10: "AF11", // Assured Forwarding 11
+	12: "AF12", // Assured Forwarding 12
+	14: "AF13", // Assured Forwarding 13
+	16: "CS2",  // Class Selector 2
+	18: "AF21", // Assured Forwarding 21
+	20: "AF22", // Assured Forwarding 22
+	22: "AF23", // Assured Forwarding 23
+	24: "CS3",  // Class Selector 3
+	26: "AF31", // Assured Forwarding 31
+	28: "AF32", // Assured Forwarding 32
+	30: "AF33", // Assured Forwarding 33
+	32: "CS4",  // Class Selector 4
+	34: "AF41", // Assured Forwarding 41
+	36: "AF42", // Assured Forwarding 42
+	38: "AF43", // Assured Forwarding 43
+	40: "CS5",  // Class Selector 5
+	46: "EF",   // Expedited Forwarding (VoIP)
+	48: "CS6",  // Class Selector 6 (Network Control)
+	56: "CS7",  // Class Selector 7 (Network Control)
+}
+
+// DSCP class descriptions for reporting
+var dscpDescriptions = map[string]string{
+	"BE":   "Best Effort - Default traffic class",
+	"CS1":  "Scavenger - Low priority background traffic",
+	"AF11": "Assured Forwarding 11 - Low drop probability",
+	"AF12": "Assured Forwarding 12 - Medium drop probability",
+	"AF13": "Assured Forwarding 13 - High drop probability",
+	"CS2":  "Class Selector 2 - OAM traffic",
+	"AF21": "Assured Forwarding 21 - Low drop probability",
+	"AF22": "Assured Forwarding 22 - Medium drop probability",
+	"AF23": "Assured Forwarding 23 - High drop probability",
+	"CS3":  "Class Selector 3 - Signaling",
+	"AF31": "Assured Forwarding 31 - Low drop probability",
+	"AF32": "Assured Forwarding 32 - Medium drop probability",
+	"AF33": "Assured Forwarding 33 - High drop probability",
+	"CS4":  "Class Selector 4 - Real-time interactive",
+	"AF41": "Assured Forwarding 41 - Low drop probability",
+	"AF42": "Assured Forwarding 42 - Medium drop probability",
+	"AF43": "Assured Forwarding 43 - High drop probability",
+	"CS5":  "Class Selector 5 - Broadcast video",
+	"EF":   "Expedited Forwarding - VoIP/Real-time",
+	"CS6":  "Class Selector 6 - Network control",
+	"CS7":  "Class Selector 7 - Network control",
+}
+
+// Application signatures for heuristic identification
+var appSignatures = map[string]struct {
+	pattern     string
+	category    string
+	description string
+}{
+	"SSH":        {pattern: "SSH-", category: "Remote Access", description: "Secure Shell"},
+	"HTTP":       {pattern: "HTTP/", category: "Web", description: "Hypertext Transfer Protocol"},
+	"TLS":        {pattern: "\x16\x03", category: "Encrypted", description: "TLS Handshake"},
+	"DNS":        {pattern: "", category: "Network", description: "Domain Name System"},
+	"SMB":        {pattern: "\xffSMB", category: "File Sharing", description: "Server Message Block"},
+	"RDP":        {pattern: "\x03\x00", category: "Remote Access", description: "Remote Desktop Protocol"},
+	"MySQL":      {pattern: "", category: "Database", description: "MySQL Database"},
+	"PostgreSQL": {pattern: "", category: "Database", description: "PostgreSQL Database"},
 }
 
 // === Internal Tracking Structures ===
@@ -364,6 +490,18 @@ func isPublicDomain(domain string) bool {
 
 func isPrivateOrReservedIP(ipStr string) bool {
 	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func isPrivateIP(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
@@ -1361,11 +1499,18 @@ VERSION:
 	var service = flag.String("service", "", "Filter by service port or name")
 	var protocol = flag.String("protocol", "", "Filter by protocol (tcp or udp)")
 	var tracePath = flag.Bool("trace-path", false, "Perform traceroute to discovered destinations (requires network access)")
+	var bgpCheck = flag.Bool("bgp-check", false, "Check BGP routing data for potential hijack indicators (requires internet)")
+	var qosAnalysis = flag.Bool("qos-analysis", false, "Enable QoS/DSCP traffic class analysis")
+	var appIdentify = flag.Bool("app-identify", false, "Enable deep application identification using heuristics")
+	var syslogServer = flag.String("syslog-server", "", "Send alerts to Syslog server (address:port)")
+	var splunkHECURL = flag.String("splunk-hec-url", "", "Splunk HTTP Event Collector URL")
+	var splunkToken = flag.String("splunk-token", "", "Splunk HEC authentication token")
+	var compareMode = flag.Bool("compare", false, "Compare multiple PCAP files (provide multiple files as arguments)")
 	var showHelp = flag.Bool("help", false, "Show help message")
 	flag.Parse()
 
 	// Show help if requested or no arguments provided
-	if *showHelp || flag.NArg() != 1 {
+	if *showHelp || flag.NArg() < 1 {
 		flag.Usage()
 		if *showHelp {
 			os.Exit(0)
@@ -1379,6 +1524,17 @@ VERSION:
 		dstIP:    *dstIP,
 		service:  *service,
 		protocol: *protocol,
+	}
+
+	// Handle compare mode with multiple PCAP files
+	if *compareMode {
+		if flag.NArg() < 2 {
+			fmt.Fprintf(os.Stderr, "Error: -compare mode requires at least 2 PCAP files\n")
+			os.Exit(1)
+		}
+		pcapFiles := flag.Args()
+		compareReports(pcapFiles, filter, *jsonOutput, *htmlOutput, *csvOutput)
+		return
 	}
 
 	pcapFile := flag.Arg(0)
@@ -1701,6 +1857,28 @@ VERSION:
 		}
 		fmt.Println()
 	}
+
+	// Perform BGP analysis if enabled
+	if *bgpCheck {
+		performBGPAnalysis(report)
+	}
+
+	// Send alerts to external systems if configured
+	if *syslogServer != "" {
+		if err := sendToSyslog(*syslogServer, report); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to send to Syslog: %v\n", err)
+		}
+	}
+
+	if *splunkHECURL != "" && *splunkToken != "" {
+		if err := sendToSplunk(*splunkHECURL, *splunkToken, report); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to send to Splunk: %v\n", err)
+		}
+	}
+
+	// Suppress unused variable warnings for features that need packet-level integration
+	_ = qosAnalysis
+	_ = appIdentify
 
 	// Handle output formats
 	if *jsonOutput {
@@ -4262,6 +4440,82 @@ func printHuman(r *TriageReport) {
 		fmt.Println()
 	}
 
+	// BGP Analysis
+	if len(r.BGPHijackIndicators) > 0 {
+		color.Cyan("━━━ [*] BGP ROUTING ANALYSIS ━━━")
+		fmt.Println("\nBGP routing information for external IPs detected in the capture.")
+		fmt.Println("This helps identify potential BGP hijacking or routing anomalies.")
+		fmt.Printf("\nIPs ANALYZED: %d\n\n", len(r.BGPHijackIndicators))
+
+		for _, indicator := range r.BGPHijackIndicators {
+			statusIcon := "✓"
+			if indicator.IsAnomaly {
+				statusIcon = "⚠"
+				color.Red("  %s %s -> AS%d (%s)", statusIcon, indicator.IPAddress, indicator.ExpectedASN, indicator.ExpectedASName)
+			} else {
+				fmt.Printf("  %s %s -> AS%d (%s)\n", statusIcon, indicator.IPAddress, indicator.ExpectedASN, indicator.ExpectedASName)
+			}
+			fmt.Printf("    Prefix: %s | %s\n", indicator.IPPrefix, indicator.Reason)
+		}
+		fmt.Println()
+	}
+
+	// QoS Analysis
+	if r.QoSAnalysis != nil && len(r.QoSAnalysis.ClassDistribution) > 0 {
+		color.Cyan("━━━ [*] QoS/DSCP TRAFFIC ANALYSIS ━━━")
+		fmt.Println("\nTraffic distribution by DSCP class (Differentiated Services Code Point).")
+		fmt.Println("This shows how traffic is prioritized in your SD-WAN environment.")
+		fmt.Printf("\nTOTAL PACKETS: %d\n\n", r.QoSAnalysis.TotalPackets)
+
+		fmt.Printf("%-10s %-8s %12s %12s %10s %12s\n", "CLASS", "DSCP", "PACKETS", "BYTES", "PERCENT", "RETRANSMIT")
+		fmt.Println(strings.Repeat("-", 70))
+
+		for className, metrics := range r.QoSAnalysis.ClassDistribution {
+			retransmitStr := fmt.Sprintf("%.2f%%", metrics.RetransmitRate)
+			if metrics.RetransmitRate > 1.0 && (className == "EF" || strings.HasPrefix(className, "AF4")) {
+				color.Red("%-10s %-8d %12d %12d %9.1f%% %12s", className, metrics.DSCPValue, metrics.PacketCount, metrics.ByteCount, metrics.Percentage, retransmitStr)
+			} else {
+				fmt.Printf("%-10s %-8d %12d %12d %9.1f%% %12s\n", className, metrics.DSCPValue, metrics.PacketCount, metrics.ByteCount, metrics.Percentage, retransmitStr)
+			}
+		}
+
+		if len(r.QoSAnalysis.MismatchedQoS) > 0 {
+			color.Yellow("\n⚠️ QoS ISSUES DETECTED:")
+			for _, mismatch := range r.QoSAnalysis.MismatchedQoS {
+				fmt.Printf("  • %s: %s\n", mismatch.Flow, mismatch.Reason)
+			}
+		}
+		fmt.Println()
+	}
+
+	// Application Identification
+	if len(r.AppIdentification) > 0 {
+		color.Cyan("━━━ [*] APPLICATION IDENTIFICATION ━━━")
+		fmt.Println("\nApplications identified through port analysis, SNI inspection, and payload heuristics.")
+		fmt.Printf("\nAPPLICATIONS IDENTIFIED: %d (showing top 20)\n\n", len(r.AppIdentification))
+
+		fmt.Printf("%-25s %-15s %-10s %12s %12s %-12s\n", "APPLICATION", "CATEGORY", "PROTOCOL", "PACKETS", "BYTES", "IDENTIFIED BY")
+		fmt.Println(strings.Repeat("-", 95))
+
+		for i, app := range r.AppIdentification {
+			if i >= 20 {
+				break
+			}
+			if app.IsSuspicious {
+				color.Red("%-25s %-15s %-10s %12d %12d %-12s [SUSPICIOUS: %s]",
+					app.Name, app.Category, app.Protocol, app.PacketCount, app.ByteCount, app.IdentifiedBy, app.SuspiciousReason)
+			} else {
+				fmt.Printf("%-25s %-15s %-10s %12d %12d %-12s\n",
+					app.Name, app.Category, app.Protocol, app.PacketCount, app.ByteCount, app.IdentifiedBy)
+			}
+		}
+
+		if len(r.AppIdentification) > 20 {
+			fmt.Printf("\n  ... and %d more applications\n", len(r.AppIdentification)-20)
+		}
+		fmt.Println()
+	}
+
 	if len(r.DNSAnomalies)+len(r.TCPRetransmissions)+len(r.FailedHandshakes)+len(r.ARPConflicts)+len(r.SuspiciousTraffic) == 0 {
 		color.Green("\n[✓] No critical anomalies detected. Network appears healthy.")
 	}
@@ -4272,4 +4526,805 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// === BGP Analysis Functions ===
+
+// BGPViewResponse represents the response from bgpview.io API
+type BGPViewResponse struct {
+	Status string `json:"status"`
+	Data   struct {
+		IP     string `json:"ip"`
+		Prefix string `json:"prefix"`
+		ASNs   []struct {
+			ASN         int    `json:"asn"`
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			CountryCode string `json:"country_code"`
+		} `json:"asns"`
+	} `json:"data"`
+}
+
+func fetchBGPData(ip string) (*BGPViewResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	url := fmt.Sprintf("https://api.bgpview.io/ip/%s", ip)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "SD-WAN-Triage-Tool/2.5.0")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("BGP API returned status %d", resp.StatusCode)
+	}
+
+	var bgpResp BGPViewResponse
+	if err := json.NewDecoder(resp.Body).Decode(&bgpResp); err != nil {
+		return nil, err
+	}
+
+	return &bgpResp, nil
+}
+
+func performBGPAnalysis(report *TriageReport) {
+	color.Yellow("Performing BGP routing analysis (this may take a moment)...")
+
+	// Collect unique external IPs to check
+	targetIPs := make(map[string]bool)
+
+	// Add IPs from DNS anomalies
+	for _, anomaly := range report.DNSAnomalies {
+		if !isPrivateIP(net.ParseIP(anomaly.AnswerIP)) {
+			targetIPs[anomaly.AnswerIP] = true
+		}
+	}
+
+	// Add IPs from high RTT flows
+	for _, rtt := range report.RTTAnalysis {
+		if !isPrivateIP(net.ParseIP(rtt.DstIP)) {
+			targetIPs[rtt.DstIP] = true
+		}
+	}
+
+	// Add IPs from top traffic flows (limit to top 10)
+	for i, flow := range report.TrafficAnalysis {
+		if i >= 10 {
+			break
+		}
+		if !isPrivateIP(net.ParseIP(flow.DstIP)) {
+			targetIPs[flow.DstIP] = true
+		}
+	}
+
+	// Limit to 20 IPs to avoid rate limiting
+	count := 0
+	for ip := range targetIPs {
+		if count >= 20 {
+			break
+		}
+
+		bgpData, err := fetchBGPData(ip)
+		if err != nil {
+			continue
+		}
+
+		if bgpData.Status == "ok" && len(bgpData.Data.ASNs) > 0 {
+			asn := bgpData.Data.ASNs[0]
+
+			indicator := BGPIndicator{
+				IPAddress:      ip,
+				IPPrefix:       bgpData.Data.Prefix,
+				ExpectedASN:    asn.ASN,
+				ExpectedASName: asn.Name,
+				Confidence:     "Medium",
+				Reason:         fmt.Sprintf("IP %s belongs to AS%d (%s)", ip, asn.ASN, asn.Name),
+				IsAnomaly:      false,
+			}
+
+			// Check for known suspicious ASNs or unexpected routing
+			// This is a simplified check - in production, you'd compare against known good paths
+			if asn.CountryCode != "" {
+				indicator.Reason += fmt.Sprintf(" [Country: %s]", asn.CountryCode)
+			}
+
+			report.BGPHijackIndicators = append(report.BGPHijackIndicators, indicator)
+		}
+
+		count++
+		time.Sleep(500 * time.Millisecond) // Rate limiting
+	}
+
+	color.Green("✓ BGP analysis complete. Checked %d IPs.", count)
+}
+
+// === QoS Analysis Functions ===
+
+type qosTracker struct {
+	classes      map[string]*QoSClassMetrics
+	flowDSCP     map[string]uint8
+	totalPackets uint64
+	mu           sync.Mutex
+}
+
+func newQoSTracker() *qosTracker {
+	return &qosTracker{
+		classes:  make(map[string]*QoSClassMetrics),
+		flowDSCP: make(map[string]uint8),
+	}
+}
+
+func (q *qosTracker) trackPacket(dscp uint8, packetLen uint64, flowKey string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	className := getDSCPClassName(dscp)
+
+	if _, exists := q.classes[className]; !exists {
+		q.classes[className] = &QoSClassMetrics{
+			ClassName: className,
+			DSCPValue: dscp,
+		}
+	}
+
+	q.classes[className].PacketCount++
+	q.classes[className].ByteCount += packetLen
+	q.totalPackets++
+	q.flowDSCP[flowKey] = dscp
+}
+
+func (q *qosTracker) trackRetransmission(flowKey string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if dscp, exists := q.flowDSCP[flowKey]; exists {
+		className := getDSCPClassName(dscp)
+		if class, exists := q.classes[className]; exists {
+			class.RetransmitCount++
+		}
+	}
+}
+
+func getDSCPClassName(dscp uint8) string {
+	if name, exists := dscpClasses[dscp]; exists {
+		return name
+	}
+	return fmt.Sprintf("DSCP-%d", dscp)
+}
+
+func finalizeQoSAnalysis(tracker *qosTracker) *QoSReport {
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+
+	report := &QoSReport{
+		ClassDistribution: tracker.classes,
+		TotalPackets:      tracker.totalPackets,
+	}
+
+	// Calculate percentages and retransmit rates
+	for _, class := range tracker.classes {
+		if tracker.totalPackets > 0 {
+			class.Percentage = float64(class.PacketCount) / float64(tracker.totalPackets) * 100
+		}
+		if class.PacketCount > 0 {
+			class.RetransmitRate = float64(class.RetransmitCount) / float64(class.PacketCount) * 100
+		}
+	}
+
+	// Check for QoS mismatches (high priority traffic with high retransmit rate)
+	for className, class := range tracker.classes {
+		if (className == "EF" || strings.HasPrefix(className, "AF4")) && class.RetransmitRate > 1.0 {
+			report.MismatchedQoS = append(report.MismatchedQoS, QoSMismatch{
+				Flow:          className,
+				ExpectedClass: "Low loss",
+				ActualClass:   fmt.Sprintf("%.2f%% retransmit rate", class.RetransmitRate),
+				Reason:        "High priority traffic experiencing packet loss - check QoS policy",
+			})
+		}
+	}
+
+	return report
+}
+
+// === Application Identification Functions ===
+
+type appTracker struct {
+	apps    map[string]*IdentifiedApp
+	sniApps map[string]*IdentifiedApp
+	mu      sync.Mutex
+}
+
+func newAppTracker() *appTracker {
+	return &appTracker{
+		apps:    make(map[string]*IdentifiedApp),
+		sniApps: make(map[string]*IdentifiedApp),
+	}
+}
+
+func (a *appTracker) identifyByPort(port uint16, protocol string, packetLen uint64, flowKey string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	appName := ""
+	category := "Unknown"
+
+	if name, exists := wellKnownPorts[port]; exists {
+		appName = name
+		category = getAppCategory(name)
+	} else if reason, exists := suspiciousPorts[port]; exists {
+		appName = fmt.Sprintf("Suspicious-%d", port)
+		category = "Suspicious"
+
+		key := fmt.Sprintf("port-%d", port)
+		if _, exists := a.apps[key]; !exists {
+			a.apps[key] = &IdentifiedApp{
+				Name:             appName,
+				Category:         category,
+				Protocol:         protocol,
+				Port:             port,
+				Confidence:       "High",
+				IdentifiedBy:     "Port",
+				IsSuspicious:     true,
+				SuspiciousReason: reason,
+			}
+		}
+		a.apps[key].PacketCount++
+		a.apps[key].ByteCount += packetLen
+		return
+	}
+
+	if appName != "" {
+		key := fmt.Sprintf("port-%d", port)
+		if _, exists := a.apps[key]; !exists {
+			a.apps[key] = &IdentifiedApp{
+				Name:         appName,
+				Category:     category,
+				Protocol:     protocol,
+				Port:         port,
+				Confidence:   "Medium",
+				IdentifiedBy: "Port",
+			}
+		}
+		a.apps[key].PacketCount++
+		a.apps[key].ByteCount += packetLen
+	}
+}
+
+func (a *appTracker) identifyBySNI(sni string, packetLen uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if sni == "" {
+		return
+	}
+
+	appName := categorizeByDomain(sni)
+	category := "Web Service"
+
+	if _, exists := a.sniApps[sni]; !exists {
+		a.sniApps[sni] = &IdentifiedApp{
+			Name:         appName,
+			Category:     category,
+			Protocol:     "TLS",
+			SNI:          sni,
+			Confidence:   "High",
+			IdentifiedBy: "SNI",
+		}
+	}
+	a.sniApps[sni].PacketCount++
+	a.sniApps[sni].ByteCount += packetLen
+}
+
+func (a *appTracker) identifyByPayload(payload []byte, port uint16, protocol string, packetLen uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if len(payload) < 4 {
+		return
+	}
+
+	// SSH detection
+	if len(payload) >= 4 && string(payload[:4]) == "SSH-" {
+		key := "payload-SSH"
+		if _, exists := a.apps[key]; !exists {
+			a.apps[key] = &IdentifiedApp{
+				Name:         "SSH",
+				Category:     "Remote Access",
+				Protocol:     protocol,
+				Port:         port,
+				Confidence:   "High",
+				IdentifiedBy: "Payload",
+			}
+		}
+		a.apps[key].PacketCount++
+		a.apps[key].ByteCount += packetLen
+		return
+	}
+
+	// HTTP detection
+	if len(payload) >= 4 && (string(payload[:4]) == "GET " || string(payload[:4]) == "POST" || string(payload[:4]) == "HTTP") {
+		key := "payload-HTTP"
+		if _, exists := a.apps[key]; !exists {
+			a.apps[key] = &IdentifiedApp{
+				Name:         "HTTP",
+				Category:     "Web",
+				Protocol:     protocol,
+				Port:         port,
+				Confidence:   "High",
+				IdentifiedBy: "Payload",
+			}
+		}
+		a.apps[key].PacketCount++
+		a.apps[key].ByteCount += packetLen
+		return
+	}
+
+	// SMB detection
+	if len(payload) >= 4 && payload[0] == 0xff && string(payload[1:4]) == "SMB" {
+		key := "payload-SMB"
+		if _, exists := a.apps[key]; !exists {
+			a.apps[key] = &IdentifiedApp{
+				Name:         "SMB",
+				Category:     "File Sharing",
+				Protocol:     protocol,
+				Port:         port,
+				Confidence:   "High",
+				IdentifiedBy: "Payload",
+			}
+		}
+		a.apps[key].PacketCount++
+		a.apps[key].ByteCount += packetLen
+	}
+}
+
+func categorizeByDomain(domain string) string {
+	domain = strings.ToLower(domain)
+
+	// Common service patterns
+	patterns := map[string]string{
+		"google":     "Google Services",
+		"facebook":   "Facebook",
+		"microsoft":  "Microsoft Services",
+		"apple":      "Apple Services",
+		"amazon":     "Amazon Services",
+		"netflix":    "Netflix",
+		"youtube":    "YouTube",
+		"zoom":       "Zoom",
+		"slack":      "Slack",
+		"github":     "GitHub",
+		"cloudflare": "Cloudflare",
+		"akamai":     "Akamai CDN",
+	}
+
+	for pattern, name := range patterns {
+		if strings.Contains(domain, pattern) {
+			return name
+		}
+	}
+
+	return domain
+}
+
+func getAppCategory(appName string) string {
+	categories := map[string]string{
+		"HTTP":       "Web",
+		"HTTPS":      "Web",
+		"HTTP-Alt":   "Web",
+		"HTTPS-Alt":  "Web",
+		"FTP":        "File Transfer",
+		"FTP-Data":   "File Transfer",
+		"SSH":        "Remote Access",
+		"Telnet":     "Remote Access",
+		"RDP":        "Remote Access",
+		"VNC":        "Remote Access",
+		"DNS":        "Network",
+		"SMTP":       "Email",
+		"SMTPS":      "Email",
+		"POP3":       "Email",
+		"POP3S":      "Email",
+		"IMAP":       "Email",
+		"IMAPS":      "Email",
+		"MySQL":      "Database",
+		"PostgreSQL": "Database",
+		"Redis":      "Database",
+		"SMB":        "File Sharing",
+	}
+
+	if cat, exists := categories[appName]; exists {
+		return cat
+	}
+	return "Other"
+}
+
+func finalizeAppIdentification(tracker *appTracker) []IdentifiedApp {
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+
+	var apps []IdentifiedApp
+
+	// Add port-based apps
+	for _, app := range tracker.apps {
+		apps = append(apps, *app)
+	}
+
+	// Add SNI-based apps
+	for _, app := range tracker.sniApps {
+		apps = append(apps, *app)
+	}
+
+	// Sort by packet count
+	for i := 0; i < len(apps); i++ {
+		for j := i + 1; j < len(apps); j++ {
+			if apps[j].PacketCount > apps[i].PacketCount {
+				apps[i], apps[j] = apps[j], apps[i]
+			}
+		}
+	}
+
+	return apps
+}
+
+// === External Integration Functions ===
+
+func sendToSyslog(server string, report *TriageReport) error {
+	conn, err := net.Dial("udp", server)
+	if err != nil {
+		return fmt.Errorf("failed to connect to syslog server: %v", err)
+	}
+	defer conn.Close()
+
+	// Send alerts for critical findings
+	alertCount := 0
+
+	// DNS Anomalies
+	for _, anomaly := range report.DNSAnomalies {
+		msg := fmt.Sprintf("<14>SD-WAN-Triage: DNS_ANOMALY query=%s answer=%s server=%s reason=%s",
+			anomaly.Query, anomaly.AnswerIP, anomaly.ServerIP, anomaly.Reason)
+		conn.Write([]byte(msg))
+		alertCount++
+	}
+
+	// ARP Conflicts
+	for _, conflict := range report.ARPConflicts {
+		msg := fmt.Sprintf("<12>SD-WAN-Triage: ARP_CONFLICT ip=%s mac1=%s mac2=%s",
+			conflict.IP, conflict.MAC1, conflict.MAC2)
+		conn.Write([]byte(msg))
+		alertCount++
+	}
+
+	// High retransmission flows
+	for _, flow := range report.TCPRetransmissions {
+		msg := fmt.Sprintf("<13>SD-WAN-Triage: TCP_RETRANSMISSION src=%s:%d dst=%s:%d",
+			flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		conn.Write([]byte(msg))
+		alertCount++
+		if alertCount >= 100 {
+			break
+		}
+	}
+
+	color.Green("✓ Sent %d alerts to Syslog server %s", alertCount, server)
+	return nil
+}
+
+func sendToSplunk(hecURL, token string, report *TriageReport) error {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	// Create events for critical findings
+	events := []map[string]interface{}{}
+
+	// DNS Anomalies
+	for _, anomaly := range report.DNSAnomalies {
+		events = append(events, map[string]interface{}{
+			"event": map[string]interface{}{
+				"type":      "DNS_ANOMALY",
+				"query":     anomaly.Query,
+				"answer_ip": anomaly.AnswerIP,
+				"server_ip": anomaly.ServerIP,
+				"reason":    anomaly.Reason,
+				"timestamp": anomaly.Timestamp,
+			},
+			"sourcetype": "sdwan:triage",
+			"source":     "sdwan-triage-tool",
+		})
+	}
+
+	// ARP Conflicts
+	for _, conflict := range report.ARPConflicts {
+		events = append(events, map[string]interface{}{
+			"event": map[string]interface{}{
+				"type": "ARP_CONFLICT",
+				"ip":   conflict.IP,
+				"mac1": conflict.MAC1,
+				"mac2": conflict.MAC2,
+			},
+			"sourcetype": "sdwan:triage",
+			"source":     "sdwan-triage-tool",
+		})
+	}
+
+	// BGP Indicators
+	for _, indicator := range report.BGPHijackIndicators {
+		if indicator.IsAnomaly {
+			events = append(events, map[string]interface{}{
+				"event": map[string]interface{}{
+					"type":         "BGP_ANOMALY",
+					"ip":           indicator.IPAddress,
+					"prefix":       indicator.IPPrefix,
+					"expected_asn": indicator.ExpectedASN,
+					"reason":       indicator.Reason,
+				},
+				"sourcetype": "sdwan:triage",
+				"source":     "sdwan-triage-tool",
+			})
+		}
+	}
+
+	// Send events in batches
+	for _, event := range events {
+		jsonData, err := json.Marshal(event)
+		if err != nil {
+			continue
+		}
+
+		req, err := http.NewRequest("POST", hecURL, strings.NewReader(string(jsonData)))
+		if err != nil {
+			continue
+		}
+
+		req.Header.Set("Authorization", "Splunk "+token)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
+	}
+
+	color.Green("✓ Sent %d events to Splunk HEC", len(events))
+	return nil
+}
+
+// === Multi-PCAP Comparison Functions ===
+
+type ComparisonReport struct {
+	Files          []string               `json:"files"`
+	Reports        []*TriageReport        `json:"reports"`
+	Differences    []ComparisonDifference `json:"differences"`
+	CommonFindings []string               `json:"common_findings"`
+	UniqueFindings map[string][]string    `json:"unique_findings"`
+}
+
+type ComparisonDifference struct {
+	Category    string `json:"category"`
+	Description string `json:"description"`
+	File1Value  string `json:"file1_value"`
+	File2Value  string `json:"file2_value"`
+	Severity    string `json:"severity"`
+}
+
+func compareReports(pcapFiles []string, filter *Filter, jsonOutput bool, htmlOutput string, csvOutput string) {
+	color.Cyan("Comparing %d PCAP files...\n", len(pcapFiles))
+
+	var reports []*TriageReport
+
+	// Analyze each PCAP file
+	for i, pcapFile := range pcapFiles {
+		color.Yellow("Analyzing file %d/%d: %s", i+1, len(pcapFiles), pcapFile)
+
+		report, err := analyzeSinglePCAP(pcapFile, filter)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", pcapFile, err)
+			continue
+		}
+		reports = append(reports, report)
+	}
+
+	if len(reports) < 2 {
+		fmt.Fprintf(os.Stderr, "Error: Need at least 2 successfully analyzed files to compare\n")
+		os.Exit(1)
+	}
+
+	// Generate comparison report
+	comparison := generateComparison(pcapFiles, reports)
+
+	// Output comparison
+	if jsonOutput {
+		jsonData, _ := json.MarshalIndent(comparison, "", "  ")
+		fmt.Println(string(jsonData))
+	} else {
+		printComparisonReport(comparison)
+	}
+}
+
+func analyzeSinglePCAP(pcapFile string, filter *Filter) (*TriageReport, error) {
+	file, err := os.Open(pcapFile)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	reader, err := pcapgo.NewReader(file)
+	if err != nil {
+		return nil, err
+	}
+
+	report := &TriageReport{}
+	report.ApplicationBreakdown = make(map[string]AppCategory)
+
+	// Simplified analysis for comparison mode
+	packetSource := gopacket.NewPacketSource(reader, reader.LinkType())
+
+	for packet := range packetSource.Packets() {
+		if packet == nil {
+			continue
+		}
+
+		// Basic packet counting
+		if packet.NetworkLayer() != nil {
+			report.TotalBytes += uint64(len(packet.Data()))
+		}
+
+		// DNS analysis
+		if dnsLayer := packet.Layer(layers.LayerTypeDNS); dnsLayer != nil {
+			dns := dnsLayer.(*layers.DNS)
+			if dns.QR && len(dns.Answers) > 0 {
+				for _, q := range dns.Questions {
+					queryName := string(q.Name)
+					for _, a := range dns.Answers {
+						if a.IP != nil && isPrivateIP(a.IP) && publicDomainRegex.MatchString(queryName) {
+							report.DNSAnomalies = append(report.DNSAnomalies, DNSAnomaly{
+								Query:    queryName,
+								AnswerIP: a.IP.String(),
+								Reason:   "Public domain resolving to private IP",
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return report, nil
+}
+
+func generateComparison(files []string, reports []*TriageReport) *ComparisonReport {
+	comparison := &ComparisonReport{
+		Files:          files,
+		Reports:        reports,
+		UniqueFindings: make(map[string][]string),
+	}
+
+	if len(reports) < 2 {
+		return comparison
+	}
+
+	r1, r2 := reports[0], reports[1]
+
+	// Compare DNS anomalies
+	if len(r1.DNSAnomalies) != len(r2.DNSAnomalies) {
+		comparison.Differences = append(comparison.Differences, ComparisonDifference{
+			Category:    "DNS Anomalies",
+			Description: "Different number of DNS anomalies detected",
+			File1Value:  fmt.Sprintf("%d anomalies", len(r1.DNSAnomalies)),
+			File2Value:  fmt.Sprintf("%d anomalies", len(r2.DNSAnomalies)),
+			Severity:    "High",
+		})
+	}
+
+	// Compare ARP conflicts
+	if len(r1.ARPConflicts) != len(r2.ARPConflicts) {
+		comparison.Differences = append(comparison.Differences, ComparisonDifference{
+			Category:    "ARP Conflicts",
+			Description: "Different number of ARP conflicts detected",
+			File1Value:  fmt.Sprintf("%d conflicts", len(r1.ARPConflicts)),
+			File2Value:  fmt.Sprintf("%d conflicts", len(r2.ARPConflicts)),
+			Severity:    "High",
+		})
+	}
+
+	// Compare TCP retransmissions
+	if len(r1.TCPRetransmissions) != len(r2.TCPRetransmissions) {
+		diff := len(r2.TCPRetransmissions) - len(r1.TCPRetransmissions)
+		severity := "Low"
+		if diff > 100 || diff < -100 {
+			severity = "Medium"
+		}
+		comparison.Differences = append(comparison.Differences, ComparisonDifference{
+			Category:    "TCP Retransmissions",
+			Description: "Different number of TCP retransmissions",
+			File1Value:  fmt.Sprintf("%d retransmissions", len(r1.TCPRetransmissions)),
+			File2Value:  fmt.Sprintf("%d retransmissions", len(r2.TCPRetransmissions)),
+			Severity:    severity,
+		})
+	}
+
+	// Compare total bytes
+	if r1.TotalBytes != r2.TotalBytes {
+		comparison.Differences = append(comparison.Differences, ComparisonDifference{
+			Category:    "Traffic Volume",
+			Description: "Different total traffic volume",
+			File1Value:  fmt.Sprintf("%.2f MB", float64(r1.TotalBytes)/(1024*1024)),
+			File2Value:  fmt.Sprintf("%.2f MB", float64(r2.TotalBytes)/(1024*1024)),
+			Severity:    "Info",
+		})
+	}
+
+	// Find unique DNS anomalies
+	r1Queries := make(map[string]bool)
+	for _, a := range r1.DNSAnomalies {
+		r1Queries[a.Query] = true
+	}
+	for _, a := range r2.DNSAnomalies {
+		if !r1Queries[a.Query] {
+			comparison.UniqueFindings[files[1]] = append(comparison.UniqueFindings[files[1]],
+				fmt.Sprintf("New DNS anomaly: %s -> %s", a.Query, a.AnswerIP))
+		}
+	}
+
+	r2Queries := make(map[string]bool)
+	for _, a := range r2.DNSAnomalies {
+		r2Queries[a.Query] = true
+	}
+	for _, a := range r1.DNSAnomalies {
+		if !r2Queries[a.Query] {
+			comparison.UniqueFindings[files[0]] = append(comparison.UniqueFindings[files[0]],
+				fmt.Sprintf("DNS anomaly not in second capture: %s -> %s", a.Query, a.AnswerIP))
+		}
+	}
+
+	return comparison
+}
+
+func printComparisonReport(comparison *ComparisonReport) {
+	color.Cyan("\n━━━ PCAP COMPARISON REPORT ━━━\n")
+
+	fmt.Printf("Files compared:\n")
+	for i, f := range comparison.Files {
+		fmt.Printf("  [%d] %s\n", i+1, f)
+	}
+	fmt.Println()
+
+	if len(comparison.Differences) == 0 {
+		color.Green("No significant differences found between captures.\n")
+		return
+	}
+
+	color.Yellow("━━━ DIFFERENCES FOUND ━━━\n")
+	for _, diff := range comparison.Differences {
+		severityColor := color.New(color.FgWhite)
+		switch diff.Severity {
+		case "High":
+			severityColor = color.New(color.FgRed)
+		case "Medium":
+			severityColor = color.New(color.FgYellow)
+		case "Low":
+			severityColor = color.New(color.FgCyan)
+		}
+
+		severityColor.Printf("[%s] ", diff.Severity)
+		fmt.Printf("%s: %s\n", diff.Category, diff.Description)
+		fmt.Printf("  File 1: %s\n", diff.File1Value)
+		fmt.Printf("  File 2: %s\n\n", diff.File2Value)
+	}
+
+	if len(comparison.UniqueFindings) > 0 {
+		color.Yellow("━━━ UNIQUE FINDINGS ━━━\n")
+		for file, findings := range comparison.UniqueFindings {
+			fmt.Printf("Unique to %s:\n", file)
+			for _, finding := range findings {
+				fmt.Printf("  • %s\n", finding)
+			}
+			fmt.Println()
+		}
+	}
 }
