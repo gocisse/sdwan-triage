@@ -41,7 +41,34 @@ type TriageReport struct {
 	RTTAnalysis          []RTTFlow              `json:"rtt_analysis"`
 	DeviceFingerprinting []DeviceFingerprint    `json:"device_fingerprinting"`
 	BandwidthReport      BandwidthReport        `json:"bandwidth_report"`
+	Timeline             []TimelineEvent        `json:"timeline"`
+	DNSDetails           []DNSRecord            `json:"dns_details"`
 	TotalBytes           uint64                 `json:"total_bytes"`
+}
+
+type TimelineEvent struct {
+	Timestamp       float64 `json:"timestamp"`
+	EventType       string  `json:"event_type"`
+	SourceIP        string  `json:"source_ip"`
+	DestinationIP   string  `json:"destination_ip"`
+	SourcePort      *uint16 `json:"source_port,omitempty"`
+	DestinationPort *uint16 `json:"destination_port,omitempty"`
+	Protocol        string  `json:"protocol"`
+	Detail          string  `json:"detail"`
+}
+
+type DNSRecord struct {
+	QueryTimestamp    float64  `json:"query_timestamp"`
+	QueryName         string   `json:"query_name"`
+	QueryType         string   `json:"query_type"`
+	SourceIP          string   `json:"source_ip"`
+	DestinationIP     string   `json:"destination_ip"`
+	ResponseTimestamp *float64 `json:"response_timestamp,omitempty"`
+	ResponseCode      *uint16  `json:"response_code,omitempty"`
+	AnswerIPs         []string `json:"answer_ips"`
+	AnswerNames       []string `json:"answer_names"`
+	IsAnomalous       bool     `json:"is_anomalous"`
+	Detail            string   `json:"detail"`
 }
 
 type DNSAnomaly struct {
@@ -265,6 +292,14 @@ type httpRequest struct {
 	host      string
 	path      string
 	timestamp time.Time
+}
+
+type dnsQueryInfo struct {
+	queryName     string
+	queryType     string
+	sourceIP      string
+	destinationIP string
+	timestamp     time.Time
 }
 
 type tcpFingerprint struct {
@@ -1320,6 +1355,7 @@ VERSION:
 	var jsonOutput = flag.Bool("json", false, "Output in JSON format")
 	var csvOutput = flag.String("csv", "", "Export findings to CSV file")
 	var htmlOutput = flag.String("html", "", "Export findings to HTML report")
+	var debugHTML = flag.Bool("debug-html", false, "Write raw HTML to debug_report.html for troubleshooting diagram issues")
 	var srcIP = flag.String("src-ip", "", "Filter by source IP address")
 	var dstIP = flag.String("dst-ip", "", "Filter by destination IP address")
 	var service = flag.String("service", "", "Filter by service port or name")
@@ -1375,6 +1411,11 @@ VERSION:
 	pathStats := &PathStats{Paths: make(map[string]*Path)}
 	conversations := make(map[string]*TrafficFlowSummary)
 	timeBuckets := make(map[int64]*TimeBucket)
+	var timelineEvents []TimelineEvent
+	dnsQueryTracker := make(map[uint16]*dnsQueryInfo)
+	var dnsRecords []DNSRecord
+	var captureStartTime time.Time
+	captureStartSet := false
 	var mu sync.Mutex
 
 	// Initialize ApplicationBreakdown map
@@ -1382,7 +1423,12 @@ VERSION:
 
 	packetSource := gopacket.NewPacketSource(reader, reader.LinkType())
 	for packet := range packetSource.Packets() {
-		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets)
+		// Set capture start time from first packet
+		if !captureStartSet {
+			captureStartTime = packet.Metadata().Timestamp
+			captureStartSet = true
+		}
+		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets, &timelineEvents, dnsQueryTracker, &dnsRecords, captureStartTime)
 	}
 
 	// Finalize failed handshakes
@@ -1486,6 +1532,26 @@ VERSION:
 		}
 	}
 	report.BandwidthReport.TimeSeriesData = timeSeriesData
+
+	// Finalize timeline events - sort by timestamp
+	for i := 0; i < len(timelineEvents); i++ {
+		for j := i + 1; j < len(timelineEvents); j++ {
+			if timelineEvents[j].Timestamp < timelineEvents[i].Timestamp {
+				timelineEvents[i], timelineEvents[j] = timelineEvents[j], timelineEvents[i]
+			}
+		}
+	}
+	report.Timeline = timelineEvents
+
+	// Finalize DNS records - sort by query timestamp
+	for i := 0; i < len(dnsRecords); i++ {
+		for j := i + 1; j < len(dnsRecords); j++ {
+			if dnsRecords[j].QueryTimestamp < dnsRecords[i].QueryTimestamp {
+				dnsRecords[i], dnsRecords[j] = dnsRecords[j], dnsRecords[i]
+			}
+		}
+	}
+	report.DNSDetails = dnsRecords
 
 	// Finalize traffic analysis - find top bandwidth consumers
 	type flowBytes struct {
@@ -1660,10 +1726,30 @@ VERSION:
 			os.Exit(1)
 		}
 		color.Green("✓ Report exported to %s", filename)
+
+		// Debug HTML - write raw HTML to separate file for troubleshooting
+		if *debugHTML {
+			debugFilename := "debug_report.html"
+			if err := exportToHTML(report, debugFilename, pathStats, filter, traceData); err != nil {
+				fmt.Fprintf(os.Stderr, "Error exporting debug HTML: %v\n", err)
+			} else {
+				color.Yellow("✓ Debug HTML written to %s (inspect browser console for JS errors)", debugFilename)
+			}
+		}
 	} else {
 		printExecutiveSummary(report)
 		fmt.Println()
 		printHuman(report)
+
+		// Debug HTML - write raw HTML even without -html flag for troubleshooting
+		if *debugHTML {
+			debugFilename := "debug_report.html"
+			if err := exportToHTML(report, debugFilename, pathStats, filter, traceData); err != nil {
+				fmt.Fprintf(os.Stderr, "Error exporting debug HTML: %v\n", err)
+			} else {
+				color.Yellow("✓ Debug HTML written to %s (inspect browser console for JS errors)", debugFilename)
+			}
+		}
 	}
 }
 
@@ -1685,6 +1771,10 @@ func analyzePacket(
 	pathStats *PathStats,
 	conversations map[string]*TrafficFlowSummary,
 	timeBuckets map[int64]*TimeBucket,
+	timelineEvents *[]TimelineEvent,
+	dnsQueryTracker map[uint16]*dnsQueryInfo,
+	dnsRecords *[]DNSRecord,
+	captureStartTime time.Time,
 ) {
 	// Apply filters if specified
 	if !filter.isEmpty() {
@@ -1861,36 +1951,142 @@ func analyzePacket(
 		if netLayer == nil || linkLayer == nil {
 			return
 		}
-		ip := netLayer.NetworkFlow().Dst().String()
+
+		var srcIP, dstIP string
+		if ip4, ok := netLayer.(*layers.IPv4); ok {
+			srcIP = ip4.SrcIP.String()
+			dstIP = ip4.DstIP.String()
+		} else {
+			srcIP = netLayer.NetworkFlow().Src().String()
+			dstIP = netLayer.NetworkFlow().Dst().String()
+		}
+
 		eth, _ := linkLayer.(*layers.Ethernet)
-		mac := eth.SrcMAC.String()
+		mac := ""
+		if eth != nil {
+			mac = eth.SrcMAC.String()
+		}
+
+		relativeTime := packet.Metadata().Timestamp.Sub(captureStartTime).Seconds()
+		dnsPort := uint16(53)
 
 		if !dns.QR { // Query
 			if len(dns.Questions) > 0 {
+				queryName := string(dns.Questions[0].Name)
+				queryType := dns.Questions[0].Type.String()
+
 				mu.Lock()
-				dnsQueries[dns.ID] = string(dns.Questions[0].Name)
+				dnsQueries[dns.ID] = queryName
+
+				// Track DNS query for later matching with response
+				dnsQueryTracker[dns.ID] = &dnsQueryInfo{
+					queryName:     queryName,
+					queryType:     queryType,
+					sourceIP:      srcIP,
+					destinationIP: dstIP,
+					timestamp:     packet.Metadata().Timestamp,
+				}
+
+				// Add timeline event for DNS query
+				*timelineEvents = append(*timelineEvents, TimelineEvent{
+					Timestamp:       relativeTime,
+					EventType:       "DNS_Query",
+					SourceIP:        srcIP,
+					DestinationIP:   dstIP,
+					SourcePort:      nil,
+					DestinationPort: &dnsPort,
+					Protocol:        "UDP",
+					Detail:          fmt.Sprintf("Query: %s (%s)", queryName, queryType),
+				})
 				mu.Unlock()
 			}
 		} else { // Response
 			mu.Lock()
 			queryName := dnsQueries[dns.ID]
-			mu.Unlock()
+			queryInfo := dnsQueryTracker[dns.ID]
+
+			// Collect answer IPs and names
+			var answerIPs []string
+			var answerNames []string
+			isAnomalous := false
+			anomalyReason := ""
 
 			for _, ans := range dns.Answers {
 				if ans.IP != nil {
 					ansIP := ans.IP.String()
+					answerIPs = append(answerIPs, ansIP)
+
 					if isPublicDomain(queryName) && isPrivateOrReservedIP(ansIP) {
+						isAnomalous = true
+						anomalyReason = "Public domain resolved to private/reserved IP"
 						report.DNSAnomalies = append(report.DNSAnomalies, DNSAnomaly{
-							Timestamp: packet.Metadata().Timestamp.Sub(packet.Metadata().CaptureInfo.Timestamp).Seconds(),
+							Timestamp: relativeTime,
 							Query:     queryName,
 							AnswerIP:  ansIP,
-							ServerIP:  ip,
+							ServerIP:  srcIP,
 							ServerMAC: mac,
-							Reason:    "Public domain resolved to private/reserved IP",
+							Reason:    anomalyReason,
+						})
+
+						// Add timeline event for DNS anomaly
+						*timelineEvents = append(*timelineEvents, TimelineEvent{
+							Timestamp:       relativeTime,
+							EventType:       "DNS_Anomaly",
+							SourceIP:        srcIP,
+							DestinationIP:   dstIP,
+							SourcePort:      &dnsPort,
+							DestinationPort: nil,
+							Protocol:        "UDP",
+							Detail:          fmt.Sprintf("%s -> %s (ANOMALY: %s)", queryName, ansIP, anomalyReason),
 						})
 					}
 				}
+				if ans.CNAME != nil {
+					answerNames = append(answerNames, string(ans.CNAME))
+				}
 			}
+
+			// Create DNS record with query/response pair
+			responseTime := relativeTime
+			responseCode := uint16(dns.ResponseCode)
+
+			queryType := "A"
+			queryTimestamp := relativeTime
+			querySrcIP := dstIP // Response destination is query source
+			queryDstIP := srcIP // Response source is query destination
+
+			if queryInfo != nil {
+				queryType = queryInfo.queryType
+				queryTimestamp = queryInfo.timestamp.Sub(captureStartTime).Seconds()
+				querySrcIP = queryInfo.sourceIP
+				queryDstIP = queryInfo.destinationIP
+			}
+
+			detail := fmt.Sprintf("Query: %s (%s)", queryName, queryType)
+			if len(answerIPs) > 0 {
+				detail += fmt.Sprintf(" -> %s", strings.Join(answerIPs, ", "))
+			}
+			if isAnomalous {
+				detail += " [ANOMALOUS]"
+			}
+
+			*dnsRecords = append(*dnsRecords, DNSRecord{
+				QueryTimestamp:    queryTimestamp,
+				QueryName:         queryName,
+				QueryType:         queryType,
+				SourceIP:          querySrcIP,
+				DestinationIP:     queryDstIP,
+				ResponseTimestamp: &responseTime,
+				ResponseCode:      &responseCode,
+				AnswerIPs:         answerIPs,
+				AnswerNames:       answerNames,
+				IsAnomalous:       isAnomalous,
+				Detail:            detail,
+			})
+
+			// Clean up tracker
+			delete(dnsQueryTracker, dns.ID)
+			mu.Unlock()
 		}
 	}
 
@@ -1913,7 +2109,21 @@ func analyzePacket(
 				deviceFingerprints[ip4.SrcIP.String()] = fp
 
 				// Track SYN packets for handshake analysis
-				timestamp := packet.Metadata().Timestamp.Sub(packet.Metadata().CaptureInfo.Timestamp).Seconds()
+				timestamp := packet.Metadata().Timestamp.Sub(captureStartTime).Seconds()
+
+				// Add timeline event for TCP SYN
+				srcPort := uint16(tcp.SrcPort)
+				dstPort := uint16(tcp.DstPort)
+				*timelineEvents = append(*timelineEvents, TimelineEvent{
+					Timestamp:       timestamp,
+					EventType:       "TCP_SYN",
+					SourceIP:        ip4.SrcIP.String(),
+					DestinationIP:   ip4.DstIP.String(),
+					SourcePort:      &srcPort,
+					DestinationPort: &dstPort,
+					Protocol:        "TCP",
+					Detail:          fmt.Sprintf("Connection attempt to port %d", tcp.DstPort),
+				})
 				found := false
 				for i := range report.TCPHandshakes.SYNFlows {
 					if report.TCPHandshakes.SYNFlows[i].SrcIP == ip4.SrcIP.String() &&
@@ -2051,6 +2261,9 @@ func analyzePacket(
 			srcIP := ip4.SrcIP.String()
 			dstIP := ip4.DstIP.String()
 			payloadLen := uint32(len(tcp.Payload))
+			retransTimestamp := packet.Metadata().Timestamp.Sub(captureStartTime).Seconds()
+			retransSrcPort := uint16(tcp.SrcPort)
+			retransDstPort := uint16(tcp.DstPort)
 
 			// Detect various TCP anomalies
 			if len(tcp.Payload) > 0 || tcp.SYN || tcp.FIN {
@@ -2061,6 +2274,20 @@ func analyzePacket(
 						DstIP: dstIP, DstPort: uint16(tcp.DstPort),
 					})
 					markPathAnomaly(pathStats, srcIP, dstIP)
+
+					// Add timeline event for retransmission (limit to avoid flooding)
+					if len(*timelineEvents) < 10000 {
+						*timelineEvents = append(*timelineEvents, TimelineEvent{
+							Timestamp:       retransTimestamp,
+							EventType:       "TCP_Retransmission",
+							SourceIP:        srcIP,
+							DestinationIP:   dstIP,
+							SourcePort:      &retransSrcPort,
+							DestinationPort: &retransDstPort,
+							Protocol:        "TCP",
+							Detail:          "Duplicate sequence number - packet retransmitted",
+						})
+					}
 				}
 
 				// 2. Out-of-order: sequence number is less than expected
@@ -2220,6 +2447,21 @@ func analyzePacket(
 					MAC1: existingMAC,
 					MAC2: macStr,
 				})
+
+				// Add timeline event for ARP conflict
+				arpTimestamp := packet.Metadata().Timestamp.Sub(captureStartTime).Seconds()
+				mu.Lock()
+				*timelineEvents = append(*timelineEvents, TimelineEvent{
+					Timestamp:       arpTimestamp,
+					EventType:       "ARP_Conflict",
+					SourceIP:        ipStr,
+					DestinationIP:   "",
+					SourcePort:      nil,
+					DestinationPort: nil,
+					Protocol:        "ARP",
+					Detail:          fmt.Sprintf("IP %s claimed by multiple MACs: %s and %s (potential spoofing)", ipStr, existingMAC, macStr),
+				})
+				mu.Unlock()
 			} else {
 				arpIPToMAC[ipStr] = macStr
 			}
@@ -2258,12 +2500,27 @@ func analyzePacket(
 								path = req.path
 							}
 
+							httpTimestamp := packet.Metadata().Timestamp.Sub(captureStartTime).Seconds()
 							report.HTTPErrors = append(report.HTTPErrors, HTTPError{
-								Timestamp: packet.Metadata().Timestamp.Sub(packet.Metadata().CaptureInfo.Timestamp).Seconds(),
+								Timestamp: httpTimestamp,
 								Method:    method,
 								Host:      host,
 								Path:      path,
 								Code:      statusCode,
+							})
+
+							// Add timeline event for HTTP error
+							httpSrcPort := uint16(tcp.SrcPort)
+							httpDstPort := uint16(tcp.DstPort)
+							*timelineEvents = append(*timelineEvents, TimelineEvent{
+								Timestamp:       httpTimestamp,
+								EventType:       "HTTP_Error",
+								SourceIP:        ip4.SrcIP.String(),
+								DestinationIP:   ip4.DstIP.String(),
+								SourcePort:      &httpSrcPort,
+								DestinationPort: &httpDstPort,
+								Protocol:        "TCP",
+								Detail:          fmt.Sprintf("HTTP %d %s %s%s", statusCode, method, host, path),
 							})
 						}
 					}
@@ -2554,6 +2811,46 @@ func exportToCSV(r *TriageReport, filename string) error {
 			file.WriteString(fmt.Sprintf("Conversation - High Packet Count,%s,%s,%d,%s,%d,%s,%s\n",
 				description, conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, severity, action))
 		}
+	}
+
+	// Timeline Events (limit to first 100 for CSV)
+	for i, event := range r.Timeline {
+		if i >= 100 {
+			break
+		}
+		srcPort := "N/A"
+		dstPort := "N/A"
+		if event.SourcePort != nil {
+			srcPort = fmt.Sprintf("%d", *event.SourcePort)
+		}
+		if event.DestinationPort != nil {
+			dstPort = fmt.Sprintf("%d", *event.DestinationPort)
+		}
+		file.WriteString(fmt.Sprintf("Timeline,%s,%.3fs,%s,%s,%s,%s,%s,%s\n",
+			event.EventType, event.Timestamp, event.SourceIP, srcPort, event.DestinationIP, dstPort, event.Protocol, event.Detail))
+	}
+
+	// DNS Details
+	for i, record := range r.DNSDetails {
+		if i >= 50 {
+			break
+		}
+		responseStr := "No response"
+		if record.ResponseTimestamp != nil {
+			if len(record.AnswerIPs) > 0 {
+				responseStr = strings.Join(record.AnswerIPs, "; ")
+			} else if len(record.AnswerNames) > 0 {
+				responseStr = strings.Join(record.AnswerNames, "; ")
+			} else {
+				responseStr = "No records"
+			}
+		}
+		status := "OK"
+		if record.IsAnomalous {
+			status = "ANOMALY"
+		}
+		file.WriteString(fmt.Sprintf("DNS Detail,%s (%s),%.3fs,%s,%s,%s,%s,%s\n",
+			record.QueryName, record.QueryType, record.QueryTimestamp, record.SourceIP, record.DestinationIP, responseStr, status, record.Detail))
 	}
 
 	return nil
@@ -2847,19 +3144,24 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
                     dragView: true
                 }
             };
-            var network = new vis.Network(container, data, options);
+            try {
+                var network = new vis.Network(container, data, options);
 
-            // Stabilization progress
-            network.on("stabilizationProgress", function(params) {
-                var maxWidth = 496;
-                var minWidth = 20;
-                var widthFactor = params.iterations/params.total;
-                var width = Math.max(minWidth, maxWidth * widthFactor);
-            });
+                // Stabilization progress
+                network.on("stabilizationProgress", function(params) {
+                    var maxWidth = 496;
+                    var minWidth = 20;
+                    var widthFactor = params.iterations/params.total;
+                    var width = Math.max(minWidth, maxWidth * widthFactor);
+                });
 
-            network.once("stabilizationIterationsDone", function() {
-                network.setOptions({ physics: false });
-            });
+                network.once("stabilizationIterationsDone", function() {
+                    network.setOptions({ physics: false });
+                });
+            } catch (e) {
+                console.error("Error initializing Vis.js network:", e);
+                document.getElementById('interactive-diagram').innerHTML = '<p style="color: red; padding: 20px;">Error: Could not render diagram. Check browser console for details.</p>';
+            }
         </script>
 `
 	}
@@ -3200,6 +3502,94 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
 			}
 			html += fmt.Sprintf(`                <tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>
 `, d.SrcIP, d.DeviceType, d.OSGuess, d.Confidence)
+		}
+		html += `            </table>
+        </div>
+`
+	}
+
+	// Network Activity Timeline
+	if len(r.Timeline) > 0 {
+		html += `        <div class="section">
+            <h2>📅 Network Activity Timeline</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> This chronological view shows significant network events detected during the capture.
+                Use this to understand the sequence of events leading to issues.
+            </p>
+            <p>Total events: <strong>` + fmt.Sprintf("%d", len(r.Timeline)) + `</strong> (showing first 50)</p>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: #f9f9f9;">
+                <table style="font-size: 12px;">
+                    <tr><th>Time</th><th>Event</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Details</th></tr>
+`
+		for i, event := range r.Timeline {
+			if i >= 50 {
+				break
+			}
+			srcInfo := event.SourceIP
+			if event.SourcePort != nil {
+				srcInfo = fmt.Sprintf("%s:%d", event.SourceIP, *event.SourcePort)
+			}
+			dstInfo := event.DestinationIP
+			if event.DestinationPort != nil {
+				dstInfo = fmt.Sprintf("%s:%d", event.DestinationIP, *event.DestinationPort)
+			}
+
+			badgeClass := "badge-info"
+			switch event.EventType {
+			case "DNS_Anomaly", "ARP_Conflict", "HTTP_Error":
+				badgeClass = "badge-danger"
+			case "TCP_Retransmission":
+				badgeClass = "badge-warning"
+			case "TCP_SYN":
+				badgeClass = "badge-success"
+			}
+
+			html += fmt.Sprintf(`                    <tr><td>%.3fs</td><td><span class="badge %s">%s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>
+`, event.Timestamp, badgeClass, event.EventType, srcInfo, dstInfo, event.Protocol, event.Detail)
+		}
+		html += `                </table>
+            </div>
+        </div>
+`
+	}
+
+	// DNS Query/Response Details
+	if len(r.DNSDetails) > 0 {
+		html += `        <div class="section">
+            <h2>🔍 DNS Query/Response Details</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> Detailed DNS resolution tracking showing query-response pairs.
+                This provides granular visibility into DNS resolution for confirming poisoning or other issues.
+            </p>
+            <p>Total DNS transactions: <strong>` + fmt.Sprintf("%d", len(r.DNSDetails)) + `</strong> (showing first 30)</p>
+            <table>
+                <tr><th>Time</th><th>Query</th><th>Type</th><th>From</th><th>To</th><th>Response</th><th>Status</th></tr>
+`
+		for i, record := range r.DNSDetails {
+			if i >= 30 {
+				break
+			}
+
+			responseStr := "No response"
+			if record.ResponseTimestamp != nil {
+				if len(record.AnswerIPs) > 0 {
+					responseStr = strings.Join(record.AnswerIPs, ", ")
+				} else if len(record.AnswerNames) > 0 {
+					responseStr = strings.Join(record.AnswerNames, ", ")
+				} else {
+					responseStr = "No records"
+				}
+			}
+
+			badge := "badge-success"
+			status := "OK"
+			if record.IsAnomalous {
+				badge = "badge-danger"
+				status = "ANOMALY"
+			}
+
+			html += fmt.Sprintf(`                <tr><td>%.3fs</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><span class="badge %s">%s</span></td></tr>
+`, record.QueryTimestamp, record.QueryName, record.QueryType, record.SourceIP, record.DestinationIP, responseStr, badge, status)
 		}
 		html += `            </table>
         </div>
@@ -3796,6 +4186,78 @@ func printHuman(r *TriageReport) {
 		}
 		if len(r.QUICFlows) > 5 {
 			fmt.Printf("  ... and %d more\n", len(r.QUICFlows)-5)
+		}
+		fmt.Println()
+	}
+
+	// Network Activity Timeline
+	if len(r.Timeline) > 0 {
+		color.Cyan("━━━ [*] NETWORK ACTIVITY TIMELINE ━━━")
+		fmt.Println("\nChronological view of significant network events detected during the capture.")
+		fmt.Println("This helps understand the sequence of events leading to issues.")
+		fmt.Printf("\nTOTAL EVENTS: %d (showing first 50)\n\n", len(r.Timeline))
+
+		for i, event := range r.Timeline {
+			if i >= 50 {
+				break
+			}
+
+			portInfo := ""
+			if event.SourcePort != nil && event.DestinationPort != nil {
+				portInfo = fmt.Sprintf(":%d -> %s:%d", *event.SourcePort, event.DestinationIP, *event.DestinationPort)
+			} else if event.DestinationPort != nil {
+				portInfo = fmt.Sprintf(" -> %s:%d", event.DestinationIP, *event.DestinationPort)
+			} else if event.DestinationIP != "" {
+				portInfo = fmt.Sprintf(" -> %s", event.DestinationIP)
+			}
+
+			fmt.Printf("[Time: %.3fs] [%s] %s%s %s [%s]\n",
+				event.Timestamp, event.EventType, event.SourceIP, portInfo, event.Protocol, event.Detail)
+		}
+
+		if len(r.Timeline) > 50 {
+			fmt.Printf("\n  ... and %d more events\n", len(r.Timeline)-50)
+		}
+		fmt.Println()
+	}
+
+	// DNS Query/Response Details
+	if len(r.DNSDetails) > 0 {
+		color.Cyan("━━━ [*] DNS QUERY/RESPONSE DETAILS ━━━")
+		fmt.Println("\nDetailed DNS resolution tracking showing query-response pairs.")
+		fmt.Println("This provides granular visibility into DNS resolution for confirming poisoning or issues.")
+		fmt.Printf("\nTOTAL DNS TRANSACTIONS: %d (showing first 30)\n\n", len(r.DNSDetails))
+
+		for i, record := range r.DNSDetails {
+			if i >= 30 {
+				break
+			}
+
+			anomalyFlag := ""
+			if record.IsAnomalous {
+				anomalyFlag = " [ANOMALOUS!]"
+			}
+
+			fmt.Printf("[Time: %.3fs] Query: %s (%s) from %s -> %s%s\n",
+				record.QueryTimestamp, record.QueryName, record.QueryType, record.SourceIP, record.DestinationIP, anomalyFlag)
+
+			if record.ResponseTimestamp != nil {
+				responseStr := ""
+				if len(record.AnswerIPs) > 0 {
+					responseStr = strings.Join(record.AnswerIPs, ", ")
+				} else if len(record.AnswerNames) > 0 {
+					responseStr = strings.Join(record.AnswerNames, ", ")
+				} else {
+					responseStr = "No answer records"
+				}
+				fmt.Printf("             Response: %s (code: %d)\n", responseStr, *record.ResponseCode)
+			} else {
+				fmt.Printf("             Response: No response observed\n")
+			}
+		}
+
+		if len(r.DNSDetails) > 30 {
+			fmt.Printf("\n  ... and %d more DNS transactions\n", len(r.DNSDetails)-30)
 		}
 		fmt.Println()
 	}
