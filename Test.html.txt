@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Network Triage Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    </script>
+    <style>
+        #interactive-diagram {
+            height: 600px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            margin: 20px 0;
+        }
+    </style>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+               background: #f5f7fa; padding: 20px; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; 
+                     border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #34495e; margin-top: 30px; margin-bottom: 15px; padding-left: 10px; 
+             border-left: 4px solid #3498db; }
+        .summary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; padding: 25px; border-radius: 8px; margin-bottom: 30px; }
+        .summary h2 { color: white; border-left: 4px solid white; margin-top: 0; }
+        .health-status { font-size: 24px; font-weight: bold; padding: 15px; 
+                        border-radius: 5px; text-align: center; margin: 20px 0; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+                gap: 15px; margin-top: 20px; }
+        .stat-card { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 5px; }
+        .stat-card h3 { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .stat-card .number { font-size: 32px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background: #3498db; color: white; padding: 12px; text-align: left; font-weight: 600; }
+        td { padding: 10px 12px; border-bottom: 1px solid #ecf0f1; }
+        tr:hover { background: #f8f9fa; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; 
+                font-size: 12px; font-weight: 600; }
+        .badge-critical { background: #dc3545; color: white; }
+        .badge-warning { background: #ffc107; color: #000; }
+        .badge-info { background: #17a2b8; color: white; }
+        .section { margin-bottom: 40px; }
+        .empty-state { text-align: center; padding: 40px; color: #95a5a6; font-style: italic; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ecf0f1; 
+                 text-align: center; color: #7f8c8d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 SD-WAN Network Triage Report</h1>
+        
+        <p style="margin-bottom: 30px; padding: 15px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+            <strong>About This Report:</strong> This report analyzes a network packet capture (PCAP) file to identify potential issues, 
+            security concerns, and traffic patterns. The analysis includes automated detection of common network problems, 
+            security threats, and performance bottlenecks. While this tool identifies potential issues, further investigation 
+            by network administrators may be required to confirm findings and implement solutions.
+        </p>
+        
+        <div class="summary">
+            <h2>Executive Summary</h2>
+            <div class="health-status" style="background-color: #ffc107;">
+                Risk Level: WARNING
+            </div>
+            <div class="stats">
+                <div class="stat-card">
+                    <h3>Critical Issues</h3>
+                    <div class="number">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Performance Issues</h3>
+                    <div class="number">687</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Security Concerns</h3>
+                    <div class="number">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Traffic</h3>
+                    <div class="number">0.8 MB</div>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <h2>🔀 Traffic Flow Diagram</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>About This Diagram:</strong> This visualization shows the communication paths detected in the analyzed traffic. 
+                Each arrow represents data flowing between two network endpoints. The label on each arrow shows the protocol, 
+                port number, and total data transferred. <strong style="color: #dc3545;">Red highlighted nodes and dashed lines</strong> 
+                indicate paths where issues were detected (packet loss, high latency, or retransmissions).
+            </p>
+            <div class="mermaid" style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e0e0e0;">
+graph LR
+    192_168_100_203["192.168.100.203"] -.->|"TCP:53786 92.1KB"| 52_110_4_150["52.110.4.150"]
+    8_8_4_4["8.8.4.4"] -.->|"TCP:443 40.6KB"| 192_168_100_203["192.168.100.203"]
+    52_110_4_150["52.110.4.150"] -.->|"TCP:53795 104.2KB"| 192_168_100_203["192.168.100.203"]
+    35_223_238_178["35.223.238.178"] -.->|"TCP:53586 125.9KB"| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -.->|"TCP:443 42.7KB"| 35_223_238_178["35.223.238.178"]
+    192_168_100_203["192.168.100.203"] -->|"TCP:51366 15.2KB"| 8_8_4_4["8.8.4.4"]
+    8_8_8_8["8.8.8.8"] -.->|"TCP/UDP:60011 42.3KB"| 192_168_100_203["192.168.100.203"]
+    172_217_19_2["172.217.19.2"] -.->|"TCP:443 87.7KB"| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -.->|"TCP/UDP:58671 12.6KB"| 8_8_8_8["8.8.8.8"]
+    142_251_141_162["142.251.141.162"] -->|"TCP:443 6.5KB"| 192_168_100_203["192.168.100.203"]
+    192_168_100_203["192.168.100.203"] -.->|"TCP:58663 16.0KB"| 69_173_156_138["69.173.156.138"]
+    192_168_100_203["192.168.100.203"] -.->|"TCP:58494 26.4KB"| 172_217_19_2["172.217.19.2"]
+    192_168_100_203["192.168.100.203"] -.->|"TCP:58477 46.5KB"| 188_125_72_139["188.125.72.139"]
+    69_173_156_138["69.173.156.138"] -.->|"TCP:443 21.5KB"| 192_168_100_203["192.168.100.203"]
+    34_8_63_254["34.8.63.254"] -.->|"TCP:443 15.9KB"| 192_168_100_203["192.168.100.203"]
+
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 52_110_4_150 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 8_8_4_4 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 52_110_4_150 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 35_223_238_178 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 35_223_238_178 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 8_8_8_8 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 172_217_19_2 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 8_8_8_8 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 69_173_156_138 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 172_217_19_2 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 188_125_72_139 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 69_173_156_138 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 34_8_63_254 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+    style 192_168_100_203 fill:#ffcccc,stroke:#ff0000,stroke-width:3px
+
+            </div>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>⚠️ Investigation Tip:</strong> Focus on the red-highlighted nodes in the diagram. These represent devices 
+                experiencing network problems. Check the physical connections, network equipment, and routing between these points.
+            </p>
+        </div>
+        <div class="section">
+            <h2>🌐 Interactive Network Diagram</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>Interactive Features:</strong> This diagram allows you to explore the network topology interactively. 
+                <strong>Drag nodes</strong> to rearrange the layout, <strong>zoom</strong> with your mouse wheel, and <strong>hover</strong> 
+                over nodes and connections to see detailed information. 
+                <span style="color: #dc3545; font-weight: bold;">Red nodes and dashed lines</span> indicate devices and connections 
+                experiencing issues (retransmissions, packet loss, or high latency).
+            </p>
+            <div id="interactive-diagram"></div>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>Legend:</strong><br>
+                • <strong style="color: #4CAF50;">Green boxes</strong>: Internal network devices<br>
+                • <strong style="color: #2196F3;">Blue diamonds</strong>: Potential gateways/routers<br>
+                • <strong style="color: #FF9800;">Orange boxes</strong>: External servers<br>
+                • <strong style="color: #9C27B0;">Purple triangles</strong>: Traceroute hops (intermediate network devices)<br>
+                • <strong style="color: #dc3545;">Red nodes/dashed lines</strong>: Devices with detected issues<br>
+                • <strong style="color: #9C27B0;">Purple arrows</strong>: Discovered traceroute paths<br>
+                • <strong>Gray arrows</strong>: Direct traffic flows from PCAP<br>
+                • <strong>Arrow labels</strong>: Protocol, port, data volume, or hop number
+            </p>
+            <p style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+                <strong>ℹ️ About Traceroute Data:</strong> If traceroute was enabled (-trace-path flag), the purple paths show 
+                the route discovered at analysis time from this machine to the destinations. Note that the actual path taken by 
+                the historical PCAP traffic may have been different if network topology or routing changed between capture and analysis time.
+            </p>
+        </div>
+
+        <script type="text/javascript">
+            // Network data
+            var nodes = new vis.DataSet([
+        {"id": "142.251.141.162", "label": "External\n142.251.141.162", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 142.251.141.162"},
+        {"id": "69.173.156.138", "label": "External\n69.173.156.138", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 69.173.156.138"},
+        {"id": "35.186.253.211", "label": "External\n35.186.253.211", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 35.186.253.211"},
+        {"id": "52.110.4.150", "label": "External\n52.110.4.150", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 52.110.4.150"},
+        {"id": "34.36.209.34", "label": "External\n34.36.209.34", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 34.36.209.34"},
+        {"id": "108.177.15.84", "label": "External\n108.177.15.84", "group": "external",  "title": "IP: 108.177.15.84"},
+        {"id": "34.243.32.177", "label": "External\n34.243.32.177", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 34.243.32.177"},
+        {"id": "142.251.36.74", "label": "External\n142.251.36.74", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 142.251.36.74"},
+        {"id": "8.8.8.8", "label": "External\n8.8.8.8", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 8.8.8.8"},
+        {"id": "140.82.113.25", "label": "External\n140.82.113.25", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 140.82.113.25"},
+        {"id": "151.101.1.44", "label": "External\n151.101.1.44", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 151.101.1.44"},
+        {"id": "17.42.251.72", "label": "External\n17.42.251.72", "group": "external",  "title": "IP: 17.42.251.72"},
+        {"id": "34.8.63.254", "label": "External\n34.8.63.254", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 34.8.63.254"},
+        {"id": "3.124.64.248", "label": "External\n3.124.64.248", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 3.124.64.248"},
+        {"id": "34.107.243.93", "label": "External\n34.107.243.93", "group": "external",  "title": "IP: 34.107.243.93"},
+        {"id": "18.97.36.68", "label": "External\n18.97.36.68", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 18.97.36.68"},
+        {"id": "192.168.100.1", "label": "Gateway\n192.168.100.1", "group": "router",  "title": "IP: 192.168.100.1"},
+        {"id": "87.248.119.252", "label": "External\n87.248.119.252", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 87.248.119.252"},
+        {"id": "185.89.210.212", "label": "External\n185.89.210.212", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 185.89.210.212"},
+        {"id": "104.18.26.193", "label": "External\n104.18.26.193", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 104.18.26.193"},
+        {"id": "8.8.4.4", "label": "External\n8.8.4.4", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 8.8.4.4"},
+        {"id": "23.44.215.200", "label": "External\n23.44.215.200", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 23.44.215.200"},
+        {"id": "104.18.41.41", "label": "External\n104.18.41.41", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 104.18.41.41"},
+        {"id": "52.209.232.99", "label": "External\n52.209.232.99", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 52.209.232.99"},
+        {"id": "172.64.146.215", "label": "External\n172.64.146.215", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 172.64.146.215"},
+        {"id": "151.101.65.44", "label": "External\n151.101.65.44", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 151.101.65.44"},
+        {"id": "151.101.193.44", "label": "External\n151.101.193.44", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 151.101.193.44"},
+        {"id": "178.250.7.136", "label": "External\n178.250.7.136", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 178.250.7.136"},
+        {"id": "34.149.50.64", "label": "External\n34.149.50.64", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 34.149.50.64"},
+        {"id": "142.251.36.78", "label": "External\n142.251.36.78", "group": "external",  "title": "IP: 142.251.36.78"},
+        {"id": "172.217.19.2", "label": "External\n172.217.19.2", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 172.217.19.2"},
+        {"id": "185.64.189.112", "label": "External\n185.64.189.112", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 185.64.189.112"},
+        {"id": "192.168.100.203", "label": "Internal\n192.168.100.203", "group": "internal", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 192.168.100.203"},
+        {"id": "192.168.100.226", "label": "Internal\n192.168.100.226", "group": "internal",  "title": "IP: 192.168.100.226"},
+        {"id": "23.44.215.194", "label": "External\n23.44.215.194", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 23.44.215.194"},
+        {"id": "142.251.36.65", "label": "External\n142.251.36.65", "group": "external",  "title": "IP: 142.251.36.65"},
+        {"id": "141.226.224.32", "label": "External\n141.226.224.32", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 141.226.224.32"},
+        {"id": "192.168.100.229", "label": "Internal\n192.168.100.229", "group": "internal",  "title": "IP: 192.168.100.229"},
+        {"id": "142.251.141.161", "label": "External\n142.251.141.161", "group": "external",  "title": "IP: 142.251.141.161"},
+        {"id": "192.168.100.191", "label": "Internal\n192.168.100.191", "group": "internal",  "title": "IP: 192.168.100.191"},
+        {"id": "104.16.102.112", "label": "External\n104.16.102.112", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 104.16.102.112"},
+        {"id": "224.0.0.251", "label": "External\n224.0.0.251", "group": "external",  "title": "IP: 224.0.0.251"},
+        {"id": "209.38.50.75", "label": "External\n209.38.50.75", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 209.38.50.75"},
+        {"id": "172.217.19.10", "label": "External\n172.217.19.10", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 172.217.19.10"},
+        {"id": "192.168.100.255", "label": "Internal\n192.168.100.255", "group": "internal",  "title": "IP: 192.168.100.255"},
+        {"id": "142.251.36.68", "label": "External\n142.251.36.68", "group": "external",  "title": "IP: 142.251.36.68"},
+        {"id": "74.125.133.188", "label": "External\n74.125.133.188", "group": "external",  "title": "IP: 74.125.133.188"},
+        {"id": "35.223.238.178", "label": "External\n35.223.238.178", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 35.223.238.178"},
+        {"id": "2.21.74.59", "label": "External\n2.21.74.59", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 2.21.74.59"},
+        {"id": "141.226.228.48", "label": "External\n141.226.228.48", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 141.226.228.48"},
+        {"id": "224.0.0.1", "label": "External\n224.0.0.1", "group": "external",  "title": "IP: 224.0.0.1"},
+        {"id": "104.16.103.112", "label": "External\n104.16.103.112", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 104.16.103.112"},
+        {"id": "192.168.100.220", "label": "Internal\n192.168.100.220", "group": "internal",  "title": "IP: 192.168.100.220"},
+        {"id": "142.251.38.131", "label": "External\n142.251.38.131", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 142.251.38.131"},
+        {"id": "255.255.255.255", "label": "External\n255.255.255.255", "group": "external",  "title": "IP: 255.255.255.255"},
+        {"id": "34.120.133.55", "label": "External\n34.120.133.55", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 34.120.133.55"},
+        {"id": "34.141.79.142", "label": "External\n34.141.79.142", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 34.141.79.142"},
+        {"id": "188.125.72.139", "label": "External\n188.125.72.139", "group": "external", "color": {"background": "#ffcccc", "border": "#ff0000", "highlight": {"background": "#ff9999", "border": "#cc0000"}}, "title": "IP: 188.125.72.139"}
+    ]);
+            var edges = new vis.DataSet([
+        {"from": "192.168.100.203", "to": "52.110.4.150", "label": "TCP:53788\n92.1KB", "title": "TCP:53788 - 140 packets, 92.1KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "8.8.4.4", "to": "192.168.100.203", "label": "TCP:51366\n40.6KB", "title": "TCP:51366 - 130 packets, 40.6KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "52.110.4.150", "to": "192.168.100.203", "label": "TCP:53787\n104.2KB", "title": "TCP:53787 - 108 packets, 104.2KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "35.223.238.178", "to": "192.168.100.203", "label": "TCP:53586\n125.9KB", "title": "TCP:53586 - 105 packets, 125.9KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "35.223.238.178", "label": "TCP:53663\n42.7KB", "title": "TCP:53663 - 102 packets, 42.7KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "8.8.4.4", "label": "TCP:443\n15.2KB", "title": "TCP:443 - 85 packets, 15.2KB transferred",  "dashes": false, "arrows": "to"},
+        {"from": "8.8.8.8", "to": "192.168.100.203", "label": "TCP/UDP:51241\n42.3KB", "title": "TCP/UDP:51241 - 82 packets, 42.3KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "172.217.19.2", "to": "192.168.100.203", "label": "TCP:443\n87.7KB", "title": "TCP:443 - 71 packets, 87.7KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "8.8.8.8", "label": "TCP/UDP:51241\n12.6KB", "title": "TCP/UDP:51241 - 61 packets, 12.6KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "142.251.141.162", "to": "192.168.100.203", "label": "TCP:443\n6.5KB", "title": "TCP:443 - 54 packets, 6.5KB transferred",  "dashes": false, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "69.173.156.138", "label": "TCP:58675\n16.0KB", "title": "TCP:58675 - 50 packets, 16.0KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "172.217.19.2", "label": "TCP:58494\n26.4KB", "title": "TCP:58494 - 46 packets, 26.4KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "188.125.72.139", "label": "TCP:58477\n46.5KB", "title": "TCP:58477 - 44 packets, 46.5KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "69.173.156.138", "to": "192.168.100.203", "label": "TCP:58663\n21.5KB", "title": "TCP:58663 - 43 packets, 21.5KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "141.226.224.32", "label": "TCP:58668\n9.0KB", "title": "TCP:58668 - 41 packets, 9.0KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "34.8.63.254", "to": "192.168.100.203", "label": "TCP:443\n15.9KB", "title": "TCP:443 - 41 packets, 15.9KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "104.18.41.41", "label": "TCP:58680\n47.9KB", "title": "TCP:58680 - 38 packets, 47.9KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "141.226.224.32", "to": "192.168.100.203", "label": "TCP:443\n18.7KB", "title": "TCP:443 - 37 packets, 18.7KB transferred",  "dashes": false, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "142.251.141.162", "label": "TCP:58475\n9.1KB", "title": "TCP:58475 - 37 packets, 9.1KB transferred - ISSUES DETECTED", "color": {"color": "#ff0000", "highlight": "#cc0000"}, "dashes": true, "arrows": "to"},
+        {"from": "192.168.100.203", "to": "34.8.63.254", "label": "TCP:58681\n22.1KB", "title": "TCP:58681 - 36 packets, 22.1KB transferred",  "dashes": false, "arrows": "to"}
+    ]);
+
+            // Create network
+            var container = document.getElementById('interactive-diagram');
+            var data = {
+                nodes: nodes,
+                edges: edges
+            };
+            var options = {
+                nodes: {
+                    shape: 'box',
+                    size: 25,
+                    font: {
+                        size: 14,
+                        face: 'Arial',
+                        color: '#333'
+                    },
+                    borderWidth: 2,
+                    shadow: true
+                },
+                edges: {
+                    width: 2,
+                    color: {
+                        color: '#848484',
+                        highlight: '#2B7CE9',
+                        hover: '#2B7CE9'
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.5
+                        }
+                    },
+                    font: {
+                        size: 11,
+                        align: 'middle'
+                    },
+                    smooth: {
+                        type: 'continuous'
+                    },
+                    shadow: true
+                },
+                groups: {
+                    internal: {
+                        color: {
+                            background: '#C8E6C9',
+                            border: '#4CAF50',
+                            highlight: {
+                                background: '#A5D6A7',
+                                border: '#388E3C'
+                            }
+                        }
+                    },
+                    router: {
+                        color: {
+                            background: '#BBDEFB',
+                            border: '#2196F3',
+                            highlight: {
+                                background: '#90CAF9',
+                                border: '#1976D2'
+                            }
+                        },
+                        shape: 'diamond',
+                        size: 30
+                    },
+                    external: {
+                        color: {
+                            background: '#FFE0B2',
+                            border: '#FF9800',
+                            highlight: {
+                                background: '#FFCC80',
+                                border: '#F57C00'
+                            }
+                        }
+                    },
+                    tracehop: {
+                        color: {
+                            background: '#E1BEE7',
+                            border: '#9C27B0',
+                            highlight: {
+                                background: '#CE93D8',
+                                border: '#7B1FA2'
+                            }
+                        },
+                        shape: 'triangle',
+                        size: 20
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -8000,
+                        centralGravity: 0.3,
+                        springLength: 200,
+                        springConstant: 0.04,
+                        damping: 0.09,
+                        avoidOverlap: 0.1
+                    },
+                    stabilization: {
+                        iterations: 200
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    tooltipDelay: 100,
+                    zoomView: true,
+                    dragView: true
+                }
+            };
+            try {
+                var network = new vis.Network(container, data, options);
+
+                // Stabilization progress
+                network.on("stabilizationProgress", function(params) {
+                    var maxWidth = 496;
+                    var minWidth = 20;
+                    var widthFactor = params.iterations/params.total;
+                    var width = Math.max(minWidth, maxWidth * widthFactor);
+                });
+
+                network.once("stabilizationIterationsDone", function() {
+                    network.setOptions({ physics: false });
+                });
+            } catch (e) {
+                console.error("Error initializing Vis.js network:", e);
+                document.getElementById('interactive-diagram').innerHTML = '<p style="color: red; padding: 20px;">Error: Could not render diagram. Check browser console for details.</p>';
+            }
+        </script>
+        <div class="section">
+            <h2>⚡ Network Performance Indicators - Packet Loss</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>What This Means:</strong> Data packets had to be sent multiple times because they didn't arrive at their destination. 
+                This usually indicates network congestion or connection problems, which can severely slow down applications and user experience. 
+                Think of it like having to repeat yourself multiple times on a bad phone connection.
+            </p>
+            <p>Total retransmissions detected: <strong>687</strong> (showing first 20)</p>
+            <table>
+                <tr><th>From Device</th><th>To Device</th><th>Impact</th></tr>
+                <tr><td>34.36.209.34:443</td><td>192.168.100.203:58484</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>34.36.209.34:443</td><td>192.168.100.203:58484</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>34.36.209.34:443</td><td>192.168.100.203:58484</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58493</td><td>87.248.119.252:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>87.248.119.252:443</td><td>192.168.100.203:58482</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58495</td><td>34.120.133.55:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58477</td><td>188.125.72.139:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>192.168.100.203:58495</td><td>34.120.133.55:443</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+                <tr><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td><span class="badge badge-warning">Slow Performance</span></td></tr>
+            </table>
+            <p><strong>⚠️ Recommended Action:</strong> Check network cables, switches, and routers between these devices. Consider reviewing Quality of Service (QoS) settings to prioritize important traffic.</p>
+        </div>
+        <div class="section">
+            <h2>🔌 TCP Handshake Analysis</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> This section tracks TCP connection establishment patterns. Every TCP connection 
+                starts with a "handshake" where the client sends a SYN packet, and the server responds with a SYN-ACK packet. 
+                Monitoring these patterns helps identify connection issues, unreachable services, and network behavior.
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; border-left: 4px solid #2196F3;">
+                    <h3 style="margin: 0 0 10px 0; color: #1976D2; font-size: 14px;">SYN Packets</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #1976D2;">31</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Connection attempts</p>
+                </div>
+                <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; border-left: 4px solid #4CAF50;">
+                    <h3 style="margin: 0 0 10px 0; color: #388E3C; font-size: 14px;">SYN-ACK Packets</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #388E3C;">31</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Connection responses</p>
+                </div>
+                <div style="background: #f3e5f5; padding: 15px; border-radius: 5px; border-left: 4px solid #9C27B0;">
+                    <h3 style="margin: 0 0 10px 0; color: #7B1FA2; font-size: 14px;">Successful Handshakes</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #7B1FA2;">31</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Completed connections</p>
+                </div>
+                <div style="background: #fff3e0; padding: 15px; border-radius: 5px; border-left: 4px solid #FF9800;">
+                    <h3 style="margin: 0 0 10px 0; color: #F57C00; font-size: 14px;">Failed Attempts</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #F57C00;">0</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">No response received</p>
+                </div>
+            </div>
+            <h3 style="margin-top: 20px; color: #1976D2;">Top Connection Initiators (SYN Packets)</h3>
+            <table>
+                <tr><th>Source</th><th>Destination</th><th>Attempts</th><th>Description</th></tr>
+                <tr><td>192.168.100.203:58668</td><td>141.226.224.32:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58668 to 141.226.224.32:443</td></tr>
+                <tr><td>192.168.100.203:58669</td><td>8.8.8.8:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58669 to 8.8.8.8:443</td></tr>
+                <tr><td>192.168.100.203:58670</td><td>2.21.74.59:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58670 to 2.21.74.59:443</td></tr>
+                <tr><td>192.168.100.203:53585</td><td>35.223.238.178:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:53585 to 35.223.238.178:443</td></tr>
+                <tr><td>192.168.100.203:53586</td><td>35.223.238.178:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:53586 to 35.223.238.178:443</td></tr>
+                <tr><td>192.168.100.203:58671</td><td>8.8.8.8:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58671 to 8.8.8.8:443</td></tr>
+                <tr><td>192.168.100.203:58672</td><td>142.251.38.131:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58672 to 142.251.38.131:443</td></tr>
+                <tr><td>192.168.100.203:58673</td><td>178.250.7.136:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58673 to 178.250.7.136:443</td></tr>
+                <tr><td>192.168.100.203:58674</td><td>3.124.64.248:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58674 to 3.124.64.248:443</td></tr>
+                <tr><td>192.168.100.203:58675</td><td>69.173.156.138:443</td><td>1</td><td>Detected TCP connection initiation from 192.168.100.203:58675 to 69.173.156.138:443</td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>📊 Top Bandwidth Consumers</h2>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Data Transferred</th><th>% of Total</th><th>Status</th></tr>
+                <tr><td>172.217.19.2:443 → 192.168.100.203:58494</td><td>TCP</td><td>0.05 MB</td><td>5.8%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>2.21.74.59:443 → 192.168.100.203:58670</td><td>TCP</td><td>0.03 MB</td><td>4.2%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:53663</td><td>TCP</td><td>0.03 MB</td><td>3.5%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58680 → 104.18.41.41:443</td><td>TCP</td><td>0.02 MB</td><td>3.2%</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>8.8.4.4:443 → 192.168.100.203:51366</td><td>TCP</td><td>0.02 MB</td><td>3.2%</td><td><span class="badge badge-info">Normal</span></td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>📱 Application Breakdown</h2>
+            <table>
+                <tr><th>Application</th><th>Port</th><th>Protocol</th><th>Packets</th><th>Data</th></tr>
+                <tr><td>HTTPS</td><td>443</td><td>TCP</td><td>1088</td><td>0.34 MB</td></tr>
+                <tr><td>Ephemeral</td><td>53796</td><td>TCP</td><td>19</td><td>0.01 MB</td></tr>
+                <tr><td>Registered</td><td>5353</td><td>UDP</td><td>38</td><td>0.01 MB</td></tr>
+                <tr><td>DNS</td><td>53</td><td>UDP</td><td>7</td><td>0.00 MB</td></tr>
+                <tr><td>IMAPS</td><td>993</td><td>TCP</td><td>2</td><td>0.00 MB</td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>📊 Bandwidth & Conversation Analysis</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> This section identifies the biggest bandwidth consumers and most active 
+                network conversations, similar to Wireshark's Conversations tool. Use this data to identify bandwidth hogs, 
+                chatty protocols, and optimize network resource allocation.
+            </p>
+            <h3 style="margin-top: 20px; color: #2196F3;">🔝 Top Conversations by Bandwidth</h3>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Total Data</th><th>Packets</th><th>Duration</th><th>Avg Rate</th><th>Status</th></tr>
+                <tr><td>172.217.19.2:443 → 192.168.100.203:58494</td><td>TCP</td><td>0.05 MB</td><td>71</td><td>47.948s</td><td>0.01 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>2.21.74.59:443 → 192.168.100.203:58670</td><td>TCP</td><td>0.03 MB</td><td>31</td><td>1.693s</td><td>0.16 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:53663</td><td>TCP</td><td>0.03 MB</td><td>36</td><td>3.174s</td><td>0.07 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58680 → 104.18.41.41:443</td><td>TCP</td><td>0.02 MB</td><td>38</td><td>1.114s</td><td>0.19 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>8.8.4.4:443 → 192.168.100.203:51366</td><td>TCP</td><td>0.02 MB</td><td>130</td><td>50.03s</td><td>0.00 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58477 → 188.125.72.139:443</td><td>TCP</td><td>0.02 MB</td><td>44</td><td>46.767s</td><td>0.00 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>35.223.238.178:443 → 192.168.100.203:53522</td><td>TCP</td><td>0.02 MB</td><td>28</td><td>3.219s</td><td>0.06 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>104.18.41.41:443 → 192.168.100.203:58680</td><td>TCP</td><td>0.02 MB</td><td>33</td><td>1.096s</td><td>0.15 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58499 → 151.101.193.44:443</td><td>TCP</td><td>0.02 MB</td><td>29</td><td>46.724s</td><td>0.00 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:53786 → 52.110.4.150:443</td><td>TCP</td><td>0.02 MB</td><td>30</td><td>384ms</td><td>0.35 Mbps</td><td><span class="badge badge-info">Normal</span></td></tr>
+            </table>
+            <h3 style="margin-top: 20px; color: #9C27B0;">💬 Top Conversations by Packet Count</h3>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Packets</th><th>Total Data</th><th>Duration</th><th>Packet Rate</th><th>Status</th></tr>
+                <tr><td>8.8.4.4:443 → 192.168.100.203:51366</td><td>TCP</td><td>130</td><td>0.02 MB</td><td>50.03s</td><td>2.6 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:51366 → 8.8.4.4:443</td><td>TCP</td><td>85</td><td>0.01 MB</td><td>50.024s</td><td>1.7 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>172.217.19.2:443 → 192.168.100.203:58494</td><td>TCP</td><td>71</td><td>0.05 MB</td><td>47.948s</td><td>1.5 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>142.251.141.162:443 → 192.168.100.203:58475</td><td>TCP</td><td>54</td><td>0.01 MB</td><td>47.861s</td><td>1.1 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58494 → 172.217.19.2:443</td><td>TCP</td><td>46</td><td>0.01 MB</td><td>47.943s</td><td>1.0 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58477 → 188.125.72.139:443</td><td>TCP</td><td>44</td><td>0.02 MB</td><td>46.767s</td><td>0.9 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>34.8.63.254:443 → 192.168.100.203:58681</td><td>TCP</td><td>41</td><td>0.01 MB</td><td>1.091s</td><td>37.6 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58680 → 104.18.41.41:443</td><td>TCP</td><td>38</td><td>0.02 MB</td><td>1.114s</td><td>34.1 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58475 → 142.251.141.162:443</td><td>TCP</td><td>37</td><td>0.01 MB</td><td>47.85s</td><td>0.8 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+                <tr><td>192.168.100.203:58681 → 34.8.63.254:443</td><td>TCP</td><td>36</td><td>0.01 MB</td><td>1.1s</td><td>32.7 pkt/s</td><td><span class="badge badge-info">Normal</span></td></tr>
+            </table>
+            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>💡 Tip:</strong> High bandwidth flows may indicate legitimate data transfers (backups, video streaming) 
+                or potential issues (data exfiltration, bandwidth abuse). Chatty connections with many small packets can impact 
+                performance due to protocol overhead - consider optimizing application design or batching requests.
+            </p>
+        </div>
+        <div class="section">
+            <h2>💻 Identified Devices</h2>
+            <table>
+                <tr><th>IP Address</th><th>Device Type</th><th>OS Guess</th><th>Confidence</th></tr>
+                <tr><td>192.168.100.203</td><td>Linux</td><td>Linux 2.6+/Ubuntu/Debian</td><td>Medium</td></tr>
+            </table>
+        </div>
+        <div class="section">
+            <h2>📅 Network Activity Timeline</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> This chronological view shows significant network events detected during the capture.
+                Use this to understand the sequence of events leading to issues.
+            </p>
+            <p>Total events: <strong>45</strong> (showing first 50)</p>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px; background: #f9f9f9;">
+                <table style="font-size: 12px;">
+                    <tr><th>Time</th><th>Event</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Details</th></tr>
+                    <tr><td>0.546s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>0.749s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58668</td><td>141.226.224.32:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>3.931s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>172.64.146.215:443</td><td>192.168.100.203:58452</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>5.877s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>172.64.146.215:443</td><td>192.168.100.203:58452</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>6.024s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58669</td><td>8.8.8.8:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>6.125s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: easylist-downloads.adblockplus.org (Unknown)</td></tr>
+                    <tr><td>6.125s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: easylist-downloads.adblockplus.org (A)</td></tr>
+                    <tr><td>6.196s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58670</td><td>2.21.74.59:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>6.878s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: onatel.bf (A)</td></tr>
+                    <tr><td>11.200s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53585</td><td>35.223.238.178:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>11.991s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53586</td><td>35.223.238.178:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>18.569s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: yahoo.com (A)</td></tr>
+                    <tr><td>19.609s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58671</td><td>8.8.8.8:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>19.681s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58672</td><td>142.251.38.131:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>22.771s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58673</td><td>178.250.7.136:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>22.772s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58674</td><td>3.124.64.248:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>22.773s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58675</td><td>69.173.156.138:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>22.774s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58676</td><td>185.89.210.212:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>23.710s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58677</td><td>141.226.224.32:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>26.668s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53663</td><td>35.223.238.178:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>31.227s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: stream-production.avcdn.net (A)</td></tr>
+                    <tr><td>31.227s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: stream-production.avcdn.net (AAAA)</td></tr>
+                    <tr><td>31.247s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53689</td><td>23.44.215.200:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>31.493s</td><td><span class="badge badge-info">DNS_Query</span></td><td>192.168.100.203</td><td>8.8.8.8:53</td><td>UDP</td><td>Query: cisco.com (A)</td></tr>
+                    <tr><td>31.704s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58678</td><td>8.8.8.8:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>31.777s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58679</td><td>172.217.19.10:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>31.781s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58680</td><td>104.18.41.41:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>31.794s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58681</td><td>34.8.63.254:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>31.859s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>192.168.100.203:58680</td><td>104.18.41.41:443</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>33.597s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58682</td><td>104.16.102.112:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>34.559s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53705</td><td>35.223.238.178:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>34.597s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58683</td><td>18.97.36.68:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>35.874s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>172.64.146.215:443</td><td>192.168.100.203:58452</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>45.739s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58684</td><td>178.250.7.136:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>45.740s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58685</td><td>185.89.210.212:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>45.743s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58686</td><td>69.173.156.138:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>46.627s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>172.217.19.2:443</td><td>192.168.100.203:58494</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>46.829s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:58687</td><td>141.226.224.32:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>50.675s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53786</td><td>52.110.4.150:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>50.773s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53787</td><td>52.110.4.150:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>50.774s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53788</td><td>52.110.4.150:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>50.774s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53789</td><td>52.110.4.150:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>51.881s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53795</td><td>52.110.4.150:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                    <tr><td>51.983s</td><td><span class="badge badge-warning">TCP_Retransmission</span></td><td>192.168.100.203:53795</td><td>52.110.4.150:443</td><td>TCP</td><td>Duplicate sequence number - packet retransmitted</td></tr>
+                    <tr><td>52.179s</td><td><span class="badge badge-success">TCP_SYN</span></td><td>192.168.100.203:53796</td><td>52.110.4.150:443</td><td>TCP</td><td>Connection attempt to port 443</td></tr>
+                </table>
+            </div>
+        </div>
+        <div class="section">
+            <h2>🔍 DNS Query/Response Details</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> Detailed DNS resolution tracking showing query-response pairs.
+                This provides granular visibility into DNS resolution for confirming poisoning or other issues.
+            </p>
+            <p>Total DNS transactions: <strong>7</strong> (showing first 30)</p>
+            <table>
+                <tr><th>Time</th><th>Query</th><th>Type</th><th>From</th><th>To</th><th>Response</th><th>Status</th></tr>
+                <tr><td>6.125s</td><td>easylist-downloads.adblockplus.org</td><td>Unknown</td><td>192.168.100.203</td><td>8.8.8.8</td><td>production-filterlist-delivery.easylist-downloads.adblockplus.org.edgesuite.net, a1446.dscr.akamai.net</td><td><span class="badge badge-success">OK</span></td></tr>
+                <tr><td>6.125s</td><td>easylist-downloads.adblockplus.org</td><td>A</td><td>192.168.100.203</td><td>8.8.8.8</td><td>2.21.74.74, 2.21.74.59</td><td><span class="badge badge-success">OK</span></td></tr>
+                <tr><td>6.878s</td><td>onatel.bf</td><td>A</td><td>192.168.100.203</td><td>8.8.8.8</td><td>196.28.243.151</td><td><span class="badge badge-success">OK</span></td></tr>
+                <tr><td>18.569s</td><td>yahoo.com</td><td>A</td><td>192.168.100.203</td><td>8.8.8.8</td><td>74.6.231.20, 74.6.143.26, 98.137.11.164, 74.6.143.25, 98.137.11.163, 74.6.231.21</td><td><span class="badge badge-success">OK</span></td></tr>
+                <tr><td>31.227s</td><td>stream-production.avcdn.net</td><td>A</td><td>192.168.100.203</td><td>8.8.8.8</td><td>23.44.215.200, 23.44.215.203, 23.44.215.178, 23.44.215.192, 23.44.215.209, 23.44.215.195, 23.44.215.184, 23.44.215.187, 23.44.215.179</td><td><span class="badge badge-success">OK</span></td></tr>
+                <tr><td>31.227s</td><td>stream-production.avcdn.net</td><td>AAAA</td><td>192.168.100.203</td><td>8.8.8.8</td><td>2a02:26f0:4700::210:27b, 2a02:26f0:4700::210:262, 2a02:26f0:4700::172c:d73b, 2a02:26f0:4700::172c:d731, 2a02:26f0:4700::172c:d732</td><td><span class="badge badge-success">OK</span></td></tr>
+                <tr><td>31.493s</td><td>cisco.com</td><td>A</td><td>192.168.100.203</td><td>8.8.8.8</td><td>72.163.4.185</td><td><span class="badge badge-success">OK</span></td></tr>
+            </table>
+        </div>
+        <div class="footer">
+            <p>Generated by SD-WAN Network Triage Tool | 2026-01-07 17:55:20</p>
+            <p>This report provides comprehensive network analysis including security threats, performance issues, and traffic patterns.</p>
+        </div>
+    </div>
+</body>
+</html>

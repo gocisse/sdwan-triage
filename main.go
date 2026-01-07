@@ -1433,6 +1433,22 @@ OPTIONS:
                               Discovers actual network paths and visualizes intermediate hops
                               Limited to top 5 destinations prioritized by anomalies
 
+  Advanced Analysis:
+    -bgp-check                Check BGP routing data for potential hijack indicators (requires internet)
+    -qos-analysis             Enable QoS/DSCP traffic class analysis
+    -app-identify             Enable deep application identification using heuristics
+
+  External Integration:
+    -syslog-server <addr:port> Send alerts to Syslog server (address:port)
+    -splunk-hec-url <url>     Splunk HTTP Event Collector URL
+    -splunk-token <token>     Splunk HEC authentication token
+
+  Multi-File Comparison:
+    -compare                  Compare multiple PCAP files (provide multiple files as arguments)
+
+  Debug Options:
+    -debug-html               Write raw HTML to debug_report.html for troubleshooting
+
   Help:
     -h, --help                Show this help message
 
@@ -1467,6 +1483,24 @@ EXAMPLES:
     # Combine traceroute with filters
     ./sdwan-triage -html https-paths.html -service https -trace-path TestFile.pcap
 
+    # Check BGP routing for potential hijacks
+    ./sdwan-triage -bgp-check TestFile.pcap
+
+    # Enable QoS/DSCP analysis
+    ./sdwan-triage -qos-analysis TestFile.pcap
+
+    # Deep application identification
+    ./sdwan-triage -app-identify TestFile.pcap
+
+    # Send alerts to Syslog server
+    ./sdwan-triage -syslog-server 192.168.1.100:514 TestFile.pcap
+
+    # Send events to Splunk
+    ./sdwan-triage -splunk-hec-url https://splunk:8088/services/collector -splunk-token abc123 TestFile.pcap
+
+    # Compare two PCAP files
+    ./sdwan-triage -compare before.pcap after.pcap
+
 DESCRIPTION:
     This tool performs comprehensive network analysis on PCAP capture files to identify:
     - Security threats (DNS poisoning, ARP spoofing, suspicious ports)
@@ -1478,14 +1512,23 @@ DESCRIPTION:
     network engineers and IT administrators.
 
     Interactive HTML reports include:
-    - Static Mermaid.js flowchart diagrams for quick overview
-    - Interactive vis.js network diagrams with drag, zoom, and hover features
+    - D3.js force-directed network graphs with advanced interactivity
+    - D3.js timeline visualization for network events
+    - D3.js Sankey/Chord diagrams for traffic flow analysis
+    - Card-based layout with actionable recommendations
     - Traceroute path visualization with intermediate hop discovery (optional)
-    - Color-coded nodes: green (internal), blue (routers), orange (external), purple (hops)
+    - Color-coded nodes and rich tooltips for detailed information
     - Plain-language explanations suitable for non-technical stakeholders
 
+    Advanced features:
+    - BGP routing analysis for hijack detection
+    - QoS/DSCP traffic class analysis
+    - Deep application identification (port, SNI, payload heuristics)
+    - External integration (Syslog, Splunk HEC)
+    - Multi-PCAP comparison for before/after analysis
+
 VERSION:
-    SD-WAN Triage v2.3.0
+    SD-WAN Triage v2.6.0
 
 `)
 	}
