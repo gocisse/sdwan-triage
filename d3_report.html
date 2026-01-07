@@ -684,348 +684,448 @@
             <tr>
                 <th>Source</th>
                 <th>Destination</th>
-                <th>Port</th>
+                <th>Status</th>
             </tr>
             <tr>
-                <td>34.36.209.34</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58484</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 34.36.209.34:443 -&gt; 192.168.100.203:58484</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>34.36.209.34:443</td>
+                <td>192.168.100.203:58484</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>34.36.209.34</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58484</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>34.36.209.34</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58484</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 34.36.209.34:443 -&gt; 192.168.100.203:58484</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>34.36.209.34:443</td>
+                <td>192.168.100.203:58484</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>34.36.209.34</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58484</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>34.36.209.34</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58484</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 34.36.209.34:443 -&gt; 192.168.100.203:58484</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>34.36.209.34:443</td>
+                <td>192.168.100.203:58484</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>34.36.209.34</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58484</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>87.248.119.252</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58493 -&gt; 87.248.119.252:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58493</td>
+                <td>87.248.119.252:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>87.248.119.252</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>87.248.119.252</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58482</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 87.248.119.252:443 -&gt; 192.168.100.203:58482</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>87.248.119.252:443</td>
+                <td>192.168.100.203:58482</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>87.248.119.252</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58482</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>34.120.133.55</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58495 -&gt; 34.120.133.55:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58495</td>
+                <td>34.120.133.55:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>34.120.133.55</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>188.125.72.139</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58477</td>
+                <td>188.125.72.139:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>188.125.72.139</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>192.168.100.203</td>
-                <td>34.120.133.55</td>
-                <td><span class="badge badge-info">443</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 192.168.100.203:58495 -&gt; 34.120.133.55:443</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>192.168.100.203:58495</td>
+                <td>34.120.133.55:443</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>192.168.100.203</strong> and <strong>34.120.133.55</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>443</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>172.217.19.2</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58494</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>172.217.19.2:443</td>
+                <td>192.168.100.203:58494</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>172.217.19.2</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58494</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>172.217.19.2</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58494</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>172.217.19.2:443</td>
+                <td>192.168.100.203:58494</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>172.217.19.2</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58494</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>172.217.19.2</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58494</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>172.217.19.2:443</td>
+                <td>192.168.100.203:58494</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>172.217.19.2</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58494</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>172.217.19.2</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58494</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>172.217.19.2:443</td>
+                <td>192.168.100.203:58494</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>172.217.19.2</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58494</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>172.217.19.2</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58494</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr>
+                <td>172.217.19.2:443</td>
+                <td>192.168.100.203:58494</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>172.217.19.2</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58494</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
             <tr>
-                <td>172.217.19.2</td>
-                <td>192.168.100.203</td>
-                <td><span class="badge badge-info">58494</span></td>
-            </tr><tr><td colspan="3">
-			<div class="action-item warning" style="margin-top: 10px;">
-				<i class="fas fa-tools"></i>
-				<div>
-					<strong>Action for this retransmission:</strong>
-					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
-					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
-						<li>Verify physical connections and interface statistics</li>
-						<li>Review QoS policies for this traffic class</li>
-					</ul>
-				</div>
-			</div></td></tr></table><p style="text-align: center; margin-top: 10px; color: #666;">
+                <td>172.217.19.2:443</td>
+                <td>192.168.100.203:58494</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>172.217.19.2</strong> and <strong>192.168.100.203</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>58494</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
+            </tr></table><p style="text-align: center; margin-top: 10px; color: #666;">
                 ... and 667 more retransmission flows</p>
     </div>
 </div><div class="card">
@@ -1110,10 +1210,48 @@
                     .attr("class", "d3-tooltip")
                     .style("opacity", 0);
                 
-                // Color scale
+                // Color scale - Green for internal, Blue for router/gateway, Orange for external
                 const colorScale = d3.scaleOrdinal()
                     .domain(["internal", "router", "external", "hop", "anomaly"])
-                    .range(["#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#dc3545"]);
+                    .range(["#66cc66", "#6699ff", "#ff9933", "#9C27B0", "#dc3545"]);
+                
+                // Helper function to check if IP is in private ranges (RFC 1918)
+                function isPrivateIP(ipParts) {
+                    const [a, b, c, d] = ipParts;
+                    return (
+                        (a === 10) ||
+                        (a === 172 && b >= 16 && b <= 31) ||
+                        (a === 192 && b === 168)
+                    );
+                }
+                
+                // Helper function to categorize IP address
+                function categorizeIP(ip) {
+                    const parts = ip.split('.').map(Number);
+                    if (parts.length !== 4 || parts.some(isNaN)) {
+                        return "external"; // Invalid IP format
+                    }
+                    
+                    // Check for Router/Gateway first (.1 or .254 within private ranges)
+                    if ((parts[3] === 1 || parts[3] === 254) && isPrivateIP(parts)) {
+                        return "router";
+                    }
+                    // Then check for general Internal (RFC 1918)
+                    else if (isPrivateIP(parts)) {
+                        return "internal";
+                    }
+                    // Otherwise, it's External
+                    else {
+                        return "external";
+                    }
+                }
+                
+                // Re-categorize nodes based on IP address
+                nodes.forEach(node => {
+                    if (!node.group || node.group === "internal" || node.group === "external") {
+                        node.group = categorizeIP(node.id);
+                    }
+                });
                 
                 // Create force simulation
                 const simulation = d3.forceSimulation(nodes)
@@ -1443,6 +1581,18 @@
                     });
                 }
             });
+            
+            // Toggle action visibility for finding-specific action items
+            function toggleAction(button) {
+                const currentRow = button.closest('tr');
+                const actionRow = currentRow.nextElementSibling;
+                if (actionRow && actionRow.classList.contains('action-row')) {
+                    const isVisible = actionRow.style.display !== 'none';
+                    actionRow.style.display = isVisible ? 'none' : '';
+                    button.textContent = isVisible ? 'Show Action' : 'Hide Action';
+                    button.style.background = isVisible ? '#6c757d' : '#28a745';
+                }
+            }
         </script>
 
     <script>
@@ -1451,8 +1601,8 @@
             try {
                 // Network Diagram
                 const networkData = {
-                    nodes: [{"group":"internal","hasIssue":false,"id":"192.168.100.203","label":"192.168.100.203","size":20,"tooltip":"IP: 192.168.100.203\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"104.18.26.193","label":"104.18.26.193","size":20,"tooltip":"IP: 104.18.26.193\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.36.209.34","label":"34.36.209.34","size":20,"tooltip":"IP: 34.36.209.34\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.64.146.215","label":"172.64.146.215","size":20,"tooltip":"IP: 172.64.146.215\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"69.173.156.138","label":"69.173.156.138","size":20,"tooltip":"IP: 69.173.156.138\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"18.97.36.68","label":"18.97.36.68","size":20,"tooltip":"IP: 18.97.36.68\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"35.186.253.211","label":"35.186.253.211","size":20,"tooltip":"IP: 35.186.253.211\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.18.41.41","label":"104.18.41.41","size":20,"tooltip":"IP: 104.18.41.41\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.65","label":"142.251.36.65","size":20,"tooltip":"IP: 142.251.36.65\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"87.248.119.252","label":"87.248.119.252","size":20,"tooltip":"IP: 87.248.119.252\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.65.44","label":"151.101.65.44","size":20,"tooltip":"IP: 151.101.65.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.141.161","label":"142.251.141.161","size":20,"tooltip":"IP: 142.251.141.161\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"209.38.50.75","label":"209.38.50.75","size":20,"tooltip":"IP: 209.38.50.75\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.8.63.254","label":"34.8.63.254","size":20,"tooltip":"IP: 34.8.63.254\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"74.125.133.188","label":"74.125.133.188","size":20,"tooltip":"IP: 74.125.133.188\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.68","label":"142.251.36.68","size":20,"tooltip":"IP: 142.251.36.68\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.16.102.112","label":"104.16.102.112","size":20,"tooltip":"IP: 104.16.102.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.149.50.64","label":"34.149.50.64","size":20,"tooltip":"IP: 34.149.50.64\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"52.110.4.150","label":"52.110.4.150","size":20,"tooltip":"IP: 52.110.4.150\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.120.133.55","label":"34.120.133.55","size":20,"tooltip":"IP: 34.120.133.55\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.191","label":"192.168.100.191","size":20,"tooltip":"IP: 192.168.100.191\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"224.0.0.251","label":"224.0.0.251","size":20,"tooltip":"IP: 224.0.0.251\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"140.82.113.25","label":"140.82.113.25","size":20,"tooltip":"IP: 140.82.113.25\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.1","label":"192.168.100.1","size":20,"tooltip":"IP: 192.168.100.1\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"17.42.251.72","label":"17.42.251.72","size":20,"tooltip":"IP: 17.42.251.72\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"185.64.189.112","label":"185.64.189.112","size":20,"tooltip":"IP: 185.64.189.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.141.79.142","label":"34.141.79.142","size":20,"tooltip":"IP: 34.141.79.142\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"2.21.74.59","label":"2.21.74.59","size":20,"tooltip":"IP: 2.21.74.59\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.220","label":"192.168.100.220","size":20,"tooltip":"IP: 192.168.100.220\u003cbr/\u003eRole: internal"},{"group":"internal","hasIssue":false,"id":"192.168.100.255","label":"192.168.100.255","size":20,"tooltip":"IP: 192.168.100.255\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"172.217.19.10","label":"172.217.19.10","size":20,"tooltip":"IP: 172.217.19.10\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"8.8.8.8","label":"8.8.8.8","size":20,"tooltip":"IP: 8.8.8.8\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.16.103.112","label":"104.16.103.112","size":20,"tooltip":"IP: 104.16.103.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.141.162","label":"142.251.141.162","size":20,"tooltip":"IP: 142.251.141.162\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"23.44.215.200","label":"23.44.215.200","size":20,"tooltip":"IP: 23.44.215.200\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"8.8.4.4","label":"8.8.4.4","size":20,"tooltip":"IP: 8.8.4.4\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.243.32.177","label":"34.243.32.177","size":20,"tooltip":"IP: 34.243.32.177\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.1.44","label":"151.101.1.44","size":20,"tooltip":"IP: 151.101.1.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"141.226.224.32","label":"141.226.224.32","size":20,"tooltip":"IP: 141.226.224.32\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.78","label":"142.251.36.78","size":20,"tooltip":"IP: 142.251.36.78\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"178.250.7.136","label":"178.250.7.136","size":20,"tooltip":"IP: 178.250.7.136\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.217.19.2","label":"172.217.19.2","size":20,"tooltip":"IP: 172.217.19.2\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"141.226.228.48","label":"141.226.228.48","size":20,"tooltip":"IP: 141.226.228.48\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.193.44","label":"151.101.193.44","size":20,"tooltip":"IP: 151.101.193.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"35.223.238.178","label":"35.223.238.178","size":20,"tooltip":"IP: 35.223.238.178\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"52.209.232.99","label":"52.209.232.99","size":20,"tooltip":"IP: 52.209.232.99\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.229","label":"192.168.100.229","size":20,"tooltip":"IP: 192.168.100.229\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"3.124.64.248","label":"3.124.64.248","size":20,"tooltip":"IP: 3.124.64.248\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"108.177.15.84","label":"108.177.15.84","size":20,"tooltip":"IP: 108.177.15.84\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.38.131","label":"142.251.38.131","size":20,"tooltip":"IP: 142.251.38.131\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"23.44.215.194","label":"23.44.215.194","size":20,"tooltip":"IP: 23.44.215.194\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"188.125.72.139","label":"188.125.72.139","size":20,"tooltip":"IP: 188.125.72.139\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"255.255.255.255","label":"255.255.255.255","size":20,"tooltip":"IP: 255.255.255.255\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.107.243.93","label":"34.107.243.93","size":20,"tooltip":"IP: 34.107.243.93\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"185.89.210.212","label":"185.89.210.212","size":20,"tooltip":"IP: 185.89.210.212\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"224.0.0.1","label":"224.0.0.1","size":20,"tooltip":"IP: 224.0.0.1\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.74","label":"142.251.36.74","size":20,"tooltip":"IP: 142.251.36.74\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.226","label":"192.168.100.226","size":20,"tooltip":"IP: 192.168.100.226\u003cbr/\u003eRole: internal"}],
-                    links: [{"hasIssue":true,"label":"58478","source":"192.168.100.203","target":"104.18.26.193","tooltip":"Traffic: 192.168.100.203 -\u003e 104.18.26.193\u003cbr/\u003eBytes: 9614\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58484","source":"34.36.209.34","target":"192.168.100.203","tooltip":"Traffic: 34.36.209.34 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 8720\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"58452","source":"192.168.100.203","target":"172.64.146.215","tooltip":"Traffic: 192.168.100.203 -\u003e 172.64.146.215\u003cbr/\u003eBytes: 1180\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"69.173.156.138","target":"192.168.100.203","tooltip":"Traffic: 69.173.156.138 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 22060\u003cbr/\u003ePackets: 43","value":5},{"hasIssue":true,"label":"443","source":"18.97.36.68","target":"192.168.100.203","tooltip":"Traffic: 18.97.36.68 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 12644\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"443","source":"35.186.253.211","target":"192.168.100.203","tooltip":"Traffic: 35.186.253.211 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1272\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"58680","source":"104.18.41.41","target":"192.168.100.203","tooltip":"Traffic: 104.18.41.41 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 37216\u003cbr/\u003ePackets: 33","value":5},{"hasIssue":false,"label":"58572","source":"192.168.100.203","target":"142.251.36.65","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.65\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58493","source":"192.168.100.203","target":"87.248.119.252","tooltip":"Traffic: 192.168.100.203 -\u003e 87.248.119.252\u003cbr/\u003eBytes: 21594\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"58498","source":"192.168.100.203","target":"151.101.65.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.65.44\u003cbr/\u003eBytes: 7104\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"58570","source":"192.168.100.203","target":"142.251.141.161","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.141.161\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58485","source":"192.168.100.203","target":"209.38.50.75","tooltip":"Traffic: 192.168.100.203 -\u003e 209.38.50.75\u003cbr/\u003eBytes: 7270\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58481","source":"192.168.100.203","target":"35.186.253.211","tooltip":"Traffic: 192.168.100.203 -\u003e 35.186.253.211\u003cbr/\u003eBytes: 11192\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"443","source":"34.8.63.254","target":"192.168.100.203","tooltip":"Traffic: 34.8.63.254 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 16332\u003cbr/\u003ePackets: 41","value":5},{"hasIssue":false,"label":"5228","source":"74.125.133.188","target":"192.168.100.203","tooltip":"Traffic: 74.125.133.188 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.203","target":"142.251.36.68","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.68\u003cbr/\u003eBytes: 336\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"58667","source":"104.16.102.112","target":"192.168.100.203","tooltip":"Traffic: 104.16.102.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 15558\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"58663","source":"192.168.100.203","target":"69.173.156.138","tooltip":"Traffic: 192.168.100.203 -\u003e 69.173.156.138\u003cbr/\u003eBytes: 16340\u003cbr/\u003ePackets: 50","value":5},{"hasIssue":true,"label":"443","source":"34.149.50.64","target":"192.168.100.203","tooltip":"Traffic: 34.149.50.64 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2732\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"53788","source":"192.168.100.203","target":"52.110.4.150","tooltip":"Traffic: 192.168.100.203 -\u003e 52.110.4.150\u003cbr/\u003eBytes: 94314\u003cbr/\u003ePackets: 140","value":5},{"hasIssue":false,"label":"443","source":"34.120.133.55","target":"192.168.100.203","tooltip":"Traffic: 34.120.133.55 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 978\u003cbr/\u003ePackets: 9","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.191","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.191 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2452\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":true,"label":"58667","source":"192.168.100.203","target":"104.16.102.112","tooltip":"Traffic: 192.168.100.203 -\u003e 104.16.102.112\u003cbr/\u003eBytes: 7254\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"443","source":"140.82.113.25","target":"192.168.100.203","tooltip":"Traffic: 140.82.113.25 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 206\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"48358","source":"192.168.100.1","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.1 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2400\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"55801","source":"17.42.251.72","target":"192.168.100.203","tooltip":"Traffic: 17.42.251.72 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"mixed","source":"142.251.36.68","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.68 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 336\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.203","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.203 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 1872\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"58491","source":"192.168.100.203","target":"185.64.189.112","tooltip":"Traffic: 192.168.100.203 -\u003e 185.64.189.112\u003cbr/\u003eBytes: 17394\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":false,"label":"65529","source":"192.168.100.203","target":"34.141.79.142","tooltip":"Traffic: 192.168.100.203 -\u003e 34.141.79.142\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"7500","source":"34.141.79.142","target":"192.168.100.203","tooltip":"Traffic: 34.141.79.142 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 126\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58680","source":"192.168.100.203","target":"104.18.41.41","tooltip":"Traffic: 192.168.100.203 -\u003e 104.18.41.41\u003cbr/\u003eBytes: 49068\u003cbr/\u003ePackets: 38","value":5},{"hasIssue":false,"label":"443","source":"142.251.36.65","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.65 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58670","source":"192.168.100.203","target":"2.21.74.59","tooltip":"Traffic: 192.168.100.203 -\u003e 2.21.74.59\u003cbr/\u003eBytes: 3528\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":true,"label":"58659","source":"192.168.100.203","target":"18.97.36.68","tooltip":"Traffic: 192.168.100.203 -\u003e 18.97.36.68\u003cbr/\u003eBytes: 3820\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":true,"label":"58493","source":"87.248.119.252","target":"192.168.100.203","tooltip":"Traffic: 87.248.119.252 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 5682\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"9956","source":"192.168.100.220","target":"192.168.100.255","tooltip":"Traffic: 192.168.100.220 -\u003e 192.168.100.255\u003cbr/\u003eBytes: 1072\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"172.217.19.10","target":"192.168.100.203","tooltip":"Traffic: 172.217.19.10 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 22408\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":true,"label":"58669","source":"192.168.100.203","target":"8.8.8.8","tooltip":"Traffic: 192.168.100.203 -\u003e 8.8.8.8\u003cbr/\u003eBytes: 12927\u003cbr/\u003ePackets: 61","value":5},{"hasIssue":false,"label":"58469","source":"104.16.103.112","target":"192.168.100.203","tooltip":"Traffic: 104.16.103.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1440\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":false,"label":"58484","source":"192.168.100.203","target":"34.36.209.34","tooltip":"Traffic: 192.168.100.203 -\u003e 34.36.209.34\u003cbr/\u003eBytes: 17918\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"58475","source":"192.168.100.203","target":"142.251.141.162","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.141.162\u003cbr/\u003eBytes: 9326\u003cbr/\u003ePackets: 37","value":5},{"hasIssue":true,"label":"53788","source":"52.110.4.150","target":"192.168.100.203","tooltip":"Traffic: 52.110.4.150 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 106694\u003cbr/\u003ePackets: 108","value":5},{"hasIssue":true,"label":"53689","source":"192.168.100.203","target":"23.44.215.200","tooltip":"Traffic: 192.168.100.203 -\u003e 23.44.215.200\u003cbr/\u003eBytes: 1708\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"51366","source":"192.168.100.203","target":"8.8.4.4","tooltip":"Traffic: 192.168.100.203 -\u003e 8.8.4.4\u003cbr/\u003eBytes: 15616\u003cbr/\u003ePackets: 85","value":5},{"hasIssue":true,"label":"58488","source":"192.168.100.203","target":"34.243.32.177","tooltip":"Traffic: 192.168.100.203 -\u003e 34.243.32.177\u003cbr/\u003eBytes: 10562\u003cbr/\u003ePackets: 7","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"151.101.1.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.1.44\u003cbr/\u003eBytes: 11144\u003cbr/\u003ePackets: 11","value":5},{"hasIssue":true,"label":"443","source":"151.101.65.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.65.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2514\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"141.226.224.32","tooltip":"Traffic: 192.168.100.203 -\u003e 141.226.224.32\u003cbr/\u003eBytes: 9248\u003cbr/\u003ePackets: 41","value":5},{"hasIssue":true,"label":"58679","source":"192.168.100.203","target":"172.217.19.10","tooltip":"Traffic: 192.168.100.203 -\u003e 172.217.19.10\u003cbr/\u003eBytes: 13042\u003cbr/\u003ePackets: 19","value":5},{"hasIssue":false,"label":"443","source":"142.251.36.78","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.78 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"443","source":"178.250.7.136","target":"192.168.100.203","tooltip":"Traffic: 178.250.7.136 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 17672\u003cbr/\u003ePackets: 23","value":5},{"hasIssue":false,"label":"443","source":"104.18.26.193","target":"192.168.100.203","tooltip":"Traffic: 104.18.26.193 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 3026\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"172.217.19.2","target":"192.168.100.203","tooltip":"Traffic: 172.217.19.2 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 89786\u003cbr/\u003ePackets: 71","value":5},{"hasIssue":false,"label":"58502","source":"192.168.100.203","target":"141.226.228.48","tooltip":"Traffic: 192.168.100.203 -\u003e 141.226.228.48\u003cbr/\u003eBytes: 21102\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"151.101.193.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.193.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 7268\u003cbr/\u003ePackets: 17","value":5},{"hasIssue":false,"label":"58681","source":"192.168.100.203","target":"34.8.63.254","tooltip":"Traffic: 192.168.100.203 -\u003e 34.8.63.254\u003cbr/\u003eBytes: 22590\u003cbr/\u003ePackets: 36","value":5},{"hasIssue":true,"label":"53522","source":"35.223.238.178","target":"192.168.100.203","tooltip":"Traffic: 35.223.238.178 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 128880\u003cbr/\u003ePackets: 105","value":5},{"hasIssue":false,"label":"443","source":"142.251.141.162","target":"192.168.100.203","tooltip":"Traffic: 142.251.141.162 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 6688\u003cbr/\u003ePackets: 54","value":5},{"hasIssue":false,"label":"58660","source":"192.168.100.203","target":"142.251.36.78","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.78\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58654","source":"192.168.100.203","target":"52.209.232.99","tooltip":"Traffic: 192.168.100.203 -\u003e 52.209.232.99\u003cbr/\u003eBytes: 5168\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":true,"label":"58494","source":"192.168.100.203","target":"172.217.19.2","tooltip":"Traffic: 192.168.100.203 -\u003e 172.217.19.2\u003cbr/\u003eBytes: 26994\u003cbr/\u003ePackets: 46","value":5},{"hasIssue":false,"label":"443","source":"141.226.224.32","target":"192.168.100.203","tooltip":"Traffic: 141.226.224.32 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 19120\u003cbr/\u003ePackets: 37","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.229","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.229 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2802\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"3.124.64.248","tooltip":"Traffic: 192.168.100.203 -\u003e 3.124.64.248\u003cbr/\u003eBytes: 23668\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":true,"label":"58473","source":"192.168.100.203","target":"140.82.113.25","tooltip":"Traffic: 192.168.100.203 -\u003e 140.82.113.25\u003cbr/\u003eBytes: 202\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"58488","source":"34.243.32.177","target":"192.168.100.203","tooltip":"Traffic: 34.243.32.177 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2140\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"20002","source":"192.168.100.1","target":"192.168.100.255","tooltip":"Traffic: 192.168.100.1 -\u003e 192.168.100.255\u003cbr/\u003eBytes: 684\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58602","source":"192.168.100.203","target":"108.177.15.84","tooltip":"Traffic: 192.168.100.203 -\u003e 108.177.15.84\u003cbr/\u003eBytes: 282\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"55801","source":"192.168.100.203","target":"17.42.251.72","tooltip":"Traffic: 192.168.100.203 -\u003e 17.42.251.72\u003cbr/\u003eBytes: 80\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"443","source":"142.251.38.131","target":"192.168.100.203","tooltip":"Traffic: 142.251.38.131 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 9196\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"443","source":"23.44.215.200","target":"192.168.100.203","tooltip":"Traffic: 23.44.215.200 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 21874\u003cbr/\u003ePackets: 13","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.203","target":"192.168.100.191","tooltip":"Traffic: 192.168.100.203 -\u003e 192.168.100.191\u003cbr/\u003eBytes: 1552\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"23.44.215.194","tooltip":"Traffic: 192.168.100.203 -\u003e 23.44.215.194\u003cbr/\u003eBytes: 286\u003cbr/\u003ePackets: 5","value":5},{"hasIssue":false,"label":"51166","source":"192.168.100.203","target":"74.125.133.188","tooltip":"Traffic: 192.168.100.203 -\u003e 74.125.133.188\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58477","source":"192.168.100.203","target":"188.125.72.139","tooltip":"Traffic: 192.168.100.203 -\u003e 188.125.72.139\u003cbr/\u003eBytes: 47644\u003cbr/\u003ePackets: 44","value":5},{"hasIssue":true,"label":"58495","source":"192.168.100.203","target":"34.120.133.55","tooltip":"Traffic: 192.168.100.203 -\u003e 34.120.133.55\u003cbr/\u003eBytes: 1158\u003cbr/\u003ePackets: 9","value":5},{"hasIssue":false,"label":"46616","source":"192.168.100.1","target":"255.255.255.255","tooltip":"Traffic: 192.168.100.1 -\u003e 255.255.255.255\u003cbr/\u003eBytes: 6732\u003cbr/\u003ePackets: 18","value":5},{"hasIssue":true,"label":"443","source":"3.124.64.248","target":"192.168.100.203","tooltip":"Traffic: 3.124.64.248 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 11566\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"185.64.189.112","target":"192.168.100.203","tooltip":"Traffic: 185.64.189.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 548\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"209.38.50.75","target":"192.168.100.203","tooltip":"Traffic: 209.38.50.75 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 456\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"188.125.72.139","target":"192.168.100.203","tooltip":"Traffic: 188.125.72.139 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 11392\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":false,"label":"58499","source":"192.168.100.203","target":"151.101.193.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.193.44\u003cbr/\u003eBytes: 37280\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":false,"label":"58638","source":"192.168.100.203","target":"34.107.243.93","tooltip":"Traffic: 192.168.100.203 -\u003e 34.107.243.93\u003cbr/\u003eBytes: 80\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"58664","source":"192.168.100.203","target":"185.89.210.212","tooltip":"Traffic: 192.168.100.203 -\u003e 185.89.210.212\u003cbr/\u003eBytes: 25172\u003cbr/\u003ePackets: 35","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.1","target":"224.0.0.1","tooltip":"Traffic: 192.168.100.1 -\u003e 224.0.0.1\u003cbr/\u003eBytes: 64\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58479","source":"151.101.1.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.1.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 19328\u003cbr/\u003ePackets: 12","value":5},{"hasIssue":true,"label":"53522","source":"192.168.100.203","target":"35.223.238.178","tooltip":"Traffic: 192.168.100.203 -\u003e 35.223.238.178\u003cbr/\u003eBytes: 43772\u003cbr/\u003ePackets: 102","value":5},{"hasIssue":true,"label":"58613","source":"142.251.36.74","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.74 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1158\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"443","source":"52.209.232.99","target":"192.168.100.203","tooltip":"Traffic: 52.209.232.99 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1972\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58570","source":"142.251.141.161","target":"192.168.100.203","tooltip":"Traffic: 142.251.141.161 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58664","source":"185.89.210.212","target":"192.168.100.203","tooltip":"Traffic: 185.89.210.212 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 16808\u003cbr/\u003ePackets: 26","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.226","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.226 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 32\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"443","source":"23.44.215.194","target":"192.168.100.203","tooltip":"Traffic: 23.44.215.194 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 218\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":true,"label":"443","source":"172.64.146.215","target":"192.168.100.203","tooltip":"Traffic: 172.64.146.215 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 10306\u003cbr/\u003ePackets: 25","value":5},{"hasIssue":true,"label":"58469","source":"192.168.100.203","target":"104.16.103.112","tooltip":"Traffic: 192.168.100.203 -\u003e 104.16.103.112\u003cbr/\u003eBytes: 1504\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":true,"label":"58662","source":"192.168.100.203","target":"178.250.7.136","tooltip":"Traffic: 192.168.100.203 -\u003e 178.250.7.136\u003cbr/\u003eBytes: 16640\u003cbr/\u003ePackets: 35","value":5},{"hasIssue":false,"label":"58638","source":"34.107.243.93","target":"192.168.100.203","tooltip":"Traffic: 34.107.243.93 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"53","source":"8.8.8.8","target":"192.168.100.203","tooltip":"Traffic: 8.8.8.8 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 43359\u003cbr/\u003ePackets: 82","value":5},{"hasIssue":false,"label":"58492","source":"192.168.100.203","target":"34.149.50.64","tooltip":"Traffic: 192.168.100.203 -\u003e 34.149.50.64\u003cbr/\u003eBytes: 6308\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":true,"label":"443","source":"8.8.4.4","target":"192.168.100.203","tooltip":"Traffic: 8.8.4.4 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 41546\u003cbr/\u003ePackets: 130","value":5},{"hasIssue":true,"label":"443","source":"141.226.228.48","target":"192.168.100.203","tooltip":"Traffic: 141.226.228.48 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 10414\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"58613","source":"192.168.100.203","target":"142.251.36.74","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.74\u003cbr/\u003eBytes: 300\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"2.21.74.59","target":"192.168.100.203","tooltip":"Traffic: 2.21.74.59 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 66438\u003cbr/\u003ePackets: 31","value":5},{"hasIssue":false,"label":"58672","source":"192.168.100.203","target":"142.251.38.131","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.38.131\u003cbr/\u003eBytes: 4230\u003cbr/\u003ePackets: 12","value":5},{"hasIssue":false,"label":"443","source":"108.177.15.84","target":"192.168.100.203","tooltip":"Traffic: 108.177.15.84 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5}]
+                    nodes: [{"group":"internal","hasIssue":false,"id":"192.168.100.203","label":"192.168.100.203","size":20,"tooltip":"IP: 192.168.100.203\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"140.82.113.25","label":"140.82.113.25","size":20,"tooltip":"IP: 140.82.113.25\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.141.161","label":"142.251.141.161","size":20,"tooltip":"IP: 142.251.141.161\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.1.44","label":"151.101.1.44","size":20,"tooltip":"IP: 151.101.1.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"87.248.119.252","label":"87.248.119.252","size":20,"tooltip":"IP: 87.248.119.252\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.65","label":"142.251.36.65","size":20,"tooltip":"IP: 142.251.36.65\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.120.133.55","label":"34.120.133.55","size":20,"tooltip":"IP: 34.120.133.55\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"2.21.74.59","label":"2.21.74.59","size":20,"tooltip":"IP: 2.21.74.59\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"74.125.133.188","label":"74.125.133.188","size":20,"tooltip":"IP: 74.125.133.188\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.65.44","label":"151.101.65.44","size":20,"tooltip":"IP: 151.101.65.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"141.226.228.48","label":"141.226.228.48","size":20,"tooltip":"IP: 141.226.228.48\u003cbr/\u003eRole: external"},{"group":"router","hasIssue":false,"id":"192.168.100.1","label":"192.168.100.1","size":20,"tooltip":"IP: 192.168.100.1\u003cbr/\u003eRole: router"},{"group":"external","hasIssue":false,"id":"224.0.0.1","label":"224.0.0.1","size":20,"tooltip":"IP: 224.0.0.1\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.38.131","label":"142.251.38.131","size":20,"tooltip":"IP: 142.251.38.131\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.18.26.193","label":"104.18.26.193","size":20,"tooltip":"IP: 104.18.26.193\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"209.38.50.75","label":"209.38.50.75","size":20,"tooltip":"IP: 209.38.50.75\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"108.177.15.84","label":"108.177.15.84","size":20,"tooltip":"IP: 108.177.15.84\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"35.223.238.178","label":"35.223.238.178","size":20,"tooltip":"IP: 35.223.238.178\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"8.8.8.8","label":"8.8.8.8","size":20,"tooltip":"IP: 8.8.8.8\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.193.44","label":"151.101.193.44","size":20,"tooltip":"IP: 151.101.193.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"255.255.255.255","label":"255.255.255.255","size":20,"tooltip":"IP: 255.255.255.255\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"185.89.210.212","label":"185.89.210.212","size":20,"tooltip":"IP: 185.89.210.212\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"185.64.189.112","label":"185.64.189.112","size":20,"tooltip":"IP: 185.64.189.112\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.191","label":"192.168.100.191","size":20,"tooltip":"IP: 192.168.100.191\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"18.97.36.68","label":"18.97.36.68","size":20,"tooltip":"IP: 18.97.36.68\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"17.42.251.72","label":"17.42.251.72","size":20,"tooltip":"IP: 17.42.251.72\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.74","label":"142.251.36.74","size":20,"tooltip":"IP: 142.251.36.74\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.64.146.215","label":"172.64.146.215","size":20,"tooltip":"IP: 172.64.146.215\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.36.209.34","label":"34.36.209.34","size":20,"tooltip":"IP: 34.36.209.34\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.141.162","label":"142.251.141.162","size":20,"tooltip":"IP: 142.251.141.162\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.217.19.2","label":"172.217.19.2","size":20,"tooltip":"IP: 172.217.19.2\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"35.186.253.211","label":"35.186.253.211","size":20,"tooltip":"IP: 35.186.253.211\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.16.103.112","label":"104.16.103.112","size":20,"tooltip":"IP: 104.16.103.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"3.124.64.248","label":"3.124.64.248","size":20,"tooltip":"IP: 3.124.64.248\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.226","label":"192.168.100.226","size":20,"tooltip":"IP: 192.168.100.226\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"224.0.0.251","label":"224.0.0.251","size":20,"tooltip":"IP: 224.0.0.251\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.149.50.64","label":"34.149.50.64","size":20,"tooltip":"IP: 34.149.50.64\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"188.125.72.139","label":"188.125.72.139","size":20,"tooltip":"IP: 188.125.72.139\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"8.8.4.4","label":"8.8.4.4","size":20,"tooltip":"IP: 8.8.4.4\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"69.173.156.138","label":"69.173.156.138","size":20,"tooltip":"IP: 69.173.156.138\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.16.102.112","label":"104.16.102.112","size":20,"tooltip":"IP: 104.16.102.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"178.250.7.136","label":"178.250.7.136","size":20,"tooltip":"IP: 178.250.7.136\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.255","label":"192.168.100.255","size":20,"tooltip":"IP: 192.168.100.255\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"23.44.215.194","label":"23.44.215.194","size":20,"tooltip":"IP: 23.44.215.194\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.68","label":"142.251.36.68","size":20,"tooltip":"IP: 142.251.36.68\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"141.226.224.32","label":"141.226.224.32","size":20,"tooltip":"IP: 141.226.224.32\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.78","label":"142.251.36.78","size":20,"tooltip":"IP: 142.251.36.78\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.243.32.177","label":"34.243.32.177","size":20,"tooltip":"IP: 34.243.32.177\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"52.209.232.99","label":"52.209.232.99","size":20,"tooltip":"IP: 52.209.232.99\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.18.41.41","label":"104.18.41.41","size":20,"tooltip":"IP: 104.18.41.41\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.217.19.10","label":"172.217.19.10","size":20,"tooltip":"IP: 172.217.19.10\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.229","label":"192.168.100.229","size":20,"tooltip":"IP: 192.168.100.229\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"23.44.215.200","label":"23.44.215.200","size":20,"tooltip":"IP: 23.44.215.200\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.107.243.93","label":"34.107.243.93","size":20,"tooltip":"IP: 34.107.243.93\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.220","label":"192.168.100.220","size":20,"tooltip":"IP: 192.168.100.220\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"34.141.79.142","label":"34.141.79.142","size":20,"tooltip":"IP: 34.141.79.142\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"52.110.4.150","label":"52.110.4.150","size":20,"tooltip":"IP: 52.110.4.150\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.8.63.254","label":"34.8.63.254","size":20,"tooltip":"IP: 34.8.63.254\u003cbr/\u003eRole: external"}],
+                    links: [{"hasIssue":true,"label":"58473","source":"192.168.100.203","target":"140.82.113.25","tooltip":"Traffic: 192.168.100.203 -\u003e 140.82.113.25\u003cbr/\u003eBytes: 202\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"58570","source":"192.168.100.203","target":"142.251.141.161","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.141.161\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58479","source":"151.101.1.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.1.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 19328\u003cbr/\u003ePackets: 12","value":5},{"hasIssue":true,"label":"58493","source":"192.168.100.203","target":"87.248.119.252","tooltip":"Traffic: 192.168.100.203 -\u003e 87.248.119.252\u003cbr/\u003eBytes: 21594\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"443","source":"142.251.36.65","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.65 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"443","source":"34.120.133.55","target":"192.168.100.203","tooltip":"Traffic: 34.120.133.55 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 978\u003cbr/\u003ePackets: 9","value":5},{"hasIssue":true,"label":"443","source":"2.21.74.59","target":"192.168.100.203","tooltip":"Traffic: 2.21.74.59 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 66438\u003cbr/\u003ePackets: 31","value":5},{"hasIssue":false,"label":"5228","source":"74.125.133.188","target":"192.168.100.203","tooltip":"Traffic: 74.125.133.188 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"443","source":"151.101.65.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.65.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2514\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"141.226.228.48","target":"192.168.100.203","tooltip":"Traffic: 141.226.228.48 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 10414\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.1","target":"224.0.0.1","tooltip":"Traffic: 192.168.100.1 -\u003e 224.0.0.1\u003cbr/\u003eBytes: 64\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58672","source":"192.168.100.203","target":"142.251.38.131","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.38.131\u003cbr/\u003eBytes: 4230\u003cbr/\u003ePackets: 12","value":5},{"hasIssue":false,"label":"443","source":"104.18.26.193","target":"192.168.100.203","tooltip":"Traffic: 104.18.26.193 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 3026\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"443","source":"209.38.50.75","target":"192.168.100.203","tooltip":"Traffic: 209.38.50.75 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 456\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"58602","source":"108.177.15.84","target":"192.168.100.203","tooltip":"Traffic: 108.177.15.84 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"53522","source":"192.168.100.203","target":"35.223.238.178","tooltip":"Traffic: 192.168.100.203 -\u003e 35.223.238.178\u003cbr/\u003eBytes: 43772\u003cbr/\u003ePackets: 102","value":5},{"hasIssue":true,"label":"443","source":"8.8.8.8","target":"192.168.100.203","tooltip":"Traffic: 8.8.8.8 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 43359\u003cbr/\u003ePackets: 82","value":5},{"hasIssue":false,"label":"51166","source":"192.168.100.203","target":"74.125.133.188","tooltip":"Traffic: 192.168.100.203 -\u003e 74.125.133.188\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"443","source":"151.101.193.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.193.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 7268\u003cbr/\u003ePackets: 17","value":5},{"hasIssue":false,"label":"46616","source":"192.168.100.1","target":"255.255.255.255","tooltip":"Traffic: 192.168.100.1 -\u003e 255.255.255.255\u003cbr/\u003eBytes: 6732\u003cbr/\u003ePackets: 18","value":5},{"hasIssue":true,"label":"10259","source":"192.168.100.203","target":"8.8.8.8","tooltip":"Traffic: 192.168.100.203 -\u003e 8.8.8.8\u003cbr/\u003eBytes: 12927\u003cbr/\u003ePackets: 61","value":5},{"hasIssue":true,"label":"443","source":"185.89.210.212","target":"192.168.100.203","tooltip":"Traffic: 185.89.210.212 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 16808\u003cbr/\u003ePackets: 26","value":5},{"hasIssue":true,"label":"58664","source":"192.168.100.203","target":"185.89.210.212","tooltip":"Traffic: 192.168.100.203 -\u003e 185.89.210.212\u003cbr/\u003eBytes: 25172\u003cbr/\u003ePackets: 35","value":5},{"hasIssue":false,"label":"58498","source":"192.168.100.203","target":"151.101.65.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.65.44\u003cbr/\u003eBytes: 7104\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58485","source":"192.168.100.203","target":"209.38.50.75","tooltip":"Traffic: 192.168.100.203 -\u003e 209.38.50.75\u003cbr/\u003eBytes: 7270\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"443","source":"192.168.100.203","target":"185.64.189.112","tooltip":"Traffic: 192.168.100.203 -\u003e 185.64.189.112\u003cbr/\u003eBytes: 17394\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.203","target":"192.168.100.191","tooltip":"Traffic: 192.168.100.203 -\u003e 192.168.100.191\u003cbr/\u003eBytes: 1552\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"443","source":"142.251.38.131","target":"192.168.100.203","tooltip":"Traffic: 142.251.38.131 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 9196\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"443","source":"18.97.36.68","target":"192.168.100.203","tooltip":"Traffic: 18.97.36.68 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 12644\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"55801","source":"192.168.100.203","target":"17.42.251.72","tooltip":"Traffic: 192.168.100.203 -\u003e 17.42.251.72\u003cbr/\u003eBytes: 80\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58502","source":"192.168.100.203","target":"141.226.228.48","tooltip":"Traffic: 192.168.100.203 -\u003e 141.226.228.48\u003cbr/\u003eBytes: 21102\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":false,"label":"58451","source":"192.168.100.203","target":"142.251.36.74","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.74\u003cbr/\u003eBytes: 300\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"58452","source":"192.168.100.203","target":"172.64.146.215","tooltip":"Traffic: 192.168.100.203 -\u003e 172.64.146.215\u003cbr/\u003eBytes: 1180\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"34.36.209.34","target":"192.168.100.203","tooltip":"Traffic: 34.36.209.34 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 8720\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"443","source":"142.251.141.162","target":"192.168.100.203","tooltip":"Traffic: 142.251.141.162 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 6688\u003cbr/\u003ePackets: 54","value":5},{"hasIssue":false,"label":"443","source":"140.82.113.25","target":"192.168.100.203","tooltip":"Traffic: 140.82.113.25 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 206\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":true,"label":"443","source":"87.248.119.252","target":"192.168.100.203","tooltip":"Traffic: 87.248.119.252 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 5682\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"443","source":"172.217.19.2","target":"192.168.100.203","tooltip":"Traffic: 172.217.19.2 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 89786\u003cbr/\u003ePackets: 71","value":5},{"hasIssue":true,"label":"58613","source":"142.251.36.74","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.74 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1158\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58481","source":"192.168.100.203","target":"35.186.253.211","tooltip":"Traffic: 192.168.100.203 -\u003e 35.186.253.211\u003cbr/\u003eBytes: 11192\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":false,"label":"443","source":"104.16.103.112","target":"192.168.100.203","tooltip":"Traffic: 104.16.103.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1440\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"3.124.64.248","tooltip":"Traffic: 192.168.100.203 -\u003e 3.124.64.248\u003cbr/\u003eBytes: 23668\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.226","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.226 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 32\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58492","source":"192.168.100.203","target":"34.149.50.64","tooltip":"Traffic: 192.168.100.203 -\u003e 34.149.50.64\u003cbr/\u003eBytes: 6308\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":true,"label":"58477","source":"192.168.100.203","target":"188.125.72.139","tooltip":"Traffic: 192.168.100.203 -\u003e 188.125.72.139\u003cbr/\u003eBytes: 47644\u003cbr/\u003ePackets: 44","value":5},{"hasIssue":false,"label":"51366","source":"192.168.100.203","target":"8.8.4.4","tooltip":"Traffic: 192.168.100.203 -\u003e 8.8.4.4\u003cbr/\u003eBytes: 15616\u003cbr/\u003ePackets: 85","value":5},{"hasIssue":true,"label":"58663","source":"192.168.100.203","target":"69.173.156.138","tooltip":"Traffic: 192.168.100.203 -\u003e 69.173.156.138\u003cbr/\u003eBytes: 16340\u003cbr/\u003ePackets: 50","value":5},{"hasIssue":false,"label":"58667","source":"104.16.102.112","target":"192.168.100.203","tooltip":"Traffic: 104.16.102.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 15558\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"48358","source":"192.168.100.1","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.1 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2400\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"993","source":"17.42.251.72","target":"192.168.100.203","tooltip":"Traffic: 17.42.251.72 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"53705","source":"35.223.238.178","target":"192.168.100.203","tooltip":"Traffic: 35.223.238.178 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 128880\u003cbr/\u003ePackets: 105","value":5},{"hasIssue":true,"label":"58469","source":"192.168.100.203","target":"104.16.103.112","tooltip":"Traffic: 192.168.100.203 -\u003e 104.16.103.112\u003cbr/\u003eBytes: 1504\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":true,"label":"58662","source":"178.250.7.136","target":"192.168.100.203","tooltip":"Traffic: 178.250.7.136 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 17672\u003cbr/\u003ePackets: 23","value":5},{"hasIssue":false,"label":"57834","source":"192.168.100.1","target":"192.168.100.255","tooltip":"Traffic: 192.168.100.1 -\u003e 192.168.100.255\u003cbr/\u003eBytes: 684\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"52691","source":"192.168.100.203","target":"23.44.215.194","tooltip":"Traffic: 192.168.100.203 -\u003e 23.44.215.194\u003cbr/\u003eBytes: 286\u003cbr/\u003ePackets: 5","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.203","target":"142.251.36.68","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.68\u003cbr/\u003eBytes: 336\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"141.226.224.32","target":"192.168.100.203","tooltip":"Traffic: 141.226.224.32 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 19120\u003cbr/\u003ePackets: 37","value":5},{"hasIssue":false,"label":"58660","source":"192.168.100.203","target":"142.251.36.78","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.78\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58488","source":"34.243.32.177","target":"192.168.100.203","tooltip":"Traffic: 34.243.32.177 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2140\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58654","source":"192.168.100.203","target":"52.209.232.99","tooltip":"Traffic: 192.168.100.203 -\u003e 52.209.232.99\u003cbr/\u003eBytes: 5168\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":true,"label":"443","source":"104.18.41.41","target":"192.168.100.203","tooltip":"Traffic: 104.18.41.41 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 37216\u003cbr/\u003ePackets: 33","value":5},{"hasIssue":false,"label":"58602","source":"192.168.100.203","target":"108.177.15.84","tooltip":"Traffic: 192.168.100.203 -\u003e 108.177.15.84\u003cbr/\u003eBytes: 282\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.191","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.191 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2452\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":true,"label":"58673","source":"192.168.100.203","target":"178.250.7.136","tooltip":"Traffic: 192.168.100.203 -\u003e 178.250.7.136\u003cbr/\u003eBytes: 16640\u003cbr/\u003ePackets: 35","value":5},{"hasIssue":true,"label":"443","source":"8.8.4.4","target":"192.168.100.203","tooltip":"Traffic: 8.8.4.4 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 41546\u003cbr/\u003ePackets: 130","value":5},{"hasIssue":true,"label":"58488","source":"192.168.100.203","target":"34.243.32.177","tooltip":"Traffic: 192.168.100.203 -\u003e 34.243.32.177\u003cbr/\u003eBytes: 10562\u003cbr/\u003ePackets: 7","value":5},{"hasIssue":false,"label":"443","source":"188.125.72.139","target":"192.168.100.203","tooltip":"Traffic: 188.125.72.139 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 11392\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":true,"label":"58668","source":"192.168.100.203","target":"141.226.224.32","tooltip":"Traffic: 192.168.100.203 -\u003e 141.226.224.32\u003cbr/\u003eBytes: 9248\u003cbr/\u003ePackets: 41","value":5},{"hasIssue":false,"label":"443","source":"23.44.215.194","target":"192.168.100.203","tooltip":"Traffic: 23.44.215.194 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 218\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":true,"label":"58679","source":"192.168.100.203","target":"172.217.19.10","tooltip":"Traffic: 192.168.100.203 -\u003e 172.217.19.10\u003cbr/\u003eBytes: 13042\u003cbr/\u003ePackets: 19","value":5},{"hasIssue":true,"label":"58478","source":"192.168.100.203","target":"104.18.26.193","tooltip":"Traffic: 192.168.100.203 -\u003e 104.18.26.193\u003cbr/\u003eBytes: 9614\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.229","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.229 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2802\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58494","source":"192.168.100.203","target":"172.217.19.2","tooltip":"Traffic: 192.168.100.203 -\u003e 172.217.19.2\u003cbr/\u003eBytes: 26994\u003cbr/\u003ePackets: 46","value":5},{"hasIssue":true,"label":"53689","source":"192.168.100.203","target":"23.44.215.200","tooltip":"Traffic: 192.168.100.203 -\u003e 23.44.215.200\u003cbr/\u003eBytes: 1708\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"443","source":"34.107.243.93","target":"192.168.100.203","tooltip":"Traffic: 34.107.243.93 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.203","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.203 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 1872\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":true,"label":"58479","source":"192.168.100.203","target":"151.101.1.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.1.44\u003cbr/\u003eBytes: 11144\u003cbr/\u003ePackets: 11","value":5},{"hasIssue":false,"label":"443","source":"172.217.19.10","target":"192.168.100.203","tooltip":"Traffic: 172.217.19.10 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 22408\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":true,"label":"443","source":"172.64.146.215","target":"192.168.100.203","tooltip":"Traffic: 172.64.146.215 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 10306\u003cbr/\u003ePackets: 25","value":5},{"hasIssue":false,"label":"9956","source":"192.168.100.220","target":"192.168.100.255","tooltip":"Traffic: 192.168.100.220 -\u003e 192.168.100.255\u003cbr/\u003eBytes: 1072\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":true,"label":"7500","source":"34.141.79.142","target":"192.168.100.203","tooltip":"Traffic: 34.141.79.142 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 126\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58499","source":"192.168.100.203","target":"151.101.193.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.193.44\u003cbr/\u003eBytes: 37280\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"18.97.36.68","tooltip":"Traffic: 192.168.100.203 -\u003e 18.97.36.68\u003cbr/\u003eBytes: 3820\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"443","source":"52.209.232.99","target":"192.168.100.203","tooltip":"Traffic: 52.209.232.99 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1972\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"65529","source":"192.168.100.203","target":"34.141.79.142","tooltip":"Traffic: 192.168.100.203 -\u003e 34.141.79.142\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"443","source":"23.44.215.200","target":"192.168.100.203","tooltip":"Traffic: 23.44.215.200 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 21874\u003cbr/\u003ePackets: 13","value":5},{"hasIssue":false,"label":"mixed","source":"142.251.36.68","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.68 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 336\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"142.251.36.78","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.78 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58572","source":"192.168.100.203","target":"142.251.36.65","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.65\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58670","source":"192.168.100.203","target":"2.21.74.59","tooltip":"Traffic: 192.168.100.203 -\u003e 2.21.74.59\u003cbr/\u003eBytes: 3528\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":false,"label":"443","source":"142.251.141.161","target":"192.168.100.203","tooltip":"Traffic: 142.251.141.161 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58495","source":"192.168.100.203","target":"34.120.133.55","tooltip":"Traffic: 192.168.100.203 -\u003e 34.120.133.55\u003cbr/\u003eBytes: 1158\u003cbr/\u003ePackets: 9","value":5},{"hasIssue":true,"label":"58667","source":"192.168.100.203","target":"104.16.102.112","tooltip":"Traffic: 192.168.100.203 -\u003e 104.16.102.112\u003cbr/\u003eBytes: 7254\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":true,"label":"58491","source":"185.64.189.112","target":"192.168.100.203","tooltip":"Traffic: 185.64.189.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 548\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"52.110.4.150","tooltip":"Traffic: 192.168.100.203 -\u003e 52.110.4.150\u003cbr/\u003eBytes: 94314\u003cbr/\u003ePackets: 140","value":5},{"hasIssue":true,"label":"53789","source":"52.110.4.150","target":"192.168.100.203","tooltip":"Traffic: 52.110.4.150 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 106694\u003cbr/\u003ePackets: 108","value":5},{"hasIssue":true,"label":"58475","source":"192.168.100.203","target":"142.251.141.162","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.141.162\u003cbr/\u003eBytes: 9326\u003cbr/\u003ePackets: 37","value":5},{"hasIssue":true,"label":"58674","source":"3.124.64.248","target":"192.168.100.203","tooltip":"Traffic: 3.124.64.248 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 11566\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":false,"label":"58638","source":"192.168.100.203","target":"34.107.243.93","tooltip":"Traffic: 192.168.100.203 -\u003e 34.107.243.93\u003cbr/\u003eBytes: 80\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58484","source":"192.168.100.203","target":"34.36.209.34","tooltip":"Traffic: 192.168.100.203 -\u003e 34.36.209.34\u003cbr/\u003eBytes: 17918\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"443","source":"69.173.156.138","target":"192.168.100.203","tooltip":"Traffic: 69.173.156.138 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 22060\u003cbr/\u003ePackets: 43","value":5},{"hasIssue":true,"label":"443","source":"34.8.63.254","target":"192.168.100.203","tooltip":"Traffic: 34.8.63.254 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 16332\u003cbr/\u003ePackets: 41","value":5},{"hasIssue":true,"label":"58680","source":"192.168.100.203","target":"104.18.41.41","tooltip":"Traffic: 192.168.100.203 -\u003e 104.18.41.41\u003cbr/\u003eBytes: 49068\u003cbr/\u003ePackets: 38","value":5},{"hasIssue":false,"label":"58681","source":"192.168.100.203","target":"34.8.63.254","tooltip":"Traffic: 192.168.100.203 -\u003e 34.8.63.254\u003cbr/\u003eBytes: 22590\u003cbr/\u003ePackets: 36","value":5},{"hasIssue":false,"label":"443","source":"35.186.253.211","target":"192.168.100.203","tooltip":"Traffic: 35.186.253.211 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1272\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"443","source":"34.149.50.64","target":"192.168.100.203","tooltip":"Traffic: 34.149.50.64 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2732\u003cbr/\u003ePackets: 10","value":5}]
                 };
                 if (networkData.nodes.length > 0) {
                     createNetworkDiagram(networkData.nodes, networkData.links);
@@ -1465,7 +1615,7 @@
                 }
                 
                 // Sankey Diagram
-                const sankeyData = {"links":[{"source":0,"target":1,"value":163071},{"source":1,"target":2,"value":163071}],"nodes":[{"name":"Internal Network"},{"name":"Gateway"},{"name":"Internet"}]};
+                const sankeyData = {"links":[{"source":0,"target":1,"value":339058},{"source":1,"target":2,"value":339058}],"nodes":[{"name":"Internal Clients"},{"name":"Local Gateway"},{"name":"Internet"}]};
                 if (sankeyData.nodes.length > 0) {
                     createSankeyDiagram(sankeyData);
                 }

@@ -3,10 +3,44 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/gocisse/sdwan-triage/pkg/output"
 )
+
+// categorizeIPForD3 categorizes an IP address for D3.js visualization
+// Returns: "router" for gateway IPs (.1 or .254 in private ranges),
+// "internal" for RFC 1918 private IPs, "external" for public IPs
+func categorizeIPForD3(ipStr string) string {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return "external"
+	}
+
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return "external"
+	}
+
+	a, b, _, d := ip4[0], ip4[1], ip4[2], ip4[3]
+
+	// Check if it's a private IP (RFC 1918)
+	isPrivate := (a == 10) ||
+		(a == 172 && b >= 16 && b <= 31) ||
+		(a == 192 && b == 168)
+
+	if !isPrivate {
+		return "external"
+	}
+
+	// Check for Router/Gateway (.1 or .254) within private ranges - check this FIRST
+	if d == 1 || d == 254 {
+		return "router"
+	}
+
+	return "internal"
+}
 
 // exportToEnhancedHTML generates a D3.js-powered HTML report with action items
 func exportToEnhancedHTML(r *TriageReport, filename string, pathStats *PathStats, filter *Filter, traceData *TracerouteData) error {
@@ -250,7 +284,7 @@ func generateDNSAnomaliesCard(r *TriageReport) string {
 	return html
 }
 
-// generateTCPRetransmissionsCard creates the TCP retransmissions section
+// generateTCPRetransmissionsCard creates the TCP retransmissions section with collapsible action items
 func generateTCPRetransmissionsCard(r *TriageReport) string {
 	html := `<div class="card">
     <div class="card-header">
@@ -269,28 +303,48 @@ func generateTCPRetransmissionsCard(r *TriageReport) string {
             <tr>
                 <th>Source</th>
                 <th>Destination</th>
-                <th>Port</th>
+                <th>Status</th>
             </tr>`
 
 		for i, flow := range r.TCPRetransmissions {
 			if i >= 20 {
 				break
 			}
+
+			// Main row with toggle button
 			html += fmt.Sprintf(`
             <tr>
-                <td>%s</td>
-                <td>%s</td>
-                <td><span class="badge badge-info">%d</span></td>
+                <td>%s:%d</td>
+                <td>%s:%d</td>
+                <td>
+                    <span class="badge badge-warning">Packet Loss</span>
+                    <button class="toggle-action-btn" onclick="toggleAction(this)" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; background: #6c757d; color: white; border: none; border-radius: 4px;">Show Action</button>
+                </td>
+            </tr>`,
+				output.EscapeHTML(flow.SrcIP),
+				flow.SrcPort,
+				output.EscapeHTML(flow.DstIP),
+				flow.DstPort)
+
+			// Hidden action row with specific recommendations
+			html += fmt.Sprintf(`
+            <tr class="action-row" style="display: none;">
+                <td colspan="3">
+                    <div class="action-details" style="padding: 12px; background: #f8f9fa; border-left: 4px solid #ffc107; margin: 5px 0;">
+                        <strong><i class="fas fa-wrench"></i> Recommended Action:</strong>
+                        <ul style="margin: 8px 0 0 20px; padding: 0;">
+                            <li>Check network links between <strong>%s</strong> and <strong>%s</strong> for congestion</li>
+                            <li>Review QoS settings on intermediate routers and switches</li>
+                            <li>Verify firewall rules are not causing packet drops on port <strong>%d</strong></li>
+                            <li>Check for duplex mismatch or cable issues on affected interfaces</li>
+                            <li>Monitor interface error counters (CRC errors, collisions, drops)</li>
+                        </ul>
+                    </div>
+                </td>
             </tr>`,
 				output.EscapeHTML(flow.SrcIP),
 				output.EscapeHTML(flow.DstIP),
 				flow.DstPort)
-
-			// Add specific action item
-			html += `<tr><td colspan="3">`
-			html += output.GenerateFindingSpecificActions("tcp_retransmit",
-				fmt.Sprintf("Flow: %s:%d -> %s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort))
-			html += `</td></tr>`
 		}
 
 		html += `</table>`
@@ -565,10 +619,7 @@ func generateD3DataInitialization(r *TriageReport, pathStats *PathStats, traceDa
 
 		if !nodeMap[src] {
 			nodeMap[src] = true
-			group := "internal"
-			if !isPrivateOrReservedIP(src) {
-				group = "external"
-			}
+			group := categorizeIPForD3(src)
 			nodes = append(nodes, map[string]interface{}{
 				"id":       src,
 				"label":    src,
@@ -581,10 +632,7 @@ func generateD3DataInitialization(r *TriageReport, pathStats *PathStats, traceDa
 
 		if !nodeMap[dst] {
 			nodeMap[dst] = true
-			group := "internal"
-			if !isPrivateOrReservedIP(dst) {
-				group = "external"
-			}
+			group := categorizeIPForD3(dst)
 			nodes = append(nodes, map[string]interface{}{
 				"id":       dst,
 				"label":    dst,
@@ -630,11 +678,97 @@ func generateD3DataInitialization(r *TriageReport, pathStats *PathStats, traceDa
 	}
 	timelineJSON, _ := json.Marshal(timelineEvents)
 
-	// Create Sankey data from traffic analysis
+	// Create Sankey data from TopConversationsByBytes
 	sankeyNodes := []map[string]string{}
 	sankeyLinks := []map[string]interface{}{}
 
-	if len(r.TrafficAnalysis) > 0 {
+	// Use TopConversationsByBytes for more accurate Sankey data
+	if len(r.BandwidthReport.TopConversationsByBytes) > 0 {
+		// Build node map to track unique entities
+		nodeIndex := make(map[string]int)
+
+		// Add logical grouping nodes first
+		sankeyNodes = append(sankeyNodes, map[string]string{"name": "Internal Clients"})
+		nodeIndex["Internal Clients"] = 0
+		sankeyNodes = append(sankeyNodes, map[string]string{"name": "Local Gateway"})
+		nodeIndex["Local Gateway"] = 1
+		sankeyNodes = append(sankeyNodes, map[string]string{"name": "Internet"})
+		nodeIndex["Internet"] = 2
+
+		// Track traffic flows by category
+		internalToGateway := uint64(0)
+		gatewayToExternal := uint64(0)
+		externalServers := make(map[string]uint64)
+
+		for i, conv := range r.BandwidthReport.TopConversationsByBytes {
+			if i >= 15 { // Limit to top 15 for readability
+				break
+			}
+
+			srcCategory := categorizeIPForD3(conv.SrcIP)
+			dstCategory := categorizeIPForD3(conv.DstIP)
+
+			// Aggregate traffic by flow direction
+			if srcCategory == "internal" || srcCategory == "router" {
+				if dstCategory == "external" {
+					// Internal -> External
+					internalToGateway += conv.TotalBytes
+					gatewayToExternal += conv.TotalBytes
+
+					// Track specific external servers
+					serverName := conv.DstIP
+					if conv.DstPort == 443 || conv.DstPort == 80 {
+						serverName = fmt.Sprintf("%s:%d", conv.DstIP, conv.DstPort)
+					}
+					externalServers[serverName] += conv.TotalBytes
+				} else {
+					// Internal -> Internal (LAN traffic)
+					internalToGateway += conv.TotalBytes / 2
+				}
+			} else if srcCategory == "external" {
+				if dstCategory == "internal" || dstCategory == "router" {
+					// External -> Internal (response traffic)
+					gatewayToExternal += conv.TotalBytes
+					internalToGateway += conv.TotalBytes
+				}
+			}
+		}
+
+		// Add links for aggregated traffic
+		if internalToGateway > 0 {
+			sankeyLinks = append(sankeyLinks, map[string]interface{}{
+				"source": 0,
+				"target": 1,
+				"value":  float64(internalToGateway),
+			})
+		}
+		if gatewayToExternal > 0 {
+			sankeyLinks = append(sankeyLinks, map[string]interface{}{
+				"source": 1,
+				"target": 2,
+				"value":  float64(gatewayToExternal),
+			})
+		}
+
+		// Add top external servers as separate nodes
+		serverCount := 0
+		for server, bytes := range externalServers {
+			if serverCount >= 5 { // Limit to top 5 external servers
+				break
+			}
+			if bytes > 100000 { // Only show servers with >100KB traffic
+				nodeIdx := len(sankeyNodes)
+				sankeyNodes = append(sankeyNodes, map[string]string{"name": server})
+				sankeyLinks = append(sankeyLinks, map[string]interface{}{
+					"source": 2,
+					"target": nodeIdx,
+					"value":  float64(bytes),
+				})
+				serverCount++
+			}
+		}
+	} else if len(r.TrafficAnalysis) > 0 {
+		// Fallback to TrafficAnalysis if TopConversationsByBytes is empty
 		sankeyNodes = append(sankeyNodes, map[string]string{"name": "Internal Network"})
 		sankeyNodes = append(sankeyNodes, map[string]string{"name": "Gateway"})
 		sankeyNodes = append(sankeyNodes, map[string]string{"name": "Internet"})

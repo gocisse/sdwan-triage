@@ -468,10 +468,48 @@ func GetD3ScriptsTemplate() string {
                     .attr("class", "d3-tooltip")
                     .style("opacity", 0);
                 
-                // Color scale
+                // Color scale - Green for internal, Blue for router/gateway, Orange for external
                 const colorScale = d3.scaleOrdinal()
                     .domain(["internal", "router", "external", "hop", "anomaly"])
-                    .range(["#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#dc3545"]);
+                    .range(["#66cc66", "#6699ff", "#ff9933", "#9C27B0", "#dc3545"]);
+                
+                // Helper function to check if IP is in private ranges (RFC 1918)
+                function isPrivateIP(ipParts) {
+                    const [a, b, c, d] = ipParts;
+                    return (
+                        (a === 10) ||
+                        (a === 172 && b >= 16 && b <= 31) ||
+                        (a === 192 && b === 168)
+                    );
+                }
+                
+                // Helper function to categorize IP address
+                function categorizeIP(ip) {
+                    const parts = ip.split('.').map(Number);
+                    if (parts.length !== 4 || parts.some(isNaN)) {
+                        return "external"; // Invalid IP format
+                    }
+                    
+                    // Check for Router/Gateway first (.1 or .254 within private ranges)
+                    if ((parts[3] === 1 || parts[3] === 254) && isPrivateIP(parts)) {
+                        return "router";
+                    }
+                    // Then check for general Internal (RFC 1918)
+                    else if (isPrivateIP(parts)) {
+                        return "internal";
+                    }
+                    // Otherwise, it's External
+                    else {
+                        return "external";
+                    }
+                }
+                
+                // Re-categorize nodes based on IP address
+                nodes.forEach(node => {
+                    if (!node.group || node.group === "internal" || node.group === "external") {
+                        node.group = categorizeIP(node.id);
+                    }
+                });
                 
                 // Create force simulation
                 const simulation = d3.forceSimulation(nodes)
@@ -801,6 +839,18 @@ func GetD3ScriptsTemplate() string {
                     });
                 }
             });
+            
+            // Toggle action visibility for finding-specific action items
+            function toggleAction(button) {
+                const currentRow = button.closest('tr');
+                const actionRow = currentRow.nextElementSibling;
+                if (actionRow && actionRow.classList.contains('action-row')) {
+                    const isVisible = actionRow.style.display !== 'none';
+                    actionRow.style.display = isVisible ? 'none' : '';
+                    button.textContent = isVisible ? 'Show Action' : 'Hide Action';
+                    button.style.background = isVisible ? '#6c757d' : '#28a745';
+                }
+            }
         </script>
 `
 }
