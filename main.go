@@ -29,6 +29,7 @@ type TriageReport struct {
 	DNSAnomalies         []DNSAnomaly           `json:"dns_anomalies"`
 	TCPRetransmissions   []TCPFlow              `json:"tcp_retransmissions"`
 	FailedHandshakes     []TCPFlow              `json:"failed_handshakes"`
+	TCPHandshakes        TCPHandshakeAnalysis   `json:"tcp_handshakes"`
 	ARPConflicts         []ARPConflict          `json:"arp_conflicts"`
 	HTTPErrors           []HTTPError            `json:"http_errors"`
 	TLSCerts             []TLSCertInfo          `json:"tls_certs"`
@@ -56,6 +57,22 @@ type TCPFlow struct {
 	SrcPort uint16 `json:"src_port"`
 	DstIP   string `json:"dst_ip"`
 	DstPort uint16 `json:"dst_port"`
+}
+
+type TCPHandshakeFlow struct {
+	SrcIP     string  `json:"src_ip"`
+	SrcPort   uint16  `json:"src_port"`
+	DstIP     string  `json:"dst_ip"`
+	DstPort   uint16  `json:"dst_port"`
+	Timestamp float64 `json:"timestamp"`
+	Count     int     `json:"count"`
+}
+
+type TCPHandshakeAnalysis struct {
+	SYNFlows                []TCPHandshakeFlow `json:"syn_flows"`
+	SYNACKFlows             []TCPHandshakeFlow `json:"synack_flows"`
+	SuccessfulHandshakes    []TCPHandshakeFlow `json:"successful_handshakes"`
+	FailedHandshakeAttempts []TCPHandshakeFlow `json:"failed_handshake_attempts"`
 }
 
 type UDPFlow struct {
@@ -1354,6 +1371,27 @@ VERSION:
 		}
 	}
 
+	// Finalize failed handshake attempts for TCP Handshake Analysis
+	// Identify SYN flows that never received a SYN-ACK response
+	for _, synFlow := range report.TCPHandshakes.SYNFlows {
+		// Check if this SYN flow has a corresponding successful handshake
+		hasSuccess := false
+		for _, successFlow := range report.TCPHandshakes.SuccessfulHandshakes {
+			if synFlow.SrcIP == successFlow.SrcIP &&
+				synFlow.SrcPort == successFlow.SrcPort &&
+				synFlow.DstIP == successFlow.DstIP &&
+				synFlow.DstPort == successFlow.DstPort {
+				hasSuccess = true
+				break
+			}
+		}
+
+		// If no successful handshake found, mark as failed attempt
+		if !hasSuccess {
+			report.TCPHandshakes.FailedHandshakeAttempts = append(report.TCPHandshakes.FailedHandshakeAttempts, synFlow)
+		}
+	}
+
 	// Finalize traffic analysis - find top bandwidth consumers
 	type flowBytes struct {
 		key   string
@@ -1698,10 +1736,96 @@ func analyzePacket(
 				fp := extractTCPFingerprint(tcp, ip4)
 				mu.Lock()
 				deviceFingerprints[ip4.SrcIP.String()] = fp
+
+				// Track SYN packets for handshake analysis
+				timestamp := packet.Metadata().Timestamp.Sub(packet.Metadata().CaptureInfo.Timestamp).Seconds()
+				found := false
+				for i := range report.TCPHandshakes.SYNFlows {
+					if report.TCPHandshakes.SYNFlows[i].SrcIP == ip4.SrcIP.String() &&
+						report.TCPHandshakes.SYNFlows[i].SrcPort == uint16(tcp.SrcPort) &&
+						report.TCPHandshakes.SYNFlows[i].DstIP == ip4.DstIP.String() &&
+						report.TCPHandshakes.SYNFlows[i].DstPort == uint16(tcp.DstPort) {
+						report.TCPHandshakes.SYNFlows[i].Count++
+						report.TCPHandshakes.SYNFlows[i].Timestamp = timestamp
+						found = true
+						break
+					}
+				}
+				if !found {
+					report.TCPHandshakes.SYNFlows = append(report.TCPHandshakes.SYNFlows, TCPHandshakeFlow{
+						SrcIP:     ip4.SrcIP.String(),
+						SrcPort:   uint16(tcp.SrcPort),
+						DstIP:     ip4.DstIP.String(),
+						DstPort:   uint16(tcp.DstPort),
+						Timestamp: timestamp,
+						Count:     1,
+					})
+				}
 				mu.Unlock()
 			}
 			if tcp.SYN && tcp.ACK {
 				synAckReceived[revKey] = true
+
+				mu.Lock()
+				// Track SYN-ACK packets for handshake analysis
+				timestamp := packet.Metadata().Timestamp.Sub(packet.Metadata().CaptureInfo.Timestamp).Seconds()
+				found := false
+				for i := range report.TCPHandshakes.SYNACKFlows {
+					if report.TCPHandshakes.SYNACKFlows[i].SrcIP == ip4.SrcIP.String() &&
+						report.TCPHandshakes.SYNACKFlows[i].SrcPort == uint16(tcp.SrcPort) &&
+						report.TCPHandshakes.SYNACKFlows[i].DstIP == ip4.DstIP.String() &&
+						report.TCPHandshakes.SYNACKFlows[i].DstPort == uint16(tcp.DstPort) {
+						report.TCPHandshakes.SYNACKFlows[i].Count++
+						report.TCPHandshakes.SYNACKFlows[i].Timestamp = timestamp
+						found = true
+						break
+					}
+				}
+				if !found {
+					report.TCPHandshakes.SYNACKFlows = append(report.TCPHandshakes.SYNACKFlows, TCPHandshakeFlow{
+						SrcIP:     ip4.SrcIP.String(),
+						SrcPort:   uint16(tcp.SrcPort),
+						DstIP:     ip4.DstIP.String(),
+						DstPort:   uint16(tcp.DstPort),
+						Timestamp: timestamp,
+						Count:     1,
+					})
+				}
+
+				// Check if this SYN-ACK corresponds to a previous SYN (successful handshake)
+				for _, synFlow := range report.TCPHandshakes.SYNFlows {
+					// Check if SYN was sent in opposite direction (DstIP:DstPort -> SrcIP:SrcPort)
+					if synFlow.SrcIP == ip4.DstIP.String() &&
+						synFlow.SrcPort == uint16(tcp.DstPort) &&
+						synFlow.DstIP == ip4.SrcIP.String() &&
+						synFlow.DstPort == uint16(tcp.SrcPort) {
+
+						// Record successful handshake (from original SYN perspective)
+						successFound := false
+						for i := range report.TCPHandshakes.SuccessfulHandshakes {
+							if report.TCPHandshakes.SuccessfulHandshakes[i].SrcIP == synFlow.SrcIP &&
+								report.TCPHandshakes.SuccessfulHandshakes[i].SrcPort == synFlow.SrcPort &&
+								report.TCPHandshakes.SuccessfulHandshakes[i].DstIP == synFlow.DstIP &&
+								report.TCPHandshakes.SuccessfulHandshakes[i].DstPort == synFlow.DstPort {
+								report.TCPHandshakes.SuccessfulHandshakes[i].Count++
+								successFound = true
+								break
+							}
+						}
+						if !successFound {
+							report.TCPHandshakes.SuccessfulHandshakes = append(report.TCPHandshakes.SuccessfulHandshakes, TCPHandshakeFlow{
+								SrcIP:     synFlow.SrcIP,
+								SrcPort:   synFlow.SrcPort,
+								DstIP:     synFlow.DstIP,
+								DstPort:   synFlow.DstPort,
+								Timestamp: timestamp,
+								Count:     1,
+							})
+						}
+						break
+					}
+				}
+				mu.Unlock()
 			}
 
 			// Enhanced retransmission detection with sequence and acknowledgment tracking
@@ -2085,6 +2209,46 @@ func exportToCSV(r *TriageReport, filename string) error {
 			d.SrcIP, d.OSGuess, d.DeviceType, d.OSGuess, d.Confidence))
 	}
 
+	// TCP Handshake Analysis - SYN Flows
+	for _, flow := range r.TCPHandshakes.SYNFlows {
+		description := fmt.Sprintf("TCP Connection Initiation: Detected TCP connection attempt from %s:%d to %s:%d. SYN packet observed initiating a connection.", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		if flow.Count > 1 {
+			description = fmt.Sprintf("TCP Connection Initiation: Detected %d TCP connection attempts from %s:%d to %s:%d. Multiple SYN packets observed.", flow.Count, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		}
+		file.WriteString(fmt.Sprintf("TCP Handshake - SYN,%s,%s,%d,%s,%d,Info,Normal connection establishment behavior\n",
+			description, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort))
+	}
+
+	// TCP Handshake Analysis - SYN-ACK Flows
+	for _, flow := range r.TCPHandshakes.SYNACKFlows {
+		description := fmt.Sprintf("TCP Connection Response: Detected TCP connection response from %s:%d to %s:%d. SYN-ACK packet observed responding to a connection request.", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		if flow.Count > 1 {
+			description = fmt.Sprintf("TCP Connection Response: Detected %d TCP connection responses from %s:%d to %s:%d. Multiple SYN-ACK packets observed.", flow.Count, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		}
+		file.WriteString(fmt.Sprintf("TCP Handshake - SYN-ACK,%s,%s,%d,%s,%d,Info,Normal connection establishment behavior\n",
+			description, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort))
+	}
+
+	// TCP Handshake Analysis - Successful Handshakes
+	for _, flow := range r.TCPHandshakes.SuccessfulHandshakes {
+		description := fmt.Sprintf("Successful TCP Handshake: Detected successful TCP handshake initiation from %s:%d to %s:%d. Both SYN and SYN-ACK packets observed indicating successful connection establishment.", flow.DstIP, flow.DstPort, flow.SrcIP, flow.SrcPort)
+		if flow.Count > 1 {
+			description = fmt.Sprintf("Successful TCP Handshakes: Detected %d successful TCP handshake initiations from %s:%d to %s:%d.", flow.Count, flow.DstIP, flow.DstPort, flow.SrcIP, flow.SrcPort)
+		}
+		file.WriteString(fmt.Sprintf("TCP Handshake - Success,%s,%s,%d,%s,%d,Info,Connection established successfully\n",
+			description, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort))
+	}
+
+	// TCP Handshake Analysis - Failed Handshake Attempts
+	for _, flow := range r.TCPHandshakes.FailedHandshakeAttempts {
+		description := fmt.Sprintf("Potential TCP Handshake Failure: SYN packet sent from %s:%d to %s:%d but no corresponding SYN-ACK response was observed in this capture. This could indicate the destination is down, unreachable, or blocking the connection.", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		if flow.Count > 1 {
+			description = fmt.Sprintf("Potential TCP Handshake Failures: %d SYN packets sent from %s:%d to %s:%d but no corresponding SYN-ACK responses were observed. The destination may be down, unreachable, or blocking connections.", flow.Count, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+		}
+		file.WriteString(fmt.Sprintf("TCP Handshake - Failed,%s,%s,%d,%s,%d,Warning,Investigate destination reachability and verify firewall rules allow this connection\n",
+			description, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort))
+	}
+
 	return nil
 }
 
@@ -2442,6 +2606,95 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
 `
 	}
 
+	// TCP Handshake Analysis
+	if len(r.TCPHandshakes.SYNFlows) > 0 || len(r.TCPHandshakes.SYNACKFlows) > 0 {
+		html += `        <div class="section">
+            <h2>🔌 TCP Handshake Analysis</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> This section tracks TCP connection establishment patterns. Every TCP connection 
+                starts with a "handshake" where the client sends a SYN packet, and the server responds with a SYN-ACK packet. 
+                Monitoring these patterns helps identify connection issues, unreachable services, and network behavior.
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; border-left: 4px solid #2196F3;">
+                    <h3 style="margin: 0 0 10px 0; color: #1976D2; font-size: 14px;">SYN Packets</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #1976D2;">` + fmt.Sprintf("%d", len(r.TCPHandshakes.SYNFlows)) + `</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Connection attempts</p>
+                </div>
+                <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; border-left: 4px solid #4CAF50;">
+                    <h3 style="margin: 0 0 10px 0; color: #388E3C; font-size: 14px;">SYN-ACK Packets</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #388E3C;">` + fmt.Sprintf("%d", len(r.TCPHandshakes.SYNACKFlows)) + `</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Connection responses</p>
+                </div>
+                <div style="background: #f3e5f5; padding: 15px; border-radius: 5px; border-left: 4px solid #9C27B0;">
+                    <h3 style="margin: 0 0 10px 0; color: #7B1FA2; font-size: 14px;">Successful Handshakes</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #7B1FA2;">` + fmt.Sprintf("%d", len(r.TCPHandshakes.SuccessfulHandshakes)) + `</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Completed connections</p>
+                </div>
+                <div style="background: #fff3e0; padding: 15px; border-radius: 5px; border-left: 4px solid #FF9800;">
+                    <h3 style="margin: 0 0 10px 0; color: #F57C00; font-size: 14px;">Failed Attempts</h3>
+                    <div style="font-size: 32px; font-weight: bold; color: #F57C00;">` + fmt.Sprintf("%d", len(r.TCPHandshakes.FailedHandshakeAttempts)) + `</div>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">No response received</p>
+                </div>
+            </div>
+`
+
+		// Top SYN Flows
+		if len(r.TCPHandshakes.SYNFlows) > 0 {
+			// Sort by count
+			synFlows := make([]TCPHandshakeFlow, len(r.TCPHandshakes.SYNFlows))
+			copy(synFlows, r.TCPHandshakes.SYNFlows)
+			for i := 0; i < len(synFlows); i++ {
+				for j := i + 1; j < len(synFlows); j++ {
+					if synFlows[j].Count > synFlows[i].Count {
+						synFlows[i], synFlows[j] = synFlows[j], synFlows[i]
+					}
+				}
+			}
+
+			html += `            <h3 style="margin-top: 20px; color: #1976D2;">Top Connection Initiators (SYN Packets)</h3>
+            <table>
+                <tr><th>Source</th><th>Destination</th><th>Attempts</th><th>Description</th></tr>
+`
+			for i, flow := range synFlows {
+				if i >= 10 {
+					break
+				}
+				description := fmt.Sprintf("Detected TCP connection initiation from %s:%d to %s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				html += fmt.Sprintf(`                <tr><td>%s:%d</td><td>%s:%d</td><td>%d</td><td>%s</td></tr>
+`, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort, flow.Count, description)
+			}
+			html += `            </table>
+`
+		}
+
+		// Failed Handshake Attempts
+		if len(r.TCPHandshakes.FailedHandshakeAttempts) > 0 {
+			html += `            <h3 style="margin-top: 20px; color: #F57C00;">⚠️ Potential Handshake Failures</h3>
+            <p style="padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>What This Means:</strong> These connections sent SYN packets but never received a SYN-ACK response. 
+                This typically indicates the destination is down, unreachable, or blocking the connection.
+            </p>
+            <table>
+                <tr><th>Source</th><th>Destination</th><th>Failed Attempts</th><th>Description</th></tr>
+`
+			for i, flow := range r.TCPHandshakes.FailedHandshakeAttempts {
+				if i >= 10 {
+					break
+				}
+				description := fmt.Sprintf("SYN packet sent from %s:%d to %s:%d but no SYN-ACK response observed. Destination may be down, unreachable, or blocking connections.", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				html += fmt.Sprintf(`                <tr><td>%s:%d</td><td>%s:%d</td><td>%d</td><td>%s</td></tr>
+`, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort, flow.Count, description)
+			}
+			html += `            </table>
+            <p><strong>⚠️ Recommended Action:</strong> Investigate destination reachability and verify firewall rules allow these connections.</p>
+`
+		}
+
+		html += `        </div>
+`
+	}
+
 	// Suspicious Traffic
 	if len(r.SuspiciousTraffic) > 0 {
 		html += `        <div class="section">
@@ -2739,6 +2992,122 @@ func printHuman(r *TriageReport) {
 		}
 		fmt.Println("⚠ ACTION: Check firewall rules and destination service status\n")
 	}
+
+	// TCP Handshake Analysis Section
+	if len(r.TCPHandshakes.SYNFlows) > 0 || len(r.TCPHandshakes.SYNACKFlows) > 0 {
+		color.Cyan("━━━ [*] TCP HANDSHAKE ANALYSIS ━━━")
+		fmt.Println("\nTCP Connection Establishment Analysis: Tracking SYN and SYN-ACK packets to understand")
+		fmt.Println("connection initiation patterns, successful handshakes, and potential failures.")
+
+		fmt.Printf("\nSUMMARY:\n")
+		fmt.Printf("  • SYN packets (connection attempts): %d\n", len(r.TCPHandshakes.SYNFlows))
+		fmt.Printf("  • SYN-ACK packets (responses): %d\n", len(r.TCPHandshakes.SYNACKFlows))
+		fmt.Printf("  • Successful handshake initiations: %d\n", len(r.TCPHandshakes.SuccessfulHandshakes))
+		fmt.Printf("  • Potential handshake failures: %d\n", len(r.TCPHandshakes.FailedHandshakeAttempts))
+
+		if len(r.TCPHandshakes.SYNFlows) > 0 {
+			// Sort SYN flows by count (most active first)
+			synFlows := make([]TCPHandshakeFlow, len(r.TCPHandshakes.SYNFlows))
+			copy(synFlows, r.TCPHandshakes.SYNFlows)
+			for i := 0; i < len(synFlows); i++ {
+				for j := i + 1; j < len(synFlows); j++ {
+					if synFlows[j].Count > synFlows[i].Count {
+						synFlows[i], synFlows[j] = synFlows[j], synFlows[i]
+					}
+				}
+			}
+
+			fmt.Println("\nTOP CONNECTION INITIATORS (SYN packets):")
+			for i, flow := range synFlows {
+				if i >= 10 {
+					break
+				}
+				fmt.Printf("  • %s:%d → %s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				if flow.Count > 1 {
+					fmt.Printf(" (%d attempts)", flow.Count)
+				}
+				fmt.Println()
+				fmt.Printf("    Detected TCP connection initiation from %s:%d to %s:%d.\n",
+					flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+			}
+			if len(synFlows) > 10 {
+				fmt.Printf("  ... and %d more\n", len(synFlows)-10)
+			}
+		}
+
+		if len(r.TCPHandshakes.SYNACKFlows) > 0 {
+			// Sort SYN-ACK flows by count
+			synackFlows := make([]TCPHandshakeFlow, len(r.TCPHandshakes.SYNACKFlows))
+			copy(synackFlows, r.TCPHandshakes.SYNACKFlows)
+			for i := 0; i < len(synackFlows); i++ {
+				for j := i + 1; j < len(synackFlows); j++ {
+					if synackFlows[j].Count > synackFlows[i].Count {
+						synackFlows[i], synackFlows[j] = synackFlows[j], synackFlows[i]
+					}
+				}
+			}
+
+			fmt.Println("\nTOP CONNECTION RESPONDERS (SYN-ACK packets):")
+			for i, flow := range synackFlows {
+				if i >= 10 {
+					break
+				}
+				fmt.Printf("  • %s:%d → %s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				if flow.Count > 1 {
+					fmt.Printf(" (%d responses)", flow.Count)
+				}
+				fmt.Println()
+				fmt.Printf("    Detected TCP connection response from %s:%d to %s:%d.\n",
+					flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+			}
+			if len(synackFlows) > 10 {
+				fmt.Printf("  ... and %d more\n", len(synackFlows)-10)
+			}
+		}
+
+		if len(r.TCPHandshakes.SuccessfulHandshakes) > 0 {
+			fmt.Println("\nSUCCESSFUL HANDSHAKE INITIATIONS (SYN → SYN-ACK observed):")
+			for i, flow := range r.TCPHandshakes.SuccessfulHandshakes {
+				if i >= 10 {
+					break
+				}
+				fmt.Printf("  • %s:%d ↔ %s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				if flow.Count > 1 {
+					fmt.Printf(" (%d successful handshakes)", flow.Count)
+				}
+				fmt.Println()
+				fmt.Printf("    Detected successful TCP handshake initiation from %s:%d to %s:%d.\n",
+					flow.DstIP, flow.DstPort, flow.SrcIP, flow.SrcPort)
+			}
+			if len(r.TCPHandshakes.SuccessfulHandshakes) > 10 {
+				fmt.Printf("  ... and %d more\n", len(r.TCPHandshakes.SuccessfulHandshakes)-10)
+			}
+		}
+
+		if len(r.TCPHandshakes.FailedHandshakeAttempts) > 0 {
+			color.Yellow("\nPOTENTIAL HANDSHAKE FAILURES (SYN sent, no SYN-ACK received):")
+			for i, flow := range r.TCPHandshakes.FailedHandshakeAttempts {
+				if i >= 10 {
+					break
+				}
+				fmt.Printf("  • %s:%d → %s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				if flow.Count > 1 {
+					fmt.Printf(" (%d failed attempts)", flow.Count)
+				}
+				fmt.Println()
+				fmt.Printf("    Detected potential TCP handshake failure: SYN packet sent from %s:%d to %s:%d,\n",
+					flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort)
+				fmt.Printf("    but no corresponding SYN-ACK response was observed in this capture. This could\n")
+				fmt.Printf("    indicate the destination is down, unreachable, or blocking the connection.\n")
+			}
+			if len(r.TCPHandshakes.FailedHandshakeAttempts) > 10 {
+				fmt.Printf("  ... and %d more\n", len(r.TCPHandshakes.FailedHandshakeAttempts)-10)
+			}
+			fmt.Println("⚠ ACTION: Investigate unreachable destinations and verify firewall rules")
+		}
+		fmt.Println()
+	}
+
 	if len(r.ARPConflicts) > 0 {
 		color.Red("━━━ [!] ARP SPOOFING DETECTED ━━━")
 		fmt.Println("\nARP Conflict Detected: The same IP address is being claimed by multiple MAC addresses.")
