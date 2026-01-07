@@ -244,12 +244,16 @@ var suspiciousPorts = map[uint16]string{
 
 // === Internal Tracking Structures ===
 type tcpFlowState struct {
-	lastSeq    uint32
-	lastAck    uint32
-	seqSeen    map[uint32]bool
-	rttSamples []float64
-	sentTimes  map[uint32]time.Time
-	totalBytes uint64
+	lastSeq       uint32
+	lastAck       uint32
+	expectedSeq   uint32
+	seqSeen       map[uint32]bool
+	rttSamples    []float64
+	sentTimes     map[uint32]time.Time
+	totalBytes    uint64
+	dupAckCount   int
+	lastDupAck    uint32
+	outOfOrderSeq map[uint32]bool
 }
 
 type udpFlowState struct {
@@ -2005,12 +2009,16 @@ func analyzePacket(
 			flow, exists := tcpFlows[flowKey]
 			if !exists {
 				flow = &tcpFlowState{
-					lastSeq:    tcp.Seq,
-					lastAck:    tcp.Ack,
-					seqSeen:    make(map[uint32]bool),
-					rttSamples: []float64{},
-					sentTimes:  make(map[uint32]time.Time),
-					totalBytes: 0,
+					lastSeq:       tcp.Seq,
+					lastAck:       tcp.Ack,
+					expectedSeq:   tcp.Seq,
+					seqSeen:       make(map[uint32]bool),
+					rttSamples:    []float64{},
+					sentTimes:     make(map[uint32]time.Time),
+					totalBytes:    0,
+					dupAckCount:   0,
+					lastDupAck:    0,
+					outOfOrderSeq: make(map[uint32]bool),
 				}
 				tcpFlows[flowKey] = flow
 			}
@@ -2039,21 +2047,87 @@ func analyzePacket(
 				flow.lastAck = tcp.Ack
 			}
 
-			// Detect retransmission: same sequence number seen before with payload
-			if len(tcp.Payload) > 0 {
-				if flow.seqSeen[tcp.Seq] {
-					srcIP := ip4.SrcIP.String()
-					dstIP := ip4.DstIP.String()
+			// Enhanced TCP retransmission detection (similar to Wireshark's tcp.analysis.flags)
+			srcIP := ip4.SrcIP.String()
+			dstIP := ip4.DstIP.String()
+			payloadLen := uint32(len(tcp.Payload))
+
+			// Detect various TCP anomalies
+			if len(tcp.Payload) > 0 || tcp.SYN || tcp.FIN {
+				// 1. Retransmission: same sequence number seen before with payload
+				if flow.seqSeen[tcp.Seq] && payloadLen > 0 {
 					report.TCPRetransmissions = append(report.TCPRetransmissions, TCPFlow{
 						SrcIP: srcIP, SrcPort: uint16(tcp.SrcPort),
 						DstIP: dstIP, DstPort: uint16(tcp.DstPort),
 					})
-					// Mark path with anomaly for diagram highlighting
 					markPathAnomaly(pathStats, srcIP, dstIP)
-				} else {
-					flow.seqSeen[tcp.Seq] = true
 				}
+
+				// 2. Out-of-order: sequence number is less than expected
+				if flow.expectedSeq > 0 && tcp.Seq < flow.expectedSeq && !flow.outOfOrderSeq[tcp.Seq] {
+					// This is an out-of-order segment (might be retransmitted later)
+					flow.outOfOrderSeq[tcp.Seq] = true
+					report.TCPRetransmissions = append(report.TCPRetransmissions, TCPFlow{
+						SrcIP: srcIP, SrcPort: uint16(tcp.SrcPort),
+						DstIP: dstIP, DstPort: uint16(tcp.DstPort),
+					})
+					markPathAnomaly(pathStats, srcIP, dstIP)
+				}
+
+				// 3. Spurious retransmission: sequence number already ACKed
+				if tcp.ACK && flow.lastAck > 0 && tcp.Seq < flow.lastAck && payloadLen > 0 {
+					report.TCPRetransmissions = append(report.TCPRetransmissions, TCPFlow{
+						SrcIP: srcIP, SrcPort: uint16(tcp.SrcPort),
+						DstIP: dstIP, DstPort: uint16(tcp.DstPort),
+					})
+					markPathAnomaly(pathStats, srcIP, dstIP)
+				}
+
+				// Track sequence numbers
+				if payloadLen > 0 {
+					flow.seqSeen[tcp.Seq] = true
+					// Update expected sequence number
+					nextSeq := tcp.Seq + payloadLen
+					if nextSeq > flow.expectedSeq {
+						flow.expectedSeq = nextSeq
+					}
+				}
+
+				// Handle SYN/FIN flags for sequence tracking
+				if tcp.SYN || tcp.FIN {
+					flow.expectedSeq = tcp.Seq + 1
+				}
+
 				flow.lastSeq = tcp.Seq
+			}
+
+			// 4. Fast retransmission detection via duplicate ACKs
+			if tcp.ACK && payloadLen == 0 {
+				if tcp.Ack == flow.lastDupAck {
+					flow.dupAckCount++
+					// Wireshark typically flags after 3 duplicate ACKs
+					if flow.dupAckCount >= 3 {
+						// This indicates packet loss and likely fast retransmission
+						report.TCPRetransmissions = append(report.TCPRetransmissions, TCPFlow{
+							SrcIP: srcIP, SrcPort: uint16(tcp.SrcPort),
+							DstIP: dstIP, DstPort: uint16(tcp.DstPort),
+						})
+						markPathAnomaly(pathStats, srcIP, dstIP)
+						flow.dupAckCount = 0 // Reset after detection
+					}
+				} else {
+					flow.lastDupAck = tcp.Ack
+					flow.dupAckCount = 1
+				}
+			}
+
+			// 5. Zero window probe detection
+			if tcp.ACK && payloadLen == 1 && tcp.Window == 0 {
+				report.TCPRetransmissions = append(report.TCPRetransmissions, TCPFlow{
+					SrcIP: srcIP, SrcPort: uint16(tcp.SrcPort),
+					DstIP: dstIP, DstPort: uint16(tcp.DstPort),
+				})
+				markPathAnomaly(pathStats, srcIP, dstIP)
 			}
 
 			// Application categorization
