@@ -40,6 +40,7 @@ type TriageReport struct {
 	SuspiciousTraffic    []SuspiciousFlow       `json:"suspicious_traffic"`
 	RTTAnalysis          []RTTFlow              `json:"rtt_analysis"`
 	DeviceFingerprinting []DeviceFingerprint    `json:"device_fingerprinting"`
+	BandwidthReport      BandwidthReport        `json:"bandwidth_report"`
 	TotalBytes           uint64                 `json:"total_bytes"`
 }
 
@@ -73,6 +74,32 @@ type TCPHandshakeAnalysis struct {
 	SYNACKFlows             []TCPHandshakeFlow `json:"synack_flows"`
 	SuccessfulHandshakes    []TCPHandshakeFlow `json:"successful_handshakes"`
 	FailedHandshakeAttempts []TCPHandshakeFlow `json:"failed_handshake_attempts"`
+}
+
+type TrafficFlowSummary struct {
+	SrcIP            string        `json:"src_ip"`
+	SrcPort          uint16        `json:"src_port"`
+	DstIP            string        `json:"dst_ip"`
+	DstPort          uint16        `json:"dst_port"`
+	Protocol         string        `json:"protocol"`
+	TotalBytes       uint64        `json:"total_bytes"`
+	TotalPackets     uint64        `json:"total_packets"`
+	Duration         time.Duration `json:"duration"`
+	AvgBitsPerSecond float64       `json:"avg_bits_per_second"`
+	FirstSeen        time.Time     `json:"first_seen"`
+	LastSeen         time.Time     `json:"last_seen"`
+}
+
+type TimeBucket struct {
+	Timestamp    time.Time `json:"timestamp"`
+	TotalBytes   uint64    `json:"total_bytes"`
+	TotalPackets uint64    `json:"total_packets"`
+}
+
+type BandwidthReport struct {
+	TopConversationsByBytes   []TrafficFlowSummary `json:"top_conversations_by_bytes"`
+	TopConversationsByPackets []TrafficFlowSummary `json:"top_conversations_by_packets"`
+	TimeSeriesData            []TimeBucket         `json:"time_series_data"`
 }
 
 type UDPFlow struct {
@@ -1342,6 +1369,8 @@ VERSION:
 	deviceFingerprints := make(map[string]*tcpFingerprint)
 	appStats := make(map[string]*AppCategory)
 	pathStats := &PathStats{Paths: make(map[string]*Path)}
+	conversations := make(map[string]*TrafficFlowSummary)
+	timeBuckets := make(map[int64]*TimeBucket)
 	var mu sync.Mutex
 
 	// Initialize ApplicationBreakdown map
@@ -1349,7 +1378,7 @@ VERSION:
 
 	packetSource := gopacket.NewPacketSource(reader, reader.LinkType())
 	for packet := range packetSource.Packets() {
-		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats)
+		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets)
 	}
 
 	// Finalize failed handshakes
@@ -1391,6 +1420,68 @@ VERSION:
 			report.TCPHandshakes.FailedHandshakeAttempts = append(report.TCPHandshakes.FailedHandshakeAttempts, synFlow)
 		}
 	}
+
+	// Finalize bandwidth report - calculate rates and sort conversations
+	var allConversations []TrafficFlowSummary
+	for _, conv := range conversations {
+		// Calculate duration and average bitrate
+		conv.Duration = conv.LastSeen.Sub(conv.FirstSeen)
+		if conv.Duration > 0 {
+			durationSeconds := conv.Duration.Seconds()
+			conv.AvgBitsPerSecond = (float64(conv.TotalBytes) * 8) / durationSeconds
+		}
+		allConversations = append(allConversations, *conv)
+	}
+
+	// Sort by bytes (descending) for top conversations by bytes
+	conversationsByBytes := make([]TrafficFlowSummary, len(allConversations))
+	copy(conversationsByBytes, allConversations)
+	for i := 0; i < len(conversationsByBytes); i++ {
+		for j := i + 1; j < len(conversationsByBytes); j++ {
+			if conversationsByBytes[j].TotalBytes > conversationsByBytes[i].TotalBytes {
+				conversationsByBytes[i], conversationsByBytes[j] = conversationsByBytes[j], conversationsByBytes[i]
+			}
+		}
+	}
+
+	// Sort by packets (descending) for top conversations by packets
+	conversationsByPackets := make([]TrafficFlowSummary, len(allConversations))
+	copy(conversationsByPackets, allConversations)
+	for i := 0; i < len(conversationsByPackets); i++ {
+		for j := i + 1; j < len(conversationsByPackets); j++ {
+			if conversationsByPackets[j].TotalPackets > conversationsByPackets[i].TotalPackets {
+				conversationsByPackets[i], conversationsByPackets[j] = conversationsByPackets[j], conversationsByPackets[i]
+			}
+		}
+	}
+
+	// Select top 20 conversations by bytes
+	topN := 20
+	if len(conversationsByBytes) < topN {
+		topN = len(conversationsByBytes)
+	}
+	report.BandwidthReport.TopConversationsByBytes = conversationsByBytes[:topN]
+
+	// Select top 20 conversations by packets
+	topN = 20
+	if len(conversationsByPackets) < topN {
+		topN = len(conversationsByPackets)
+	}
+	report.BandwidthReport.TopConversationsByPackets = conversationsByPackets[:topN]
+
+	// Sort time buckets by timestamp for time series data
+	var timeSeriesData []TimeBucket
+	for _, bucket := range timeBuckets {
+		timeSeriesData = append(timeSeriesData, *bucket)
+	}
+	for i := 0; i < len(timeSeriesData); i++ {
+		for j := i + 1; j < len(timeSeriesData); j++ {
+			if timeSeriesData[j].Timestamp.Before(timeSeriesData[i].Timestamp) {
+				timeSeriesData[i], timeSeriesData[j] = timeSeriesData[j], timeSeriesData[i]
+			}
+		}
+	}
+	report.BandwidthReport.TimeSeriesData = timeSeriesData
 
 	// Finalize traffic analysis - find top bandwidth consumers
 	type flowBytes struct {
@@ -1588,6 +1679,8 @@ func analyzePacket(
 	mu *sync.Mutex,
 	filter *Filter,
 	pathStats *PathStats,
+	conversations map[string]*TrafficFlowSummary,
+	timeBuckets map[int64]*TimeBucket,
 ) {
 	// Apply filters if specified
 	if !filter.isEmpty() {
@@ -1675,6 +1768,84 @@ func analyzePacket(
 	if netLayer != nil {
 		if ip4, ok := netLayer.(*layers.IPv4); ok {
 			trackPath(pathStats, ip4.SrcIP.String(), ip4.DstIP.String(), packet)
+		}
+	}
+
+	// Track conversations for bandwidth analysis
+	if netLayer != nil {
+		var flowKey string
+		var protocol string
+		var srcIP, dstIP string
+		var srcPort, dstPort uint16
+
+		if ip4, ok := netLayer.(*layers.IPv4); ok {
+			srcIP = ip4.SrcIP.String()
+			dstIP = ip4.DstIP.String()
+
+			transportLayer := packet.TransportLayer()
+			if transportLayer != nil {
+				if tcp, ok := transportLayer.(*layers.TCP); ok {
+					protocol = "TCP"
+					srcPort = uint16(tcp.SrcPort)
+					dstPort = uint16(tcp.DstPort)
+					flowKey = fmt.Sprintf("%s:%d->%s:%d/TCP", srcIP, srcPort, dstIP, dstPort)
+				} else if udp, ok := transportLayer.(*layers.UDP); ok {
+					protocol = "UDP"
+					srcPort = uint16(udp.SrcPort)
+					dstPort = uint16(udp.DstPort)
+					flowKey = fmt.Sprintf("%s:%d->%s:%d/UDP", srcIP, srcPort, dstIP, dstPort)
+				}
+			} else {
+				protocol = "ICMP"
+				flowKey = fmt.Sprintf("%s->%s/ICMP", srcIP, dstIP)
+			}
+
+			if flowKey != "" {
+				timestamp := packet.Metadata().Timestamp
+				packetSize := uint64(len(packet.Data()))
+
+				mu.Lock()
+				conv, exists := conversations[flowKey]
+				if !exists {
+					conv = &TrafficFlowSummary{
+						SrcIP:        srcIP,
+						SrcPort:      srcPort,
+						DstIP:        dstIP,
+						DstPort:      dstPort,
+						Protocol:     protocol,
+						TotalBytes:   0,
+						TotalPackets: 0,
+						FirstSeen:    timestamp,
+						LastSeen:     timestamp,
+					}
+					conversations[flowKey] = conv
+				}
+
+				conv.TotalBytes += packetSize
+				conv.TotalPackets++
+				if timestamp.After(conv.LastSeen) {
+					conv.LastSeen = timestamp
+				}
+				if timestamp.Before(conv.FirstSeen) {
+					conv.FirstSeen = timestamp
+				}
+
+				// Track time series data (bucket by second)
+				bucketTime := timestamp.Unix()
+				bucket, bucketExists := timeBuckets[bucketTime]
+				if !bucketExists {
+					bucket = &TimeBucket{
+						Timestamp:    time.Unix(bucketTime, 0),
+						TotalBytes:   0,
+						TotalPackets: 0,
+					}
+					timeBuckets[bucketTime] = bucket
+				}
+				bucket.TotalBytes += packetSize
+				bucket.TotalPackets++
+
+				mu.Unlock()
+			}
 		}
 	}
 
@@ -2249,6 +2420,68 @@ func exportToCSV(r *TriageReport, filename string) error {
 			description, flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort))
 	}
 
+	// Bandwidth & Conversation Analysis - Top Conversations by Bytes
+	for i, conv := range r.BandwidthReport.TopConversationsByBytes {
+		if i >= 20 {
+			break
+		}
+
+		mbps := conv.AvgBitsPerSecond / 1_000_000
+		durationStr := conv.Duration.Round(time.Millisecond).String()
+		severity := "Info"
+		action := "Monitor for normal business activity"
+
+		description := fmt.Sprintf("High Bandwidth Conversation: Flow from %s:%d to %s:%d (%s) transferred %.2f MB over %s, averaging %.2f Mbps. This represents significant data transfer.",
+			conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, conv.Protocol,
+			float64(conv.TotalBytes)/(1024*1024), durationStr, mbps)
+
+		if conv.TotalBytes > 10*1024*1024 {
+			severity = "Warning"
+			action = "Investigate this high-bandwidth connection - could be legitimate data transfer, video streaming, or potential data exfiltration"
+		}
+
+		if conv.Protocol == "ICMP" {
+			file.WriteString(fmt.Sprintf("Bandwidth - High Usage,%s,%s,N/A,%s,N/A,%s,%s\n",
+				description, conv.SrcIP, conv.DstIP, severity, action))
+		} else {
+			file.WriteString(fmt.Sprintf("Bandwidth - High Usage,%s,%s,%d,%s,%d,%s,%s\n",
+				description, conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, severity, action))
+		}
+	}
+
+	// Bandwidth & Conversation Analysis - Top Conversations by Packets
+	for i, conv := range r.BandwidthReport.TopConversationsByPackets {
+		if i >= 20 {
+			break
+		}
+
+		durationStr := conv.Duration.Round(time.Millisecond).String()
+		packetsPerSec := float64(0)
+		if conv.Duration.Seconds() > 0 {
+			packetsPerSec = float64(conv.TotalPackets) / conv.Duration.Seconds()
+		}
+
+		severity := "Info"
+		action := "Normal connection activity"
+
+		description := fmt.Sprintf("Chatty Connection: Flow from %s:%d to %s:%d (%s) generated %d packets over %s (%.1f pkt/s). This indicates many small requests/responses which can impact performance due to protocol overhead.",
+			conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, conv.Protocol,
+			conv.TotalPackets, durationStr, packetsPerSec)
+
+		if conv.TotalPackets > 10000 {
+			severity = "Warning"
+			action = "Review application design for efficiency - consider batching requests or optimizing protocol usage"
+		}
+
+		if conv.Protocol == "ICMP" {
+			file.WriteString(fmt.Sprintf("Conversation - High Packet Count,%s,%s,N/A,%s,N/A,%s,%s\n",
+				description, conv.SrcIP, conv.DstIP, severity, action))
+		} else {
+			file.WriteString(fmt.Sprintf("Conversation - High Packet Count,%s,%s,%d,%s,%d,%s,%s\n",
+				description, conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, severity, action))
+		}
+	}
+
 	return nil
 }
 
@@ -2788,6 +3021,98 @@ func exportToHTML(r *TriageReport, filename string, pathStats *PathStats, filter
 `
 	}
 
+	// Bandwidth & Conversation Analysis
+	if len(r.BandwidthReport.TopConversationsByBytes) > 0 || len(r.BandwidthReport.TopConversationsByPackets) > 0 {
+		html += `        <div class="section">
+            <h2>📊 Bandwidth & Conversation Analysis</h2>
+            <p style="margin-bottom: 15px; padding: 10px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 4px;">
+                <strong>What This Means:</strong> This section identifies the biggest bandwidth consumers and most active 
+                network conversations, similar to Wireshark's Conversations tool. Use this data to identify bandwidth hogs, 
+                chatty protocols, and optimize network resource allocation.
+            </p>
+`
+
+		if len(r.BandwidthReport.TopConversationsByBytes) > 0 {
+			html += `            <h3 style="margin-top: 20px; color: #2196F3;">🔝 Top Conversations by Bandwidth</h3>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Total Data</th><th>Packets</th><th>Duration</th><th>Avg Rate</th><th>Status</th></tr>
+`
+			for i, conv := range r.BandwidthReport.TopConversationsByBytes {
+				if i >= 10 {
+					break
+				}
+
+				mbps := conv.AvgBitsPerSecond / 1_000_000
+				durationStr := conv.Duration.Round(time.Millisecond).String()
+				badge := "badge-info"
+				status := "Normal"
+
+				if conv.TotalBytes > 10*1024*1024 {
+					badge = "badge-warning"
+					status = "High Bandwidth"
+				}
+
+				flowStr := ""
+				if conv.Protocol == "ICMP" {
+					flowStr = fmt.Sprintf("%s → %s", conv.SrcIP, conv.DstIP)
+				} else {
+					flowStr = fmt.Sprintf("%s:%d → %s:%d", conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort)
+				}
+
+				html += fmt.Sprintf(`                <tr><td>%s</td><td>%s</td><td>%.2f MB</td><td>%d</td><td>%s</td><td>%.2f Mbps</td><td><span class="badge %s">%s</span></td></tr>
+`, flowStr, conv.Protocol, float64(conv.TotalBytes)/(1024*1024), conv.TotalPackets, durationStr, mbps, badge, status)
+			}
+			html += `            </table>
+`
+		}
+
+		if len(r.BandwidthReport.TopConversationsByPackets) > 0 {
+			html += `            <h3 style="margin-top: 20px; color: #9C27B0;">💬 Top Conversations by Packet Count</h3>
+            <table>
+                <tr><th>Flow</th><th>Protocol</th><th>Packets</th><th>Total Data</th><th>Duration</th><th>Packet Rate</th><th>Status</th></tr>
+`
+			for i, conv := range r.BandwidthReport.TopConversationsByPackets {
+				if i >= 10 {
+					break
+				}
+
+				durationStr := conv.Duration.Round(time.Millisecond).String()
+				packetsPerSec := float64(0)
+				if conv.Duration.Seconds() > 0 {
+					packetsPerSec = float64(conv.TotalPackets) / conv.Duration.Seconds()
+				}
+
+				badge := "badge-info"
+				status := "Normal"
+
+				if conv.TotalPackets > 10000 {
+					badge = "badge-warning"
+					status = "Chatty"
+				}
+
+				flowStr := ""
+				if conv.Protocol == "ICMP" {
+					flowStr = fmt.Sprintf("%s → %s", conv.SrcIP, conv.DstIP)
+				} else {
+					flowStr = fmt.Sprintf("%s:%d → %s:%d", conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort)
+				}
+
+				html += fmt.Sprintf(`                <tr><td>%s</td><td>%s</td><td>%d</td><td>%.2f MB</td><td>%s</td><td>%.1f pkt/s</td><td><span class="badge %s">%s</span></td></tr>
+`, flowStr, conv.Protocol, conv.TotalPackets, float64(conv.TotalBytes)/(1024*1024), durationStr, packetsPerSec, badge, status)
+			}
+			html += `            </table>
+`
+		}
+
+		html += `            <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                <strong>💡 Tip:</strong> High bandwidth flows may indicate legitimate data transfers (backups, video streaming) 
+                or potential issues (data exfiltration, bandwidth abuse). Chatty connections with many small packets can impact 
+                performance due to protocol overhead - consider optimizing application design or batching requests.
+            </p>
+        </div>
+`
+	}
+
 	// Device Fingerprinting
 	if len(r.DeviceFingerprinting) > 0 {
 		html += `        <div class="section">
@@ -3232,6 +3557,81 @@ func printHuman(r *TriageReport) {
 				a.app.PacketCount, float64(a.app.ByteCount)/(1024*1024))
 		}
 		fmt.Println()
+	}
+
+	if len(r.BandwidthReport.TopConversationsByBytes) > 0 || len(r.BandwidthReport.TopConversationsByPackets) > 0 {
+		color.Cyan("━━━ [*] BANDWIDTH & CONVERSATION ANALYSIS ━━━")
+		fmt.Println("\nDetailed analysis of network conversations showing the biggest bandwidth consumers and")
+		fmt.Println("most active connections. This helps identify data-intensive applications and chatty protocols.")
+
+		if len(r.BandwidthReport.TopConversationsByBytes) > 0 {
+			fmt.Println("\n🔝 TOP CONVERSATIONS BY BANDWIDTH (Bytes Transferred):")
+			for i, conv := range r.BandwidthReport.TopConversationsByBytes {
+				if i >= 10 {
+					break
+				}
+
+				mbps := conv.AvgBitsPerSecond / 1_000_000
+				durationStr := conv.Duration.Round(time.Millisecond).String()
+
+				if conv.Protocol == "ICMP" {
+					fmt.Printf("  • %s → %s (%s)\n", conv.SrcIP, conv.DstIP, conv.Protocol)
+				} else {
+					fmt.Printf("  • %s:%d → %s:%d (%s)\n",
+						conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, conv.Protocol)
+				}
+
+				fmt.Printf("    Total: %.2f MB | Packets: %d | Duration: %s | Avg Rate: %.2f Mbps\n",
+					float64(conv.TotalBytes)/(1024*1024), conv.TotalPackets, durationStr, mbps)
+
+				if conv.TotalBytes > 10*1024*1024 {
+					fmt.Printf("    ⚠ High Bandwidth Usage: This flow transferred %.2f MB over %s, averaging %.2f Mbps.\n",
+						float64(conv.TotalBytes)/(1024*1024), durationStr, mbps)
+					fmt.Printf("    This indicates a significant data transfer that may be legitimate (file transfer, video\n")
+					fmt.Printf("    streaming, backup) or could represent data exfiltration or bandwidth abuse.\n")
+				}
+			}
+			if len(r.BandwidthReport.TopConversationsByBytes) > 10 {
+				fmt.Printf("  ... and %d more conversations\n", len(r.BandwidthReport.TopConversationsByBytes)-10)
+			}
+		}
+
+		if len(r.BandwidthReport.TopConversationsByPackets) > 0 {
+			fmt.Println("\n💬 TOP CONVERSATIONS BY PACKET COUNT (Most Active):")
+			for i, conv := range r.BandwidthReport.TopConversationsByPackets {
+				if i >= 10 {
+					break
+				}
+
+				durationStr := conv.Duration.Round(time.Millisecond).String()
+				packetsPerSec := float64(0)
+				if conv.Duration.Seconds() > 0 {
+					packetsPerSec = float64(conv.TotalPackets) / conv.Duration.Seconds()
+				}
+
+				if conv.Protocol == "ICMP" {
+					fmt.Printf("  • %s → %s (%s)\n", conv.SrcIP, conv.DstIP, conv.Protocol)
+				} else {
+					fmt.Printf("  • %s:%d → %s:%d (%s)\n",
+						conv.SrcIP, conv.SrcPort, conv.DstIP, conv.DstPort, conv.Protocol)
+				}
+
+				fmt.Printf("    Packets: %d | Total: %.2f MB | Duration: %s | Rate: %.1f pkt/s\n",
+					conv.TotalPackets, float64(conv.TotalBytes)/(1024*1024), durationStr, packetsPerSec)
+
+				if conv.TotalPackets > 10000 {
+					fmt.Printf("    ⚠ Chatty Connection: This flow generated %d packets over %s (%.1f pkt/s).\n",
+						conv.TotalPackets, durationStr, packetsPerSec)
+					fmt.Printf("    This indicates a connection making many small requests/responses, which can impact\n")
+					fmt.Printf("    performance due to protocol overhead and may indicate inefficient application design.\n")
+				}
+			}
+			if len(r.BandwidthReport.TopConversationsByPackets) > 10 {
+				fmt.Printf("  ... and %d more conversations\n", len(r.BandwidthReport.TopConversationsByPackets)-10)
+			}
+		}
+
+		fmt.Println("ℹ Use this data to identify bandwidth hogs and optimize network resource allocation\n")
 	}
 
 	if len(r.DeviceFingerprinting) > 0 {
