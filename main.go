@@ -1942,16 +1942,17 @@ VERSION:
 		if filename == "" {
 			filename = "output.html"
 		}
-		if err := exportToHTML(report, filename, pathStats, filter, traceData); err != nil {
+		// Use enhanced D3.js-powered HTML export
+		if err := exportToEnhancedHTML(report, filename, pathStats, filter, traceData); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to HTML: %v\n", err)
 			os.Exit(1)
 		}
-		color.Green("✓ Report exported to %s", filename)
+		color.Green("✓ D3.js-enhanced report exported to %s", filename)
 
 		// Debug HTML - write raw HTML to separate file for troubleshooting
 		if *debugHTML {
 			debugFilename := "debug_report.html"
-			if err := exportToHTML(report, debugFilename, pathStats, filter, traceData); err != nil {
+			if err := exportToEnhancedHTML(report, debugFilename, pathStats, filter, traceData); err != nil {
 				fmt.Fprintf(os.Stderr, "Error exporting debug HTML: %v\n", err)
 			} else {
 				color.Yellow("✓ Debug HTML written to %s (inspect browser console for JS errors)", debugFilename)
@@ -1965,7 +1966,7 @@ VERSION:
 		// Debug HTML - write raw HTML even without -html flag for troubleshooting
 		if *debugHTML {
 			debugFilename := "debug_report.html"
-			if err := exportToHTML(report, debugFilename, pathStats, filter, traceData); err != nil {
+			if err := exportToEnhancedHTML(report, debugFilename, pathStats, filter, traceData); err != nil {
 				fmt.Fprintf(os.Stderr, "Error exporting debug HTML: %v\n", err)
 			} else {
 				color.Yellow("✓ Debug HTML written to %s (inspect browser console for JS errors)", debugFilename)

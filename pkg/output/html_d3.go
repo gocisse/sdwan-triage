@@ -9,14 +9,14 @@ import (
 
 // D3Node represents a node in the D3.js force-directed graph
 type D3Node struct {
-	ID       string  `json:"id"`
-	Label    string  `json:"label"`
-	Group    string  `json:"group"`
-	Size     int     `json:"size"`
-	HasIssue bool    `json:"hasIssue"`
-	Tooltip  string  `json:"tooltip"`
-	Packets  uint64  `json:"packets"`
-	Bytes    uint64  `json:"bytes"`
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Group    string `json:"group"`
+	Size     int    `json:"size"`
+	HasIssue bool   `json:"hasIssue"`
+	Tooltip  string `json:"tooltip"`
+	Packets  uint64 `json:"packets"`
+	Bytes    uint64 `json:"bytes"`
 }
 
 // D3Link represents an edge in the D3.js force-directed graph
@@ -31,11 +31,11 @@ type D3Link struct {
 
 // D3TimelineEvent represents an event for the D3.js timeline
 type D3TimelineEvent struct {
-	Time      float64 `json:"time"`
-	Type      string  `json:"type"`
-	Label     string  `json:"label"`
-	Detail    string  `json:"detail"`
-	Severity  string  `json:"severity"`
+	Time     float64 `json:"time"`
+	Type     string  `json:"type"`
+	Label    string  `json:"label"`
+	Detail   string  `json:"detail"`
+	Severity string  `json:"severity"`
 }
 
 // SankeyNode represents a node in the Sankey diagram
@@ -611,7 +611,7 @@ func GetD3ScriptsTemplate() string {
                     .attr("height", height);
                 
                 const g = svg.append("g")
-                    .attr("transform", \`translate(\${margin.left},\${margin.top})\`);
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
                 
                 const innerWidth = width - margin.left - margin.right;
                 const innerHeight = height - margin.top - margin.bottom;
@@ -636,7 +636,7 @@ func GetD3ScriptsTemplate() string {
                     .tickFormat(d => d.toFixed(1) + "s");
                 
                 g.append("g")
-                    .attr("transform", \`translate(0,\${innerHeight})\`)
+                    .attr("transform", "translate(0," + innerHeight + ")")
                     .call(xAxis)
                     .append("text")
                     .attr("x", innerWidth / 2)
@@ -707,7 +707,7 @@ func GetD3ScriptsTemplate() string {
                     .attr("height", height);
                 
                 const g = svg.append("g")
-                    .attr("transform", \`translate(\${margin.left},\${margin.top})\`);
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
                 
                 const innerWidth = width - margin.left - margin.right;
                 const innerHeight = height - margin.top - margin.bottom;
@@ -813,7 +813,7 @@ func GenerateActionItems(criticalIssues, performanceIssues, securityConcerns int
         <h2>Recommended Actions</h2>
     </div>
     <div class="card-body">`
-	
+
 	if criticalIssues > 0 {
 		html += `
         <div class="action-item critical">
@@ -830,7 +830,7 @@ func GenerateActionItems(criticalIssues, performanceIssues, securityConcerns int
             </div>
         </div>`
 	}
-	
+
 	if performanceIssues > 5 {
 		html += `
         <div class="action-item warning">
@@ -847,7 +847,7 @@ func GenerateActionItems(criticalIssues, performanceIssues, securityConcerns int
             </div>
         </div>`
 	}
-	
+
 	if securityConcerns > 0 {
 		html += `
         <div class="action-item warning">
@@ -864,7 +864,7 @@ func GenerateActionItems(criticalIssues, performanceIssues, securityConcerns int
             </div>
         </div>`
 	}
-	
+
 	if criticalIssues == 0 && performanceIssues <= 5 && securityConcerns == 0 {
 		html += `
         <div class="action-item" style="background: #d4edda; border-left-color: #28a745;">
@@ -880,11 +880,11 @@ func GenerateActionItems(criticalIssues, performanceIssues, securityConcerns int
             </div>
         </div>`
 	}
-	
+
 	html += `
     </div>
 </div>`
-	
+
 	return html
 }
 
@@ -905,7 +905,7 @@ func WriteHTMLFile(filename, content string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	_, err = file.WriteString(content)
 	return err
 }

@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Network Triage Report</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px; 
+            line-height: 1.6;
+            color: #2c3e50;
+        }
+        
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            background: #f8f9fa;
+            border-radius: 12px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        /* Card System */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .card-header i {
+            font-size: 1.8em;
+            margin-right: 15px;
+            color: #667eea;
+        }
+        
+        .card-header h2 {
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .card-body {
+            color: #495057;
+        }
+        
+        /* Executive Summary */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .stat-card h3 {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card.critical {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        
+        .stat-card.warning {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #000;
+        }
+        
+        .stat-card.success {
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+        }
+        
+        /* Action Items */
+        .action-item {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: start;
+        }
+        
+        .action-item.critical {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        
+        .action-item i {
+            margin-right: 12px;
+            margin-top: 2px;
+            font-size: 1.2em;
+        }
+        
+        .action-item strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #856404;
+        }
+        
+        .action-item.critical strong {
+            color: #721c24;
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 2px;
+        }
+        
+        .badge-critical { background: #dc3545; color: white; }
+        .badge-warning { background: #ffc107; color: #000; }
+        .badge-info { background: #17a2b8; color: white; }
+        .badge-success { background: #28a745; color: white; }
+        
+        /* Visualization Containers */
+        #d3-network-diagram {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #d3-timeline {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: #fff;
+            margin-top: 20px;
+        }
+        
+        #d3-traffic-flow {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background: #fff;
+            margin-top: 20px;
+        }
+        
+        /* D3 Tooltip */
+        .d3-tooltip {
+            position: absolute;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 0.9em;
+            line-height: 1.4;
+            max-width: 300px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .d3-tooltip strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #667eea;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        /* Collapsible Sections */
+        .collapsible {
+            cursor: pointer;
+            padding: 12px;
+            background: #e9ecef;
+            border: none;
+            text-align: left;
+            width: 100%;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+        
+        .collapsible:hover {
+            background: #dee2e6;
+        }
+        
+        .collapsible:after {
+            content: '\\002B';
+            float: right;
+            font-weight: bold;
+        }
+        
+        .collapsible.active:after {
+            content: "\\2212";
+        }
+        
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: #f8f9fa;
+            border-radius: 0 0 6px 6px;
+        }
+        
+        .collapsible-content-inner {
+            padding: 15px;
+        }
+        
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 8px;
+            border: 2px solid #333;
+        }
+        
+        /* Footer */
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin-top: 40px;
+        }
+        
+        .footer p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            #d3-network-diagram,
+            #d3-timeline,
+            #d3-traffic-flow {
+                height: 400px;
+            }
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-network-wired"></i> SD-WAN Network Triage Report</h1>
+            <p>Comprehensive Network Analysis with Advanced Visualizations</p>
+        </div>
+        
+        <div class="content">
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-chart-pie"></i>
+        <h2>Executive Summary</h2>
+    </div>
+    <div class="card-body">
+        <div class="stat-card warning" style="margin-bottom: 20px;">
+            <h3><i class="fas fa-exclamation-circle"></i> Network Health Status</h3>
+            <div class="number">WARNING</div>
+        </div>
+        
+        <div class="summary-grid">
+            <div class="stat-card">
+                <h3>Critical Issues</h3>
+                <div class="number">0</div>
+                <p style="font-size: 0.85em; margin-top: 5px;">DNS anomalies, ARP conflicts</p>
+            </div>
+            
+            <div class="stat-card warning">
+                <h3>Performance Issues</h3>
+                <div class="number">687</div>
+                <p style="font-size: 0.85em; margin-top: 5px;">Retransmissions, high latency</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Security Concerns</h3>
+                <div class="number">0</div>
+                <p style="font-size: 0.85em; margin-top: 5px;">Suspicious traffic, cert issues</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3>Total Traffic</h3>
+                <div class="number">0.8</div>
+                <p style="font-size: 0.85em; margin-top: 5px;">Megabytes analyzed</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong><i class="fas fa-info-circle"></i> What This Means:</strong>
+            <p style="margin-top: 8px;">Your network is operational but has some issues that should be addressed to prevent future problems.</p>
+        </div>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-tasks"></i>
+        <h2>Recommended Actions</h2>
+    </div>
+    <div class="card-body">
+        <div class="action-item warning">
+            <i class="fas fa-chart-line"></i>
+            <div>
+                <strong>Performance Optimization Needed</strong>
+                Detected 687 performance issues including TCP retransmissions and high latency.
+                <ul style="margin-top: 8px; margin-left: 20px;">
+                    <li>Check network links for congestion or hardware issues</li>
+                    <li>Review QoS policies on routers and switches</li>
+                    <li>Consider upgrading bandwidth for high-traffic links</li>
+                    <li>Investigate applications causing retransmissions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-clipboard-check"></i>
+        <h2>Detailed Action Items</h2>
+    </div>
+    <div class="card-body">
+        <button class="collapsible">DNS Anomalies - Recommended Actions</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item critical">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <strong>Immediate Action Required</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Verify DNS Server:</strong> Check if the DNS server IP matches your configured DNS servers</li>
+                            <li><strong>Scan for Malware:</strong> Run antivirus/antimalware scan on affected client devices</li>
+                            <li><strong>Check Gateway:</strong> Verify gateway device is not compromised (check MAC address)</li>
+                            <li><strong>Network Isolation:</strong> Consider isolating affected devices until investigation is complete</li>
+                            <li><strong>DNS Security:</strong> Implement DNSSEC if not already enabled</li>
+                            <li><strong>Monitor Traffic:</strong> Continue monitoring for additional DNS anomalies</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">TCP Retransmissions - Performance Optimization</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item warning">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <div>
+                        <strong>Performance Investigation Steps</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Check Physical Links:</strong> Inspect cables, connectors, and network interface cards</li>
+                            <li><strong>Review Switch/Router Logs:</strong> Look for errors, CRC errors, or interface resets</li>
+                            <li><strong>Bandwidth Analysis:</strong> Check if links are saturated (>80% utilization)</li>
+                            <li><strong>QoS Configuration:</strong> Review and adjust Quality of Service policies</li>
+                            <li><strong>MTU Settings:</strong> Verify MTU is consistent across the path (typically 1500)</li>
+                            <li><strong>Duplex Mismatch:</strong> Ensure all interfaces are auto-negotiating or manually set to full-duplex</li>
+                            <li><strong>Buffer Tuning:</strong> Check router/switch buffer settings for congestion</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">ARP Conflicts - Network Integrity</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item critical">
+                    <i class="fas fa-network-wired"></i>
+                    <div>
+                        <strong>ARP Conflict Resolution</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Identify Devices:</strong> Use MAC address lookup to identify both devices claiming the same IP</li>
+                            <li><strong>Check DHCP:</strong> Verify DHCP server is not assigning duplicate IPs</li>
+                            <li><strong>Static IP Audit:</strong> Review all static IP assignments for conflicts</li>
+                            <li><strong>Remove Rogue Device:</strong> Physically locate and remove/reconfigure the conflicting device</li>
+                            <li><strong>Enable Port Security:</strong> Configure switch port security to prevent MAC spoofing</li>
+                            <li><strong>ARP Inspection:</strong> Enable Dynamic ARP Inspection (DAI) on switches</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">TLS Certificate Issues - Security Compliance</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item warning">
+                    <i class="fas fa-certificate"></i>
+                    <div>
+                        <strong>Certificate Management Actions</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Renew Expired Certificates:</strong> Obtain and install new certificates from trusted CA</li>
+                            <li><strong>Replace Self-Signed Certs:</strong> Use proper CA-signed certificates in production</li>
+                            <li><strong>Certificate Monitoring:</strong> Implement automated certificate expiration monitoring</li>
+                            <li><strong>Update Certificate Store:</strong> Ensure client devices have updated root CA certificates</li>
+                            <li><strong>Review Certificate Chain:</strong> Verify complete certificate chain is properly configured</li>
+                            <li><strong>Enable HSTS:</strong> Configure HTTP Strict Transport Security headers</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">Suspicious Traffic - Security Investigation</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item critical">
+                    <i class="fas fa-user-secret"></i>
+                    <div>
+                        <strong>Security Incident Response</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Isolate Affected Systems:</strong> Quarantine devices communicating on suspicious ports</li>
+                            <li><strong>Malware Scan:</strong> Run comprehensive security scans on identified devices</li>
+                            <li><strong>Firewall Rules:</strong> Block suspicious ports at firewall/router level</li>
+                            <li><strong>Log Analysis:</strong> Review system and application logs for unauthorized access</li>
+                            <li><strong>Password Reset:</strong> Force password changes on potentially compromised accounts</li>
+                            <li><strong>Incident Report:</strong> Document findings and notify security team/management</li>
+                            <li><strong>Forensic Analysis:</strong> Consider engaging security professionals for deep investigation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">High Latency (RTT) - Performance Tuning</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item warning">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <strong>Latency Reduction Strategies</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Traceroute Analysis:</strong> Identify which hop is introducing latency</li>
+                            <li><strong>ISP Investigation:</strong> Contact ISP if latency is on WAN links</li>
+                            <li><strong>Route Optimization:</strong> Consider alternate routes or BGP path selection</li>
+                            <li><strong>WAN Acceleration:</strong> Implement WAN optimization/SD-WAN solutions</li>
+                            <li><strong>Caching:</strong> Deploy caching proxies for frequently accessed content</li>
+                            <li><strong>CDN Usage:</strong> Use Content Delivery Networks for web applications</li>
+                            <li><strong>Application Tuning:</strong> Optimize application protocols (HTTP/2, QUIC)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">BGP Routing Issues - Advanced Troubleshooting</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item critical">
+                    <i class="fas fa-route"></i>
+                    <div>
+                        <strong>BGP Investigation Steps</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Verify AS Path:</strong> Confirm traffic is routing through expected autonomous systems</li>
+                            <li><strong>Check BGP Tables:</strong> Review BGP routing tables on border routers</li>
+                            <li><strong>Route Filtering:</strong> Implement BGP route filtering and prefix lists</li>
+                            <li><strong>RPKI Validation:</strong> Enable Resource Public Key Infrastructure validation</li>
+                            <li><strong>Contact Upstream:</strong> Notify upstream provider of potential hijack</li>
+                            <li><strong>Monitoring:</strong> Set up BGP monitoring and alerting systems</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="collapsible">QoS/DSCP Issues - Traffic Management</button>
+        <div class="collapsible-content">
+            <div class="collapsible-content-inner">
+                <div class="action-item warning">
+                    <i class="fas fa-layer-group"></i>
+                    <div>
+                        <strong>QoS Configuration Review</strong>
+                        <ul style="margin-top: 8px; margin-left: 20px;">
+                            <li><strong>Verify DSCP Marking:</strong> Ensure applications are marking traffic correctly</li>
+                            <li><strong>QoS Policy Check:</strong> Review router/switch QoS policies and queuing</li>
+                            <li><strong>Bandwidth Allocation:</strong> Adjust bandwidth guarantees for priority traffic</li>
+                            <li><strong>Queue Depth:</strong> Tune queue depths to prevent drops on priority traffic</li>
+                            <li><strong>Traffic Shaping:</strong> Implement traffic shaping for non-critical applications</li>
+                            <li><strong>End-to-End QoS:</strong> Ensure QoS is configured across entire path</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-project-diagram"></i>
+        <h2>Interactive Network Topology</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong><i class="fas fa-mouse-pointer"></i> Interactive Features:</strong>
+            Drag nodes to rearrange, zoom with mouse wheel, hover for details. Red nodes indicate issues.
+        </p>
+        <div id="d3-network-diagram"></div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4CAF50;"></div>
+                <span>Internal Devices</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2196F3;"></div>
+                <span>Routers/Gateways</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FF9800;"></div>
+                <span>External Servers</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #dc3545;"></div>
+                <span>Devices with Issues</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-clock"></i>
+        <h2>Network Activity Timeline</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong><i class="fas fa-chart-line"></i> Timeline View:</strong>
+            Shows network events over time. Hover over markers for event details. Zoom and pan to explore.
+        </p>
+        <div id="d3-timeline"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-exchange-alt"></i>
+        <h2>Traffic Flow Analysis</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong><i class="fas fa-stream"></i> Sankey Diagram:</strong>
+            Visualizes traffic volume between network segments. Wider flows indicate higher traffic volume.
+        </p>
+        <div id="d3-traffic-flow"></div>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h2>DNS Anomalies</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <strong><i class="fas fa-info-circle"></i> What are DNS Anomalies?</strong>
+            DNS anomalies occur when domain names resolve to unexpected IP addresses, which could indicate DNS poisoning, 
+            misconfiguration, or man-in-the-middle attacks.
+        </p><p class="empty-state">No DNS anomalies detected.</p>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-redo"></i>
+        <h2>TCP Retransmissions</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong><i class="fas fa-info-circle"></i> What are TCP Retransmissions?</strong>
+            TCP retransmissions occur when packets are lost or corrupted in transit, requiring resending. 
+            High retransmission rates indicate network congestion, faulty equipment, or poor link quality.
+        </p><table>
+            <tr>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Port</th>
+            </tr>
+            <tr>
+                <td>34.36.209.34</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58484</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 34.36.209.34:443 -&gt; 192.168.100.203:58484</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>34.36.209.34</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58484</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 34.36.209.34:443 -&gt; 192.168.100.203:58484</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>34.36.209.34</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58484</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 34.36.209.34:443 -&gt; 192.168.100.203:58484</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>87.248.119.252</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58493 -&gt; 87.248.119.252:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>87.248.119.252</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58482</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 87.248.119.252:443 -&gt; 192.168.100.203:58482</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>34.120.133.55</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58495 -&gt; 34.120.133.55:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>188.125.72.139</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58477 -&gt; 188.125.72.139:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>192.168.100.203</td>
+                <td>34.120.133.55</td>
+                <td><span class="badge badge-info">443</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 192.168.100.203:58495 -&gt; 34.120.133.55:443</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>172.217.19.2</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58494</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>172.217.19.2</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58494</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>172.217.19.2</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58494</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>172.217.19.2</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58494</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>172.217.19.2</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58494</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr>
+            <tr>
+                <td>172.217.19.2</td>
+                <td>192.168.100.203</td>
+                <td><span class="badge badge-info">58494</span></td>
+            </tr><tr><td colspan="3">
+			<div class="action-item warning" style="margin-top: 10px;">
+				<i class="fas fa-tools"></i>
+				<div>
+					<strong>Action for this retransmission:</strong>
+					<p style="margin-top: 5px;">Flow: 172.217.19.2:443 -&gt; 192.168.100.203:58494</p>
+					<ul style="margin-top: 5px; margin-left: 20px;">
+						<li>Check network path for congestion or packet loss</li>
+						<li>Verify physical connections and interface statistics</li>
+						<li>Review QoS policies for this traffic class</li>
+					</ul>
+				</div>
+			</div></td></tr></table><p style="text-align: center; margin-top: 10px; color: #666;">
+                ... and 667 more retransmission flows</p>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-network-wired"></i>
+        <h2>ARP Conflicts</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+            <strong><i class="fas fa-info-circle"></i> What are ARP Conflicts?</strong>
+            ARP conflicts occur when two devices claim the same IP address, causing network connectivity issues. 
+            This can result from DHCP misconfigurations, static IP conflicts, or malicious activity.
+        </p><p class="empty-state">No ARP conflicts detected.</p>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-user-secret"></i>
+        <h2>Suspicious Traffic</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #f8d7da; border-left: 4px solid #dc3545; border-radius: 4px;">
+            <strong><i class="fas fa-info-circle"></i> What is Suspicious Traffic?</strong>
+            Traffic on known malicious ports or unusual patterns that may indicate malware, backdoors, 
+            or unauthorized access attempts.
+        </p><p class="empty-state">No suspicious traffic detected.</p>
+    </div>
+</div><div class="card">
+    <div class="card-header">
+        <i class="fas fa-certificate"></i>
+        <h2>TLS Certificate Issues</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom: 15px; padding: 12px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <strong><i class="fas fa-info-circle"></i> Why Certificate Issues Matter</strong>
+            Expired or self-signed certificates can indicate security misconfigurations or potential 
+            man-in-the-middle attacks. They also cause browser warnings and connection failures.
+        </p><p class="empty-state">No certificate issues detected.</p>
+    </div>
+</div><div class="card"><div class="card-header"><i class="fas fa-clock"></i><h2>High Latency (RTT) Flows</h2></div><div class="card-body"><p class="empty-state">RTT analysis data available in main report.</p></div></div><div class="card"><div class="card-header"><i class="fas fa-route"></i><h2>BGP Routing Analysis</h2></div><div class="card-body"><p class="empty-state">BGP analysis not performed. Use -bgp-check flag to enable.</p></div></div><div class="card"><div class="card-header"><i class="fas fa-layer-group"></i><h2>QoS/DSCP Analysis</h2></div><div class="card-body"><p class="empty-state">QoS analysis not performed. Use -qos-analysis flag to enable.</p></div></div><div class="card"><div class="card-header"><i class="fas fa-th"></i><h2>Application Identification</h2></div><div class="card-body"><p class="empty-state">Application identification not performed. Use -app-identify flag to enable.</p></div></div><div class="card"><div class="card-header"><i class="fas fa-chart-bar"></i><h2>Top Traffic Flows</h2></div><div class="card-body"><p>Traffic analysis data available in main report.</p></div></div><div class="card"><div class="card-header"><i class="fas fa-stream"></i><h2>Network Timeline</h2></div><div class="card-body"><p>Timeline visualization above shows network events over time.</p></div></div><div class="card"><div class="card-header"><i class="fas fa-list"></i><h2>DNS Query/Response Details</h2></div><div class="card-body"><p>DNS transaction details available in main report.</p></div></div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>SD-WAN Network Triage Report v2.6.0</strong></p>
+            <p>Generated with advanced D3.js visualizations and actionable recommendations</p>
+            <p style="margin-top: 10px; font-size: 0.9em;">
+                This automated analysis identifies potential network issues. 
+                Further investigation by network administrators may be required.
+            </p>
+        </div>
+    </div>
+
+        <script>
+            // D3.js Force-Directed Network Graph
+            function createNetworkDiagram(nodes, links) {
+                const container = d3.select("#d3-network-diagram");
+                const width = container.node().getBoundingClientRect().width;
+                const height = 600;
+                
+                // Clear any existing content
+                container.selectAll("*").remove();
+                
+                // Create SVG
+                const svg = container.append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .attr("viewBox", [0, 0, width, height]);
+                
+                // Create zoom behavior
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 4])
+                    .on("zoom", (event) => {
+                        g.attr("transform", event.transform);
+                    });
+                
+                svg.call(zoom);
+                
+                // Create container group
+                const g = svg.append("g");
+                
+                // Create tooltip
+                const tooltip = d3.select("body").append("div")
+                    .attr("class", "d3-tooltip")
+                    .style("opacity", 0);
+                
+                // Color scale
+                const colorScale = d3.scaleOrdinal()
+                    .domain(["internal", "router", "external", "hop", "anomaly"])
+                    .range(["#4CAF50", "#2196F3", "#FF9800", "#9C27B0", "#dc3545"]);
+                
+                // Create force simulation
+                const simulation = d3.forceSimulation(nodes)
+                    .force("link", d3.forceLink(links).id(d => d.id).distance(150))
+                    .force("charge", d3.forceManyBody().strength(-300))
+                    .force("center", d3.forceCenter(width / 2, height / 2))
+                    .force("collision", d3.forceCollide().radius(40));
+                
+                // Create links
+                const link = g.append("g")
+                    .selectAll("line")
+                    .data(links)
+                    .join("line")
+                    .attr("stroke", d => d.hasIssue ? "#dc3545" : "#999")
+                    .attr("stroke-opacity", 0.6)
+                    .attr("stroke-width", d => Math.sqrt(d.value))
+                    .attr("stroke-dasharray", d => d.hasIssue ? "5,5" : "0")
+                    .on("mouseover", function(event, d) {
+                        tooltip.transition().duration(200).style("opacity", .9);
+                        tooltip.html(d.tooltip || d.label)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        tooltip.transition().duration(500).style("opacity", 0);
+                    });
+                
+                // Create link labels
+                const linkLabel = g.append("g")
+                    .selectAll("text")
+                    .data(links)
+                    .join("text")
+                    .attr("font-size", 10)
+                    .attr("fill", "#666")
+                    .text(d => d.label);
+                
+                // Create nodes
+                const node = g.append("g")
+                    .selectAll("circle")
+                    .data(nodes)
+                    .join("circle")
+                    .attr("r", d => d.size || 20)
+                    .attr("fill", d => d.hasIssue ? "#dc3545" : colorScale(d.group))
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 2)
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended))
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).attr("r", (d.size || 20) * 1.5);
+                        tooltip.transition().duration(200).style("opacity", .9);
+                        tooltip.html("<strong>" + d.label + "</strong><br/>" + (d.tooltip || ""))
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                        
+                        // Highlight connected nodes and edges
+                        link.style("opacity", l => 
+                            l.source.id === d.id || l.target.id === d.id ? 1 : 0.1);
+                        node.style("opacity", n => 
+                            n.id === d.id || links.some(l => 
+                                (l.source.id === d.id && l.target.id === n.id) ||
+                                (l.target.id === d.id && l.source.id === n.id)) ? 1 : 0.3);
+                    })
+                    .on("mouseout", function(event, d) {
+                        d3.select(this).attr("r", d.size || 20);
+                        tooltip.transition().duration(500).style("opacity", 0);
+                        link.style("opacity", 0.6);
+                        node.style("opacity", 1);
+                    });
+                
+                // Create node labels
+                const nodeLabel = g.append("g")
+                    .selectAll("text")
+                    .data(nodes)
+                    .join("text")
+                    .attr("font-size", 12)
+                    .attr("font-weight", "bold")
+                    .attr("fill", "#333")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", -25)
+                    .text(d => d.label);
+                
+                // Update positions on each tick
+                simulation.on("tick", () => {
+                    link
+                        .attr("x1", d => d.source.x)
+                        .attr("y1", d => d.source.y)
+                        .attr("x2", d => d.target.x)
+                        .attr("y2", d => d.target.y);
+                    
+                    linkLabel
+                        .attr("x", d => (d.source.x + d.target.x) / 2)
+                        .attr("y", d => (d.source.y + d.target.y) / 2);
+                    
+                    node
+                        .attr("cx", d => d.x)
+                        .attr("cy", d => d.y);
+                    
+                    nodeLabel
+                        .attr("x", d => d.x)
+                        .attr("y", d => d.y);
+                });
+                
+                // Drag functions
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+                
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+                
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+            }
+            
+            // D3.js Timeline Visualization
+            function createTimeline(events) {
+                const container = d3.select("#d3-timeline");
+                const width = container.node().getBoundingClientRect().width;
+                const height = 400;
+                const margin = {top: 40, right: 40, bottom: 60, left: 60};
+                
+                // Clear any existing content
+                container.selectAll("*").remove();
+                
+                // Create SVG
+                const svg = container.append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+                
+                const g = svg.append("g")
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+                
+                const innerWidth = width - margin.left - margin.right;
+                const innerHeight = height - margin.top - margin.bottom;
+                
+                // Create tooltip
+                const tooltip = d3.select("body").append("div")
+                    .attr("class", "d3-tooltip")
+                    .style("opacity", 0);
+                
+                // Scales
+                const xScale = d3.scaleLinear()
+                    .domain([0, d3.max(events, d => d.time)])
+                    .range([0, innerWidth]);
+                
+                const colorScale = d3.scaleOrdinal()
+                    .domain(["DNS", "TCP", "HTTP", "ARP", "TLS"])
+                    .range(["#2196F3", "#4CAF50", "#FF9800", "#dc3545", "#9C27B0"]);
+                
+                // Axes
+                const xAxis = d3.axisBottom(xScale)
+                    .ticks(10)
+                    .tickFormat(d => d.toFixed(1) + "s");
+                
+                g.append("g")
+                    .attr("transform", "translate(0," + innerHeight + ")")
+                    .call(xAxis)
+                    .append("text")
+                    .attr("x", innerWidth / 2)
+                    .attr("y", 40)
+                    .attr("fill", "#000")
+                    .attr("font-weight", "bold")
+                    .text("Time (seconds)");
+                
+                // Event markers
+                const eventHeight = 30;
+                const lanes = {};
+                let currentLane = 0;
+                
+                events.forEach(event => {
+                    if (!lanes[event.type]) {
+                        lanes[event.type] = currentLane++;
+                    }
+                });
+                
+                g.selectAll("circle")
+                    .data(events)
+                    .join("circle")
+                    .attr("cx", d => xScale(d.time))
+                    .attr("cy", d => lanes[d.type] * eventHeight + eventHeight / 2)
+                    .attr("r", 6)
+                    .attr("fill", d => colorScale(d.type))
+                    .attr("stroke", "#fff")
+                    .attr("stroke-width", 2)
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).attr("r", 10);
+                        tooltip.transition().duration(200).style("opacity", .9);
+                        tooltip.html("<strong>" + d.type + " @ " + d.time.toFixed(3) + "s</strong><br/>" + d.detail)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this).attr("r", 6);
+                        tooltip.transition().duration(500).style("opacity", 0);
+                    });
+                
+                // Lane labels
+                Object.keys(lanes).forEach(type => {
+                    g.append("text")
+                        .attr("x", -10)
+                        .attr("y", lanes[type] * eventHeight + eventHeight / 2)
+                        .attr("text-anchor", "end")
+                        .attr("alignment-baseline", "middle")
+                        .attr("font-size", 12)
+                        .attr("fill", colorScale(type))
+                        .attr("font-weight", "bold")
+                        .text(type);
+                });
+            }
+            
+            // D3.js Sankey Diagram for Traffic Flow
+            function createSankeyDiagram(data) {
+                const container = d3.select("#d3-traffic-flow");
+                const width = container.node().getBoundingClientRect().width;
+                const height = 500;
+                const margin = {top: 10, right: 10, bottom: 10, left: 10};
+                
+                // Clear any existing content
+                container.selectAll("*").remove();
+                
+                // Create SVG
+                const svg = container.append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+                
+                const g = svg.append("g")
+                    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+                
+                const innerWidth = width - margin.left - margin.right;
+                const innerHeight = height - margin.top - margin.bottom;
+                
+                // Create Sankey generator
+                const sankey = d3.sankey()
+                    .nodeWidth(15)
+                    .nodePadding(10)
+                    .extent([[1, 1], [innerWidth - 1, innerHeight - 5]]);
+                
+                const {nodes, links} = sankey(data);
+                
+                // Create tooltip
+                const tooltip = d3.select("body").append("div")
+                    .attr("class", "d3-tooltip")
+                    .style("opacity", 0);
+                
+                // Color scale
+                const color = d3.scaleOrdinal(d3.schemeCategory10);
+                
+                // Draw links
+                g.append("g")
+                    .selectAll("path")
+                    .data(links)
+                    .join("path")
+                    .attr("d", d3.sankeyLinkHorizontal())
+                    .attr("stroke", d => color(d.source.name))
+                    .attr("stroke-width", d => Math.max(1, d.width))
+                    .attr("fill", "none")
+                    .attr("opacity", 0.5)
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).attr("opacity", 0.8);
+                        tooltip.transition().duration(200).style("opacity", .9);
+                        tooltip.html("<strong>" + d.source.name + " → " + d.target.name + "</strong><br/>" +
+                                   "Traffic: " + (d.value / (1024*1024)).toFixed(2) + " MB")
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        d3.select(this).attr("opacity", 0.5);
+                        tooltip.transition().duration(500).style("opacity", 0);
+                    });
+                
+                // Draw nodes
+                g.append("g")
+                    .selectAll("rect")
+                    .data(nodes)
+                    .join("rect")
+                    .attr("x", d => d.x0)
+                    .attr("y", d => d.y0)
+                    .attr("height", d => d.y1 - d.y0)
+                    .attr("width", d => d.x1 - d.x0)
+                    .attr("fill", d => color(d.name))
+                    .attr("stroke", "#000")
+                    .on("mouseover", function(event, d) {
+                        tooltip.transition().duration(200).style("opacity", .9);
+                        tooltip.html("<strong>" + d.name + "</strong><br/>" +
+                                   "Total: " + (d.value / (1024*1024)).toFixed(2) + " MB")
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 28) + "px");
+                    })
+                    .on("mouseout", function() {
+                        tooltip.transition().duration(500).style("opacity", 0);
+                    });
+                
+                // Add node labels
+                g.append("g")
+                    .selectAll("text")
+                    .data(nodes)
+                    .join("text")
+                    .attr("x", d => d.x0 < innerWidth / 2 ? d.x1 + 6 : d.x0 - 6)
+                    .attr("y", d => (d.y1 + d.y0) / 2)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", d => d.x0 < innerWidth / 2 ? "start" : "end")
+                    .attr("font-size", 12)
+                    .text(d => d.name);
+            }
+            
+            // Collapsible sections
+            document.addEventListener('DOMContentLoaded', function() {
+                const collapsibles = document.getElementsByClassName("collapsible");
+                for (let i = 0; i < collapsibles.length; i++) {
+                    collapsibles[i].addEventListener("click", function() {
+                        this.classList.toggle("active");
+                        const content = this.nextElementSibling;
+                        if (content.style.maxHeight) {
+                            content.style.maxHeight = null;
+                        } else {
+                            content.style.maxHeight = content.scrollHeight + "px";
+                        }
+                    });
+                }
+            });
+        </script>
+
+    <script>
+        // Initialize visualizations when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // Network Diagram
+                const networkData = {
+                    nodes: [{"group":"internal","hasIssue":false,"id":"192.168.100.203","label":"192.168.100.203","size":20,"tooltip":"IP: 192.168.100.203\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"104.18.26.193","label":"104.18.26.193","size":20,"tooltip":"IP: 104.18.26.193\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.36.209.34","label":"34.36.209.34","size":20,"tooltip":"IP: 34.36.209.34\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.64.146.215","label":"172.64.146.215","size":20,"tooltip":"IP: 172.64.146.215\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"69.173.156.138","label":"69.173.156.138","size":20,"tooltip":"IP: 69.173.156.138\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"18.97.36.68","label":"18.97.36.68","size":20,"tooltip":"IP: 18.97.36.68\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"35.186.253.211","label":"35.186.253.211","size":20,"tooltip":"IP: 35.186.253.211\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.18.41.41","label":"104.18.41.41","size":20,"tooltip":"IP: 104.18.41.41\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.65","label":"142.251.36.65","size":20,"tooltip":"IP: 142.251.36.65\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"87.248.119.252","label":"87.248.119.252","size":20,"tooltip":"IP: 87.248.119.252\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.65.44","label":"151.101.65.44","size":20,"tooltip":"IP: 151.101.65.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.141.161","label":"142.251.141.161","size":20,"tooltip":"IP: 142.251.141.161\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"209.38.50.75","label":"209.38.50.75","size":20,"tooltip":"IP: 209.38.50.75\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.8.63.254","label":"34.8.63.254","size":20,"tooltip":"IP: 34.8.63.254\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"74.125.133.188","label":"74.125.133.188","size":20,"tooltip":"IP: 74.125.133.188\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.68","label":"142.251.36.68","size":20,"tooltip":"IP: 142.251.36.68\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.16.102.112","label":"104.16.102.112","size":20,"tooltip":"IP: 104.16.102.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.149.50.64","label":"34.149.50.64","size":20,"tooltip":"IP: 34.149.50.64\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"52.110.4.150","label":"52.110.4.150","size":20,"tooltip":"IP: 52.110.4.150\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.120.133.55","label":"34.120.133.55","size":20,"tooltip":"IP: 34.120.133.55\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.191","label":"192.168.100.191","size":20,"tooltip":"IP: 192.168.100.191\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"224.0.0.251","label":"224.0.0.251","size":20,"tooltip":"IP: 224.0.0.251\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"140.82.113.25","label":"140.82.113.25","size":20,"tooltip":"IP: 140.82.113.25\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.1","label":"192.168.100.1","size":20,"tooltip":"IP: 192.168.100.1\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"17.42.251.72","label":"17.42.251.72","size":20,"tooltip":"IP: 17.42.251.72\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"185.64.189.112","label":"185.64.189.112","size":20,"tooltip":"IP: 185.64.189.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.141.79.142","label":"34.141.79.142","size":20,"tooltip":"IP: 34.141.79.142\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"2.21.74.59","label":"2.21.74.59","size":20,"tooltip":"IP: 2.21.74.59\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.220","label":"192.168.100.220","size":20,"tooltip":"IP: 192.168.100.220\u003cbr/\u003eRole: internal"},{"group":"internal","hasIssue":false,"id":"192.168.100.255","label":"192.168.100.255","size":20,"tooltip":"IP: 192.168.100.255\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"172.217.19.10","label":"172.217.19.10","size":20,"tooltip":"IP: 172.217.19.10\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"8.8.8.8","label":"8.8.8.8","size":20,"tooltip":"IP: 8.8.8.8\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"104.16.103.112","label":"104.16.103.112","size":20,"tooltip":"IP: 104.16.103.112\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.141.162","label":"142.251.141.162","size":20,"tooltip":"IP: 142.251.141.162\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"23.44.215.200","label":"23.44.215.200","size":20,"tooltip":"IP: 23.44.215.200\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"8.8.4.4","label":"8.8.4.4","size":20,"tooltip":"IP: 8.8.4.4\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.243.32.177","label":"34.243.32.177","size":20,"tooltip":"IP: 34.243.32.177\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.1.44","label":"151.101.1.44","size":20,"tooltip":"IP: 151.101.1.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"141.226.224.32","label":"141.226.224.32","size":20,"tooltip":"IP: 141.226.224.32\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.78","label":"142.251.36.78","size":20,"tooltip":"IP: 142.251.36.78\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"178.250.7.136","label":"178.250.7.136","size":20,"tooltip":"IP: 178.250.7.136\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"172.217.19.2","label":"172.217.19.2","size":20,"tooltip":"IP: 172.217.19.2\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"141.226.228.48","label":"141.226.228.48","size":20,"tooltip":"IP: 141.226.228.48\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"151.101.193.44","label":"151.101.193.44","size":20,"tooltip":"IP: 151.101.193.44\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"35.223.238.178","label":"35.223.238.178","size":20,"tooltip":"IP: 35.223.238.178\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"52.209.232.99","label":"52.209.232.99","size":20,"tooltip":"IP: 52.209.232.99\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.229","label":"192.168.100.229","size":20,"tooltip":"IP: 192.168.100.229\u003cbr/\u003eRole: internal"},{"group":"external","hasIssue":false,"id":"3.124.64.248","label":"3.124.64.248","size":20,"tooltip":"IP: 3.124.64.248\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"108.177.15.84","label":"108.177.15.84","size":20,"tooltip":"IP: 108.177.15.84\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.38.131","label":"142.251.38.131","size":20,"tooltip":"IP: 142.251.38.131\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"23.44.215.194","label":"23.44.215.194","size":20,"tooltip":"IP: 23.44.215.194\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"188.125.72.139","label":"188.125.72.139","size":20,"tooltip":"IP: 188.125.72.139\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"255.255.255.255","label":"255.255.255.255","size":20,"tooltip":"IP: 255.255.255.255\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"34.107.243.93","label":"34.107.243.93","size":20,"tooltip":"IP: 34.107.243.93\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"185.89.210.212","label":"185.89.210.212","size":20,"tooltip":"IP: 185.89.210.212\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"224.0.0.1","label":"224.0.0.1","size":20,"tooltip":"IP: 224.0.0.1\u003cbr/\u003eRole: external"},{"group":"external","hasIssue":false,"id":"142.251.36.74","label":"142.251.36.74","size":20,"tooltip":"IP: 142.251.36.74\u003cbr/\u003eRole: external"},{"group":"internal","hasIssue":false,"id":"192.168.100.226","label":"192.168.100.226","size":20,"tooltip":"IP: 192.168.100.226\u003cbr/\u003eRole: internal"}],
+                    links: [{"hasIssue":true,"label":"58478","source":"192.168.100.203","target":"104.18.26.193","tooltip":"Traffic: 192.168.100.203 -\u003e 104.18.26.193\u003cbr/\u003eBytes: 9614\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58484","source":"34.36.209.34","target":"192.168.100.203","tooltip":"Traffic: 34.36.209.34 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 8720\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"58452","source":"192.168.100.203","target":"172.64.146.215","tooltip":"Traffic: 192.168.100.203 -\u003e 172.64.146.215\u003cbr/\u003eBytes: 1180\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"69.173.156.138","target":"192.168.100.203","tooltip":"Traffic: 69.173.156.138 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 22060\u003cbr/\u003ePackets: 43","value":5},{"hasIssue":true,"label":"443","source":"18.97.36.68","target":"192.168.100.203","tooltip":"Traffic: 18.97.36.68 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 12644\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"443","source":"35.186.253.211","target":"192.168.100.203","tooltip":"Traffic: 35.186.253.211 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1272\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"58680","source":"104.18.41.41","target":"192.168.100.203","tooltip":"Traffic: 104.18.41.41 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 37216\u003cbr/\u003ePackets: 33","value":5},{"hasIssue":false,"label":"58572","source":"192.168.100.203","target":"142.251.36.65","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.65\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58493","source":"192.168.100.203","target":"87.248.119.252","tooltip":"Traffic: 192.168.100.203 -\u003e 87.248.119.252\u003cbr/\u003eBytes: 21594\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"58498","source":"192.168.100.203","target":"151.101.65.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.65.44\u003cbr/\u003eBytes: 7104\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"58570","source":"192.168.100.203","target":"142.251.141.161","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.141.161\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58485","source":"192.168.100.203","target":"209.38.50.75","tooltip":"Traffic: 192.168.100.203 -\u003e 209.38.50.75\u003cbr/\u003eBytes: 7270\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"58481","source":"192.168.100.203","target":"35.186.253.211","tooltip":"Traffic: 192.168.100.203 -\u003e 35.186.253.211\u003cbr/\u003eBytes: 11192\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"443","source":"34.8.63.254","target":"192.168.100.203","tooltip":"Traffic: 34.8.63.254 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 16332\u003cbr/\u003ePackets: 41","value":5},{"hasIssue":false,"label":"5228","source":"74.125.133.188","target":"192.168.100.203","tooltip":"Traffic: 74.125.133.188 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.203","target":"142.251.36.68","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.68\u003cbr/\u003eBytes: 336\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"58667","source":"104.16.102.112","target":"192.168.100.203","tooltip":"Traffic: 104.16.102.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 15558\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"58663","source":"192.168.100.203","target":"69.173.156.138","tooltip":"Traffic: 192.168.100.203 -\u003e 69.173.156.138\u003cbr/\u003eBytes: 16340\u003cbr/\u003ePackets: 50","value":5},{"hasIssue":true,"label":"443","source":"34.149.50.64","target":"192.168.100.203","tooltip":"Traffic: 34.149.50.64 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2732\u003cbr/\u003ePackets: 10","value":5},{"hasIssue":true,"label":"53788","source":"192.168.100.203","target":"52.110.4.150","tooltip":"Traffic: 192.168.100.203 -\u003e 52.110.4.150\u003cbr/\u003eBytes: 94314\u003cbr/\u003ePackets: 140","value":5},{"hasIssue":false,"label":"443","source":"34.120.133.55","target":"192.168.100.203","tooltip":"Traffic: 34.120.133.55 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 978\u003cbr/\u003ePackets: 9","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.191","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.191 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2452\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":true,"label":"58667","source":"192.168.100.203","target":"104.16.102.112","tooltip":"Traffic: 192.168.100.203 -\u003e 104.16.102.112\u003cbr/\u003eBytes: 7254\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"443","source":"140.82.113.25","target":"192.168.100.203","tooltip":"Traffic: 140.82.113.25 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 206\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"48358","source":"192.168.100.1","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.1 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2400\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":false,"label":"55801","source":"17.42.251.72","target":"192.168.100.203","tooltip":"Traffic: 17.42.251.72 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"mixed","source":"142.251.36.68","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.68 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 336\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.203","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.203 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 1872\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"58491","source":"192.168.100.203","target":"185.64.189.112","tooltip":"Traffic: 192.168.100.203 -\u003e 185.64.189.112\u003cbr/\u003eBytes: 17394\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":false,"label":"65529","source":"192.168.100.203","target":"34.141.79.142","tooltip":"Traffic: 192.168.100.203 -\u003e 34.141.79.142\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"7500","source":"34.141.79.142","target":"192.168.100.203","tooltip":"Traffic: 34.141.79.142 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 126\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58680","source":"192.168.100.203","target":"104.18.41.41","tooltip":"Traffic: 192.168.100.203 -\u003e 104.18.41.41\u003cbr/\u003eBytes: 49068\u003cbr/\u003ePackets: 38","value":5},{"hasIssue":false,"label":"443","source":"142.251.36.65","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.65 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58670","source":"192.168.100.203","target":"2.21.74.59","tooltip":"Traffic: 192.168.100.203 -\u003e 2.21.74.59\u003cbr/\u003eBytes: 3528\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":true,"label":"58659","source":"192.168.100.203","target":"18.97.36.68","tooltip":"Traffic: 192.168.100.203 -\u003e 18.97.36.68\u003cbr/\u003eBytes: 3820\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":true,"label":"58493","source":"87.248.119.252","target":"192.168.100.203","tooltip":"Traffic: 87.248.119.252 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 5682\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"9956","source":"192.168.100.220","target":"192.168.100.255","tooltip":"Traffic: 192.168.100.220 -\u003e 192.168.100.255\u003cbr/\u003eBytes: 1072\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"172.217.19.10","target":"192.168.100.203","tooltip":"Traffic: 172.217.19.10 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 22408\u003cbr/\u003ePackets: 20","value":5},{"hasIssue":true,"label":"58669","source":"192.168.100.203","target":"8.8.8.8","tooltip":"Traffic: 192.168.100.203 -\u003e 8.8.8.8\u003cbr/\u003eBytes: 12927\u003cbr/\u003ePackets: 61","value":5},{"hasIssue":false,"label":"58469","source":"104.16.103.112","target":"192.168.100.203","tooltip":"Traffic: 104.16.103.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1440\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":false,"label":"58484","source":"192.168.100.203","target":"34.36.209.34","tooltip":"Traffic: 192.168.100.203 -\u003e 34.36.209.34\u003cbr/\u003eBytes: 17918\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":true,"label":"58475","source":"192.168.100.203","target":"142.251.141.162","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.141.162\u003cbr/\u003eBytes: 9326\u003cbr/\u003ePackets: 37","value":5},{"hasIssue":true,"label":"53788","source":"52.110.4.150","target":"192.168.100.203","tooltip":"Traffic: 52.110.4.150 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 106694\u003cbr/\u003ePackets: 108","value":5},{"hasIssue":true,"label":"53689","source":"192.168.100.203","target":"23.44.215.200","tooltip":"Traffic: 192.168.100.203 -\u003e 23.44.215.200\u003cbr/\u003eBytes: 1708\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"51366","source":"192.168.100.203","target":"8.8.4.4","tooltip":"Traffic: 192.168.100.203 -\u003e 8.8.4.4\u003cbr/\u003eBytes: 15616\u003cbr/\u003ePackets: 85","value":5},{"hasIssue":true,"label":"58488","source":"192.168.100.203","target":"34.243.32.177","tooltip":"Traffic: 192.168.100.203 -\u003e 34.243.32.177\u003cbr/\u003eBytes: 10562\u003cbr/\u003ePackets: 7","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"151.101.1.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.1.44\u003cbr/\u003eBytes: 11144\u003cbr/\u003ePackets: 11","value":5},{"hasIssue":true,"label":"443","source":"151.101.65.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.65.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2514\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"141.226.224.32","tooltip":"Traffic: 192.168.100.203 -\u003e 141.226.224.32\u003cbr/\u003eBytes: 9248\u003cbr/\u003ePackets: 41","value":5},{"hasIssue":true,"label":"58679","source":"192.168.100.203","target":"172.217.19.10","tooltip":"Traffic: 192.168.100.203 -\u003e 172.217.19.10\u003cbr/\u003eBytes: 13042\u003cbr/\u003ePackets: 19","value":5},{"hasIssue":false,"label":"443","source":"142.251.36.78","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.78 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"443","source":"178.250.7.136","target":"192.168.100.203","tooltip":"Traffic: 178.250.7.136 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 17672\u003cbr/\u003ePackets: 23","value":5},{"hasIssue":false,"label":"443","source":"104.18.26.193","target":"192.168.100.203","tooltip":"Traffic: 104.18.26.193 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 3026\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"172.217.19.2","target":"192.168.100.203","tooltip":"Traffic: 172.217.19.2 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 89786\u003cbr/\u003ePackets: 71","value":5},{"hasIssue":false,"label":"58502","source":"192.168.100.203","target":"141.226.228.48","tooltip":"Traffic: 192.168.100.203 -\u003e 141.226.228.48\u003cbr/\u003eBytes: 21102\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"151.101.193.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.193.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 7268\u003cbr/\u003ePackets: 17","value":5},{"hasIssue":false,"label":"58681","source":"192.168.100.203","target":"34.8.63.254","tooltip":"Traffic: 192.168.100.203 -\u003e 34.8.63.254\u003cbr/\u003eBytes: 22590\u003cbr/\u003ePackets: 36","value":5},{"hasIssue":true,"label":"53522","source":"35.223.238.178","target":"192.168.100.203","tooltip":"Traffic: 35.223.238.178 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 128880\u003cbr/\u003ePackets: 105","value":5},{"hasIssue":false,"label":"443","source":"142.251.141.162","target":"192.168.100.203","tooltip":"Traffic: 142.251.141.162 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 6688\u003cbr/\u003ePackets: 54","value":5},{"hasIssue":false,"label":"58660","source":"192.168.100.203","target":"142.251.36.78","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.78\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58654","source":"192.168.100.203","target":"52.209.232.99","tooltip":"Traffic: 192.168.100.203 -\u003e 52.209.232.99\u003cbr/\u003eBytes: 5168\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":true,"label":"58494","source":"192.168.100.203","target":"172.217.19.2","tooltip":"Traffic: 192.168.100.203 -\u003e 172.217.19.2\u003cbr/\u003eBytes: 26994\u003cbr/\u003ePackets: 46","value":5},{"hasIssue":false,"label":"443","source":"141.226.224.32","target":"192.168.100.203","tooltip":"Traffic: 141.226.224.32 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 19120\u003cbr/\u003ePackets: 37","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.229","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.229 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 2802\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"3.124.64.248","tooltip":"Traffic: 192.168.100.203 -\u003e 3.124.64.248\u003cbr/\u003eBytes: 23668\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":true,"label":"58473","source":"192.168.100.203","target":"140.82.113.25","tooltip":"Traffic: 192.168.100.203 -\u003e 140.82.113.25\u003cbr/\u003eBytes: 202\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"58488","source":"34.243.32.177","target":"192.168.100.203","tooltip":"Traffic: 34.243.32.177 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 2140\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"20002","source":"192.168.100.1","target":"192.168.100.255","tooltip":"Traffic: 192.168.100.1 -\u003e 192.168.100.255\u003cbr/\u003eBytes: 684\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"58602","source":"192.168.100.203","target":"108.177.15.84","tooltip":"Traffic: 192.168.100.203 -\u003e 108.177.15.84\u003cbr/\u003eBytes: 282\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":false,"label":"55801","source":"192.168.100.203","target":"17.42.251.72","tooltip":"Traffic: 192.168.100.203 -\u003e 17.42.251.72\u003cbr/\u003eBytes: 80\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"443","source":"142.251.38.131","target":"192.168.100.203","tooltip":"Traffic: 142.251.38.131 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 9196\u003cbr/\u003ePackets: 15","value":5},{"hasIssue":false,"label":"443","source":"23.44.215.200","target":"192.168.100.203","tooltip":"Traffic: 23.44.215.200 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 21874\u003cbr/\u003ePackets: 13","value":5},{"hasIssue":false,"label":"5353","source":"192.168.100.203","target":"192.168.100.191","tooltip":"Traffic: 192.168.100.203 -\u003e 192.168.100.191\u003cbr/\u003eBytes: 1552\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"443","source":"192.168.100.203","target":"23.44.215.194","tooltip":"Traffic: 192.168.100.203 -\u003e 23.44.215.194\u003cbr/\u003eBytes: 286\u003cbr/\u003ePackets: 5","value":5},{"hasIssue":false,"label":"51166","source":"192.168.100.203","target":"74.125.133.188","tooltip":"Traffic: 192.168.100.203 -\u003e 74.125.133.188\u003cbr/\u003eBytes: 40\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58477","source":"192.168.100.203","target":"188.125.72.139","tooltip":"Traffic: 192.168.100.203 -\u003e 188.125.72.139\u003cbr/\u003eBytes: 47644\u003cbr/\u003ePackets: 44","value":5},{"hasIssue":true,"label":"58495","source":"192.168.100.203","target":"34.120.133.55","tooltip":"Traffic: 192.168.100.203 -\u003e 34.120.133.55\u003cbr/\u003eBytes: 1158\u003cbr/\u003ePackets: 9","value":5},{"hasIssue":false,"label":"46616","source":"192.168.100.1","target":"255.255.255.255","tooltip":"Traffic: 192.168.100.1 -\u003e 255.255.255.255\u003cbr/\u003eBytes: 6732\u003cbr/\u003ePackets: 18","value":5},{"hasIssue":true,"label":"443","source":"3.124.64.248","target":"192.168.100.203","tooltip":"Traffic: 3.124.64.248 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 11566\u003cbr/\u003ePackets: 22","value":5},{"hasIssue":true,"label":"443","source":"185.64.189.112","target":"192.168.100.203","tooltip":"Traffic: 185.64.189.112 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 548\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"209.38.50.75","target":"192.168.100.203","tooltip":"Traffic: 209.38.50.75 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 456\u003cbr/\u003ePackets: 4","value":5},{"hasIssue":false,"label":"443","source":"188.125.72.139","target":"192.168.100.203","tooltip":"Traffic: 188.125.72.139 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 11392\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":false,"label":"58499","source":"192.168.100.203","target":"151.101.193.44","tooltip":"Traffic: 192.168.100.203 -\u003e 151.101.193.44\u003cbr/\u003eBytes: 37280\u003cbr/\u003ePackets: 29","value":5},{"hasIssue":false,"label":"58638","source":"192.168.100.203","target":"34.107.243.93","tooltip":"Traffic: 192.168.100.203 -\u003e 34.107.243.93\u003cbr/\u003eBytes: 80\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"58664","source":"192.168.100.203","target":"185.89.210.212","tooltip":"Traffic: 192.168.100.203 -\u003e 185.89.210.212\u003cbr/\u003eBytes: 25172\u003cbr/\u003ePackets: 35","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.1","target":"224.0.0.1","tooltip":"Traffic: 192.168.100.1 -\u003e 224.0.0.1\u003cbr/\u003eBytes: 64\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58479","source":"151.101.1.44","target":"192.168.100.203","tooltip":"Traffic: 151.101.1.44 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 19328\u003cbr/\u003ePackets: 12","value":5},{"hasIssue":true,"label":"53522","source":"192.168.100.203","target":"35.223.238.178","tooltip":"Traffic: 192.168.100.203 -\u003e 35.223.238.178\u003cbr/\u003eBytes: 43772\u003cbr/\u003ePackets: 102","value":5},{"hasIssue":true,"label":"58613","source":"142.251.36.74","target":"192.168.100.203","tooltip":"Traffic: 142.251.36.74 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1158\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":false,"label":"443","source":"52.209.232.99","target":"192.168.100.203","tooltip":"Traffic: 52.209.232.99 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 1972\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":false,"label":"58570","source":"142.251.141.161","target":"192.168.100.203","tooltip":"Traffic: 142.251.141.161 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 52\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":true,"label":"58664","source":"185.89.210.212","target":"192.168.100.203","tooltip":"Traffic: 185.89.210.212 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 16808\u003cbr/\u003ePackets: 26","value":5},{"hasIssue":false,"label":"mixed","source":"192.168.100.226","target":"224.0.0.251","tooltip":"Traffic: 192.168.100.226 -\u003e 224.0.0.251\u003cbr/\u003eBytes: 32\u003cbr/\u003ePackets: 1","value":5},{"hasIssue":false,"label":"443","source":"23.44.215.194","target":"192.168.100.203","tooltip":"Traffic: 23.44.215.194 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 218\u003cbr/\u003ePackets: 3","value":5},{"hasIssue":true,"label":"443","source":"172.64.146.215","target":"192.168.100.203","tooltip":"Traffic: 172.64.146.215 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 10306\u003cbr/\u003ePackets: 25","value":5},{"hasIssue":true,"label":"58469","source":"192.168.100.203","target":"104.16.103.112","tooltip":"Traffic: 192.168.100.203 -\u003e 104.16.103.112\u003cbr/\u003eBytes: 1504\u003cbr/\u003ePackets: 16","value":5},{"hasIssue":true,"label":"58662","source":"192.168.100.203","target":"178.250.7.136","tooltip":"Traffic: 192.168.100.203 -\u003e 178.250.7.136\u003cbr/\u003eBytes: 16640\u003cbr/\u003ePackets: 35","value":5},{"hasIssue":false,"label":"58638","source":"34.107.243.93","target":"192.168.100.203","tooltip":"Traffic: 34.107.243.93 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5},{"hasIssue":true,"label":"53","source":"8.8.8.8","target":"192.168.100.203","tooltip":"Traffic: 8.8.8.8 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 43359\u003cbr/\u003ePackets: 82","value":5},{"hasIssue":false,"label":"58492","source":"192.168.100.203","target":"34.149.50.64","tooltip":"Traffic: 192.168.100.203 -\u003e 34.149.50.64\u003cbr/\u003eBytes: 6308\u003cbr/\u003ePackets: 8","value":5},{"hasIssue":true,"label":"443","source":"8.8.4.4","target":"192.168.100.203","tooltip":"Traffic: 8.8.4.4 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 41546\u003cbr/\u003ePackets: 130","value":5},{"hasIssue":true,"label":"443","source":"141.226.228.48","target":"192.168.100.203","tooltip":"Traffic: 141.226.228.48 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 10414\u003cbr/\u003ePackets: 14","value":5},{"hasIssue":false,"label":"58613","source":"192.168.100.203","target":"142.251.36.74","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.36.74\u003cbr/\u003eBytes: 300\u003cbr/\u003ePackets: 6","value":5},{"hasIssue":true,"label":"443","source":"2.21.74.59","target":"192.168.100.203","tooltip":"Traffic: 2.21.74.59 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 66438\u003cbr/\u003ePackets: 31","value":5},{"hasIssue":false,"label":"58672","source":"192.168.100.203","target":"142.251.38.131","tooltip":"Traffic: 192.168.100.203 -\u003e 142.251.38.131\u003cbr/\u003eBytes: 4230\u003cbr/\u003ePackets: 12","value":5},{"hasIssue":false,"label":"443","source":"108.177.15.84","target":"192.168.100.203","tooltip":"Traffic: 108.177.15.84 -\u003e 192.168.100.203\u003cbr/\u003eBytes: 104\u003cbr/\u003ePackets: 2","value":5}]
+                };
+                if (networkData.nodes.length > 0) {
+                    createNetworkDiagram(networkData.nodes, networkData.links);
+                }
+                
+                // Timeline
+                const timelineData = [{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":0.545872,"type":"TCP_Retransmission"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":0.748586,"type":"TCP_SYN"},{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":3.931091,"type":"TCP_Retransmission"},{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":5.87693,"type":"TCP_Retransmission"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":6.024497,"type":"TCP_SYN"},{"detail":"Query: easylist-downloads.adblockplus.org (Unknown)","label":"DNS_Query","severity":"info","time":6.124764,"type":"DNS_Query"},{"detail":"Query: easylist-downloads.adblockplus.org (A)","label":"DNS_Query","severity":"info","time":6.12483,"type":"DNS_Query"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":6.19554,"type":"TCP_SYN"},{"detail":"Query: onatel.bf (A)","label":"DNS_Query","severity":"info","time":6.87847,"type":"DNS_Query"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":11.200076,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":11.99131,"type":"TCP_SYN"},{"detail":"Query: yahoo.com (A)","label":"DNS_Query","severity":"info","time":18.569241,"type":"DNS_Query"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":19.609201,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":19.681396,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":22.771493,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":22.772094,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":22.772998,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":22.773702,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":23.710062,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":26.667757,"type":"TCP_SYN"},{"detail":"Query: stream-production.avcdn.net (A)","label":"DNS_Query","severity":"info","time":31.226677,"type":"DNS_Query"},{"detail":"Query: stream-production.avcdn.net (AAAA)","label":"DNS_Query","severity":"info","time":31.226702,"type":"DNS_Query"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":31.246981,"type":"TCP_SYN"},{"detail":"Query: cisco.com (A)","label":"DNS_Query","severity":"info","time":31.493109,"type":"DNS_Query"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":31.703879,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":31.777452,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":31.78073,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":31.79426,"type":"TCP_SYN"},{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":31.858888,"type":"TCP_Retransmission"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":33.596742,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":34.558872,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":34.597286,"type":"TCP_SYN"},{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":35.873547,"type":"TCP_Retransmission"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":45.739058,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":45.739729,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":45.742664,"type":"TCP_SYN"},{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":46.627171,"type":"TCP_Retransmission"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":46.829446,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":50.675054,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":50.772576,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":50.773877,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":50.774088,"type":"TCP_SYN"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":51.88147,"type":"TCP_SYN"},{"detail":"Duplicate sequence number - packet retransmitted","label":"TCP_Retransmission","severity":"info","time":51.982505,"type":"TCP_Retransmission"},{"detail":"Connection attempt to port 443","label":"TCP_SYN","severity":"info","time":52.178957,"type":"TCP_SYN"}];
+                if (timelineData.length > 0) {
+                    createTimeline(timelineData);
+                }
+                
+                // Sankey Diagram
+                const sankeyData = {"links":[{"source":0,"target":1,"value":163071},{"source":1,"target":2,"value":163071}],"nodes":[{"name":"Internal Network"},{"name":"Gateway"},{"name":"Internet"}]};
+                if (sankeyData.nodes.length > 0) {
+                    createSankeyDiagram(sankeyData);
+                }
+            } catch (error) {
+                console.error('Error initializing visualizations:', error);
+            }
+        });
+    </script>
+
+</body>
+</html>
