@@ -352,6 +352,217 @@ function formatBytes(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// Protocol Distribution Pie Chart
+function createProtocolChart(container, data) {
+    const width = container.clientWidth || 400;
+    const height = 350;
+    const radius = Math.min(width, height) / 2 - 40;
+    
+    d3.select(container).selectAll("*").remove();
+    
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    
+    const g = svg.append("g")
+        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+    
+    // Tooltip
+    const tooltip = d3.select("body").append("div")
+        .attr("class", "d3-tooltip")
+        .style("opacity", 0);
+    
+    // Pie generator
+    const pie = d3.pie()
+        .value(d => d.Bytes)
+        .sort(null);
+    
+    // Arc generator
+    const arc = d3.arc()
+        .innerRadius(radius * 0.5)
+        .outerRadius(radius);
+    
+    const arcHover = d3.arc()
+        .innerRadius(radius * 0.5)
+        .outerRadius(radius * 1.1);
+    
+    // Draw slices
+    const slices = g.selectAll("path")
+        .data(pie(data))
+        .join("path")
+        .attr("d", arc)
+        .attr("fill", d => d.data.Color || "#667eea")
+        .attr("stroke", "white")
+        .attr("stroke-width", 2)
+        .on("mouseover", function(event, d) {
+            d3.select(this).transition().duration(200).attr("d", arcHover);
+            tooltip.transition().duration(200).style("opacity", 0.9);
+            tooltip.html(`<strong>${d.data.Protocol}</strong><br/>
+                ${formatBytes(d.data.Bytes)}<br/>
+                ${d.data.Percent.toFixed(1)}%`)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function() {
+            d3.select(this).transition().duration(200).attr("d", arc);
+            tooltip.transition().duration(500).style("opacity", 0);
+        });
+    
+    // Center text
+    g.append("text")
+        .attr("text-anchor", "middle")
+        .attr("dy", "-0.5em")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .text("Protocol");
+    
+    g.append("text")
+        .attr("text-anchor", "middle")
+        .attr("dy", "1em")
+        .attr("font-size", "12px")
+        .attr("fill", "#6c757d")
+        .text("Distribution");
+    
+    // Legend
+    const legend = svg.append("g")
+        .attr("transform", `translate(${width - 120}, 30)`);
+    
+    data.forEach((d, i) => {
+        const lg = legend.append("g")
+            .attr("transform", `translate(0, ${i * 25})`);
+        lg.append("rect")
+            .attr("width", 18)
+            .attr("height", 18)
+            .attr("fill", d.Color || "#667eea");
+        lg.append("text")
+            .attr("x", 24)
+            .attr("y", 14)
+            .attr("font-size", "12px")
+            .text(`${d.Protocol} (${d.Percent.toFixed(1)}%)`);
+    });
+}
+
+// Top Talkers Bar Chart
+function createTopTalkersChart(container, data) {
+    const width = container.clientWidth || 600;
+    const height = 350;
+    const margin = { top: 30, right: 30, bottom: 60, left: 150 };
+    
+    d3.select(container).selectAll("*").remove();
+    
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="viz-error">No traffic data available</div>';
+        return;
+    }
+    
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+    
+    // Tooltip
+    const tooltip = d3.select("body").append("div")
+        .attr("class", "d3-tooltip")
+        .style("opacity", 0);
+    
+    // Scales
+    const x = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.Bytes)])
+        .range([0, innerWidth]);
+    
+    const y = d3.scaleBand()
+        .domain(data.map(d => d.IP))
+        .range([0, innerHeight])
+        .padding(0.2);
+    
+    // Color scale
+    const colorScale = d3.scaleOrdinal()
+        .domain(["internal", "external"])
+        .range(["#28a745", "#667eea"]);
+    
+    // Bars
+    g.selectAll("rect")
+        .data(data)
+        .join("rect")
+        .attr("x", 0)
+        .attr("y", d => y(d.IP))
+        .attr("width", d => x(d.Bytes))
+        .attr("height", y.bandwidth())
+        .attr("fill", d => colorScale(d.Type))
+        .attr("rx", 4)
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("opacity", 0.8);
+            tooltip.transition().duration(200).style("opacity", 0.9);
+            tooltip.html(`<strong>${d.IP}</strong><br/>
+                Traffic: ${formatBytes(d.Bytes)}<br/>
+                ${d.Percent.toFixed(1)}% of total<br/>
+                Type: ${d.Type}`)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("opacity", 1);
+            tooltip.transition().duration(500).style("opacity", 0);
+        });
+    
+    // Labels on bars
+    g.selectAll(".bar-label")
+        .data(data)
+        .join("text")
+        .attr("class", "bar-label")
+        .attr("x", d => x(d.Bytes) + 5)
+        .attr("y", d => y(d.IP) + y.bandwidth() / 2)
+        .attr("dy", "0.35em")
+        .attr("font-size", "11px")
+        .attr("fill", "#333")
+        .text(d => formatBytes(d.Bytes));
+    
+    // Y axis (IPs)
+    g.append("g")
+        .call(d3.axisLeft(y))
+        .selectAll("text")
+        .attr("font-size", "11px");
+    
+    // X axis
+    g.append("g")
+        .attr("transform", `translate(0,${innerHeight})`)
+        .call(d3.axisBottom(x).ticks(5).tickFormat(d => formatBytes(d)));
+    
+    // Title
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 15)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .text("Top Talkers by Traffic Volume");
+    
+    // Legend
+    const legend = svg.append("g")
+        .attr("transform", `translate(${width - 150}, ${height - 30})`);
+    
+    [{ label: "Internal", color: "#28a745" }, { label: "External", color: "#667eea" }].forEach((item, i) => {
+        const lg = legend.append("g")
+            .attr("transform", `translate(${i * 80}, 0)`);
+        lg.append("rect")
+            .attr("width", 14)
+            .attr("height", 14)
+            .attr("fill", item.color);
+        lg.append("text")
+            .attr("x", 18)
+            .attr("y", 11)
+            .attr("font-size", "11px")
+            .text(item.label);
+    });
+}
+
 // Tab functionality
 function initTabs() {
     document.querySelectorAll('.tab').forEach(tab => {
@@ -421,6 +632,12 @@ document.addEventListener('DOMContentLoaded', function() {
     initTableSorting();
     
     // Initialize visualizations if data exists
+    if (typeof protocolStats !== 'undefined') {
+        safeD3Init('protocol-chart', createProtocolChart, protocolStats);
+    }
+    if (typeof topTalkers !== 'undefined') {
+        safeD3Init('top-talkers-chart', createTopTalkersChart, topTalkers);
+    }
     if (typeof networkData !== 'undefined') {
         safeD3Init('network-diagram', createNetworkDiagram, networkData);
     }

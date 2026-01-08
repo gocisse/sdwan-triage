@@ -59,15 +59,24 @@ type ReportData struct {
 	HighRTTFlows       []RTTFlowView
 	TopFlows           []TrafficFlowView
 	DeviceFingerprints []DeviceFingerprintView
+	HTTPErrors         []HTTPErrorView
+	TLSCerts           []TLSCertView
+	FailedHandshakes   []FailedHandshakeView
+
+	// Protocol and traffic stats for visualizations
+	ProtocolStats []ProtocolStatView
+	TopTalkers    []TopTalkerView
 
 	// Embedded assets
 	CSS template.CSS
 	JS  template.JS
 
 	// Visualization data (JSON strings)
-	NetworkDataJSON  template.JS
-	TimelineDataJSON template.JS
-	SankeyDataJSON   template.JS
+	NetworkDataJSON   template.JS
+	TimelineDataJSON  template.JS
+	SankeyDataJSON    template.JS
+	ProtocolStatsJSON template.JS
+	TopTalkersJSON    template.JS
 }
 
 // View structs for template rendering (with escaped/formatted data)
@@ -122,6 +131,45 @@ type DeviceFingerprintView struct {
 	OSType     string
 	OSName     string
 	Confidence string
+}
+
+type HTTPErrorView struct {
+	Method     string
+	URL        string
+	StatusCode int
+	Reason     string
+	SrcIP      string
+	DstIP      string
+}
+
+type TLSCertView struct {
+	Subject    string
+	Issuer     string
+	NotBefore  string
+	NotAfter   string
+	ServerIP   string
+	ServerName string
+}
+
+type FailedHandshakeView struct {
+	SrcIP   string
+	SrcPort uint16
+	DstIP   string
+	DstPort uint16
+}
+
+type ProtocolStatView struct {
+	Protocol string
+	Bytes    uint64
+	Percent  float64
+	Color    string
+}
+
+type TopTalkerView struct {
+	IP      string
+	Bytes   uint64
+	Percent float64
+	Type    string
 }
 
 // GenerateHTMLReport generates a professional HTML report using templates
@@ -200,11 +248,19 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.HighRTTFlows = convertRTTFlows(r.RTTAnalysis)
 	data.TopFlows = convertTopFlows(r.TrafficAnalysis, r.TotalBytes)
 	data.DeviceFingerprints = convertDeviceFingerprints(r.DeviceFingerprinting)
+	data.HTTPErrors = convertHTTPErrors(r.HTTPErrors)
+	data.TLSCerts = convertTLSCerts(r.TLSCerts)
+	data.FailedHandshakes = convertFailedHandshakes(r.FailedHandshakes)
+
+	// Generate protocol stats and top talkers
+	data.ProtocolStats, data.TopTalkers = generateTrafficStats(r)
 
 	// Generate visualization data
 	data.NetworkDataJSON = template.JS(generateNetworkJSON(r))
 	data.TimelineDataJSON = template.JS(generateTimelineJSON(r))
 	data.SankeyDataJSON = template.JS(generateSankeyJSON(r))
+	data.ProtocolStatsJSON = template.JS(generateProtocolStatsJSON(data.ProtocolStats))
+	data.TopTalkersJSON = template.JS(generateTopTalkersJSON(data.TopTalkers))
 
 	return data
 }
@@ -500,6 +556,143 @@ func formatBytesForTemplate(bytes uint64) string {
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
+func convertHTTPErrors(errors []models.HTTPError) []HTTPErrorView {
+	result := make([]HTTPErrorView, len(errors))
+	for i, e := range errors {
+		result[i] = HTTPErrorView{
+			Method:     html.EscapeString(e.Method),
+			URL:        html.EscapeString(e.Host + e.Path),
+			StatusCode: e.Code,
+			Reason:     "",
+			SrcIP:      html.EscapeString(e.Host),
+			DstIP:      "",
+		}
+	}
+	return result
+}
+
+func convertTLSCerts(certs []models.TLSCertInfo) []TLSCertView {
+	result := make([]TLSCertView, len(certs))
+	for i, c := range certs {
+		result[i] = TLSCertView{
+			Subject:    html.EscapeString(c.Subject),
+			Issuer:     html.EscapeString(c.Issuer),
+			NotBefore:  c.NotBefore,
+			NotAfter:   c.NotAfter,
+			ServerIP:   html.EscapeString(c.ServerIP),
+			ServerName: html.EscapeString(c.ServerName),
+		}
+	}
+	return result
+}
+
+func convertFailedHandshakes(flows []models.TCPFlow) []FailedHandshakeView {
+	result := make([]FailedHandshakeView, len(flows))
+	for i, f := range flows {
+		result[i] = FailedHandshakeView{
+			SrcIP:   html.EscapeString(f.SrcIP),
+			SrcPort: f.SrcPort,
+			DstIP:   html.EscapeString(f.DstIP),
+			DstPort: f.DstPort,
+		}
+	}
+	return result
+}
+
+func generateTrafficStats(r *models.TriageReport) ([]ProtocolStatView, []TopTalkerView) {
+	// Protocol stats from application breakdown
+	protocolBytes := make(map[string]uint64)
+	for _, app := range r.ApplicationBreakdown {
+		protocolBytes[app.Protocol] += app.ByteCount
+	}
+
+	totalBytes := r.TotalBytes
+	if totalBytes == 0 {
+		for _, b := range protocolBytes {
+			totalBytes += b
+		}
+	}
+
+	colors := map[string]string{
+		"TCP":   "#667eea",
+		"UDP":   "#28a745",
+		"ICMP":  "#ffc107",
+		"Other": "#6c757d",
+	}
+
+	var protocolStats []ProtocolStatView
+	for proto, bytes := range protocolBytes {
+		pct := float64(0)
+		if totalBytes > 0 {
+			pct = float64(bytes) / float64(totalBytes) * 100
+		}
+		color := colors[proto]
+		if color == "" {
+			color = colors["Other"]
+		}
+		protocolStats = append(protocolStats, ProtocolStatView{
+			Protocol: proto,
+			Bytes:    bytes,
+			Percent:  pct,
+			Color:    color,
+		})
+	}
+
+	// Top talkers from traffic analysis
+	ipBytes := make(map[string]uint64)
+	for _, flow := range r.TrafficAnalysis {
+		ipBytes[flow.SrcIP] += flow.TotalBytes
+		ipBytes[flow.DstIP] += flow.TotalBytes
+	}
+
+	type ipStat struct {
+		ip    string
+		bytes uint64
+	}
+	var ipList []ipStat
+	for ip, bytes := range ipBytes {
+		ipList = append(ipList, ipStat{ip, bytes})
+	}
+	sort.Slice(ipList, func(i, j int) bool {
+		return ipList[i].bytes > ipList[j].bytes
+	})
+
+	limit := 10
+	if len(ipList) < limit {
+		limit = len(ipList)
+	}
+
+	topTalkers := make([]TopTalkerView, limit)
+	for i := 0; i < limit; i++ {
+		pct := float64(0)
+		if totalBytes > 0 {
+			pct = float64(ipList[i].bytes) / float64(totalBytes) * 100
+		}
+		ipType := "external"
+		if models.IsPrivateOrReservedIP(ipList[i].ip) {
+			ipType = "internal"
+		}
+		topTalkers[i] = TopTalkerView{
+			IP:      ipList[i].ip,
+			Bytes:   ipList[i].bytes,
+			Percent: pct,
+			Type:    ipType,
+		}
+	}
+
+	return protocolStats, topTalkers
+}
+
+func generateProtocolStatsJSON(stats []ProtocolStatView) string {
+	jsonBytes, _ := json.Marshal(stats)
+	return string(jsonBytes)
+}
+
+func generateTopTalkersJSON(talkers []TopTalkerView) string {
+	jsonBytes, _ := json.Marshal(talkers)
+	return string(jsonBytes)
+}
+
 func getTemplateContent() string {
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -690,6 +883,50 @@ func getTemplateContent() string {
                     {{else}}
                     <div class="alert alert-success"><i class="fas fa-check"></i> No suspicious traffic detected</div>
                     {{end}}
+
+                    {{if .HTTPErrors}}
+                    <details>
+                        <summary><i class="fas fa-globe"></i> HTTP Errors ({{len .HTTPErrors}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Method</th><th>URL</th><th>Status</th><th>Source</th><th>Destination</th></tr></thead>
+                                <tbody>
+                                    {{range .HTTPErrors}}
+                                    <tr>
+                                        <td>{{.Method}}</td>
+                                        <td><code>{{.URL}}</code></td>
+                                        <td class="severity-high">{{.StatusCode}} {{.Reason}}</td>
+                                        <td><code>{{.SrcIP}}</code></td>
+                                        <td><code>{{.DstIP}}</code></td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .TLSCerts}}
+                    <details>
+                        <summary><i class="fas fa-lock"></i> TLS Certificates ({{len .TLSCerts}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Subject</th><th>Issuer</th><th>Valid From</th><th>Valid Until</th><th>Server</th></tr></thead>
+                                <tbody>
+                                    {{range .TLSCerts}}
+                                    <tr>
+                                        <td>{{.Subject}}</td>
+                                        <td>{{.Issuer}}</td>
+                                        <td>{{.NotBefore}}</td>
+                                        <td>{{.NotAfter}}</td>
+                                        <td><code>{{.ServerIP}}</code> ({{.ServerName}})</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
                 </div>
 
                 <div id="tab-performance" class="tab-content">
@@ -732,6 +969,30 @@ func getTemplateContent() string {
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
                                         <td class="severity-medium">{{printf "%.1f" .AvgRTT}}</td>
                                         <td>{{printf "%.1f" .MaxRTT}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .FailedHandshakes}}
+                    <details>
+                        <summary><i class="fas fa-handshake-slash"></i> Failed TCP Handshakes ({{len .FailedHandshakes}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Action</th></tr></thead>
+                                <tbody>
+                                    {{range .FailedHandshakes}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.DstPort}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="4"><div class="action-content"><h4>Recommended Action</h4><ul><li>Check if destination service is running</li><li>Verify firewall rules allow connection</li><li>Check for network connectivity issues</li></ul></div></td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -788,6 +1049,14 @@ func getTemplateContent() string {
 
                 <div id="tab-visualizations" class="tab-content">
                     <details open>
+                        <summary><i class="fas fa-chart-pie"></i> Protocol Distribution</summary>
+                        <div><div id="protocol-chart" class="viz-container" style="height: 350px;"></div></div>
+                    </details>
+                    <details open>
+                        <summary><i class="fas fa-users"></i> Top Talkers</summary>
+                        <div><div id="top-talkers-chart" class="viz-container" style="height: 350px;"></div></div>
+                    </details>
+                    <details>
                         <summary><i class="fas fa-project-diagram"></i> Network Topology</summary>
                         <div><div id="network-diagram" class="viz-container" style="height: 500px;"></div></div>
                     </details>
@@ -812,6 +1081,8 @@ func getTemplateContent() string {
         var networkData = {{.NetworkDataJSON}};
         var timelineData = {{.TimelineDataJSON}};
         var sankeyData = {{.SankeyDataJSON}};
+        var protocolStats = {{.ProtocolStatsJSON}};
+        var topTalkers = {{.TopTalkersJSON}};
     </script>
     <script>{{.JS}}</script>
 </body>

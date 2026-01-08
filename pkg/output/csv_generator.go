@@ -107,6 +107,33 @@ func GenerateCSVReports(r *models.TriageReport, baseFilename string) (*CSVExport
 		result.Files = append(result.Files, rttFile)
 	}
 
+	// Generate HTTP errors CSV if any exist
+	if len(r.HTTPErrors) > 0 {
+		httpFile := filepath.Join(dir, baseName+"_http_errors.csv")
+		if err := generateHTTPErrorsCSV(r.HTTPErrors, httpFile); err != nil {
+			return nil, fmt.Errorf("failed to generate HTTP errors CSV: %w", err)
+		}
+		result.Files = append(result.Files, httpFile)
+	}
+
+	// Generate TLS certificates CSV if any exist
+	if len(r.TLSCerts) > 0 {
+		tlsFile := filepath.Join(dir, baseName+"_tls_certificates.csv")
+		if err := generateTLSCertsCSV(r.TLSCerts, tlsFile); err != nil {
+			return nil, fmt.Errorf("failed to generate TLS certificates CSV: %w", err)
+		}
+		result.Files = append(result.Files, tlsFile)
+	}
+
+	// Generate failed handshakes CSV if any exist
+	if len(r.FailedHandshakes) > 0 {
+		handshakeFile := filepath.Join(dir, baseName+"_failed_handshakes.csv")
+		if err := generateFailedHandshakesCSV(r.FailedHandshakes, handshakeFile); err != nil {
+			return nil, fmt.Errorf("failed to generate failed handshakes CSV: %w", err)
+		}
+		result.Files = append(result.Files, handshakeFile)
+	}
+
 	return result, nil
 }
 
@@ -533,6 +560,149 @@ func generateRTTAnalysisCSV(flows []models.RTTFlow, filename string) error {
 			fmt.Sprintf("%.2f", f.MaxRTT),
 			fmt.Sprintf("%.2f", f.AvgRTT),
 			fmt.Sprintf("%d", f.SampleSize),
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateHTTPErrorsCSV creates a CSV for HTTP errors
+func generateHTTPErrorsCSV(errors []models.HTTPError, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Finding Type",
+		"Method",
+		"URL",
+		"Status Code",
+		"Reason",
+		"Source IP",
+		"Destination IP",
+		"Plain Language Description",
+		"Severity Level",
+		"Recommended Action",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, e := range errors {
+		url := e.Host + e.Path
+		description := fmt.Sprintf("HTTP %s request to %s returned error %d",
+			e.Method, url, e.Code)
+		action := "Check server availability; verify URL is correct; review server logs"
+
+		row := []string{
+			"HTTP Error",
+			e.Method,
+			url,
+			fmt.Sprintf("%d", e.Code),
+			"",
+			e.Host,
+			"",
+			description,
+			"Medium",
+			action,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateTLSCertsCSV creates a CSV for TLS certificates
+func generateTLSCertsCSV(certs []models.TLSCertInfo, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Subject",
+		"Issuer",
+		"Valid From",
+		"Valid Until",
+		"Server IP",
+		"Server Name",
+		"Fingerprint",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, c := range certs {
+		row := []string{
+			c.Subject,
+			c.Issuer,
+			c.NotBefore,
+			c.NotAfter,
+			c.ServerIP,
+			c.ServerName,
+			c.Fingerprint,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateFailedHandshakesCSV creates a CSV for failed TCP handshakes
+func generateFailedHandshakesCSV(flows []models.TCPFlow, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Finding Type",
+		"Source IP",
+		"Source Port",
+		"Destination IP",
+		"Destination Port",
+		"Plain Language Description",
+		"Severity Level",
+		"Recommended Action",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, f := range flows {
+		description := fmt.Sprintf("TCP handshake from %s:%d to %s:%d failed (RST received)",
+			f.SrcIP, f.SrcPort, f.DstIP, f.DstPort)
+		action := "Check if destination service is running; verify firewall rules; check network connectivity"
+
+		row := []string{
+			"Failed TCP Handshake",
+			f.SrcIP,
+			fmt.Sprintf("%d", f.SrcPort),
+			f.DstIP,
+			fmt.Sprintf("%d", f.DstPort),
+			description,
+			"Medium",
+			action,
 		}
 		if err := writer.Write(row); err != nil {
 			return err
