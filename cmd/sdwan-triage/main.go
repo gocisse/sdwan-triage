@@ -180,16 +180,20 @@ VERSION:
 
 	// Export to CSV if requested
 	if *csvOutput != "" {
-		if err := output.ExportToCSV(report, *csvOutput); err != nil {
+		result, err := output.GenerateCSVReports(report, *csvOutput)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to CSV: %v\n", err)
 		} else {
-			color.Green("✓ CSV report exported to %s", *csvOutput)
+			color.Green("✓ CSV reports exported:")
+			for _, f := range result.Files {
+				color.Green("  - %s", filepath.Base(f))
+			}
 		}
 	}
 
 	// Export to HTML if requested
 	if *htmlOutput != "" {
-		if err := output.ExportToHTML(report, *htmlOutput); err != nil {
+		if err := output.GenerateHTMLReport(report, *htmlOutput, filepath.Base(absPath)); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to HTML: %v\n", err)
 		} else {
 			color.Green("✓ HTML report exported to %s", *htmlOutput)

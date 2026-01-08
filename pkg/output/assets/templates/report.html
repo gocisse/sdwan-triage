@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Network Triage Report</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>{{.CSS}}</style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-network-wired"></i> SD-WAN Network Triage Report</h1>
+            <p class="subtitle">Comprehensive Network Analysis</p>
+            <p class="meta">Generated: {{.GeneratedAt}} | File: {{.FileName}} | Packets: {{.PacketCount}}</p>
+        </div>
+
+        <div class="content">
+            <!-- Executive Summary -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    <h2>Executive Summary</h2>
+                </div>
+                <div class="card-body">
+                    {{if eq .HealthStatus "good"}}
+                    <div class="health-badge health-good">
+                        <i class="fas fa-check-circle"></i>&nbsp; Network Health: GOOD
+                    </div>
+                    {{else if eq .HealthStatus "warning"}}
+                    <div class="health-badge health-warning">
+                        <i class="fas fa-exclamation-triangle"></i>&nbsp; Network Health: WARNING
+                    </div>
+                    {{else}}
+                    <div class="health-badge health-critical">
+                        <i class="fas fa-times-circle"></i>&nbsp; Network Health: CRITICAL
+                    </div>
+                    {{end}}
+
+                    <div style="display: flex; align-items: center; gap: 30px; margin: 20px 0;">
+                        <div class="risk-score risk-{{.RiskLevel}}">{{.RiskScore}}</div>
+                        <div>
+                            <strong>Risk Score</strong><br/>
+                            <span style="color: #6c757d;">Based on {{.TotalFindings}} findings</span>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.DNSAnomalies}}</span>
+                            <span class="stat-label">DNS Anomalies</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.TCPRetransmissions}}</span>
+                            <span class="stat-label">TCP Retransmissions</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.ARPConflicts}}</span>
+                            <span class="stat-label">ARP Conflicts</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.SuspiciousTraffic}}</span>
+                            <span class="stat-label">Suspicious Traffic</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.TLSCerts}}</span>
+                            <span class="stat-label">TLS Certificates</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.TotalTraffic}}</span>
+                            <span class="stat-label">Total Traffic</span>
+                        </div>
+                    </div>
+
+                    {{if .NextSteps}}
+                    <div class="next-steps">
+                        <h3><i class="fas fa-tasks"></i> Recommended Next Steps</h3>
+                        <ol>
+                            {{range .NextSteps}}
+                            <li>{{.}}</li>
+                            {{end}}
+                        </ol>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- Tabbed Sections -->
+            <div class="card">
+                <div class="tabs">
+                    <button class="tab active" data-tab="tab-security"><i class="fas fa-shield-alt"></i> Security</button>
+                    <button class="tab" data-tab="tab-performance"><i class="fas fa-tachometer-alt"></i> Performance</button>
+                    <button class="tab" data-tab="tab-traffic"><i class="fas fa-exchange-alt"></i> Traffic</button>
+                    <button class="tab" data-tab="tab-visualizations"><i class="fas fa-project-diagram"></i> Visualizations</button>
+                </div>
+
+                <!-- Security Tab -->
+                <div id="tab-security" class="tab-content active">
+                    {{if .DNSAnomalies}}
+                    <details open>
+                        <summary><i class="fas fa-dns"></i> DNS Anomalies ({{len .DNSAnomalies}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>Query</th>
+                                        <th data-sort>Answer IP</th>
+                                        <th data-sort>Server</th>
+                                        <th>Reason</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .DNSAnomalies}}
+                                    <tr>
+                                        <td><code>{{.Query}}</code></td>
+                                        <td><code>{{.AnswerIP}}</code></td>
+                                        <td><code>{{.ServerIP}}</code></td>
+                                        <td class="severity-high">{{.Reason}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                <h4><i class="fas fa-wrench"></i> Recommended Action</h4>
+                                                <ul>
+                                                    <li>Verify DNS server configuration at <strong>{{.ServerIP}}</strong></li>
+                                                    <li>Check for DNS hijacking or poisoning attempts</li>
+                                                    <li>Review firewall rules for DNS traffic</li>
+                                                    <li>Consider using DNS-over-HTTPS (DoH) or DNS-over-TLS (DoT)</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{else}}
+                    <div class="alert alert-success"><i class="fas fa-check"></i> No DNS anomalies detected</div>
+                    {{end}}
+
+                    {{if .ARPConflicts}}
+                    <details>
+                        <summary><i class="fas fa-network-wired"></i> ARP Conflicts ({{len .ARPConflicts}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>IP Address</th>
+                                        <th data-sort>MAC 1</th>
+                                        <th data-sort>MAC 2</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .ARPConflicts}}
+                                    <tr>
+                                        <td><code>{{.IP}}</code></td>
+                                        <td><code>{{.MAC1}}</code></td>
+                                        <td><code>{{.MAC2}}</code></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="4">
+                                            <div class="action-content">
+                                                <h4><i class="fas fa-wrench"></i> Recommended Action</h4>
+                                                <ul>
+                                                    <li>Investigate potential ARP spoofing attack</li>
+                                                    <li>Check for duplicate IP assignments in DHCP</li>
+                                                    <li>Enable Dynamic ARP Inspection (DAI) on switches</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{else}}
+                    <div class="alert alert-success"><i class="fas fa-check"></i> No ARP conflicts detected</div>
+                    {{end}}
+
+                    {{if .SuspiciousTraffic}}
+                    <details>
+                        <summary><i class="fas fa-exclamation-triangle"></i> Suspicious Traffic ({{len .SuspiciousTraffic}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>Source</th>
+                                        <th data-sort>Destination</th>
+                                        <th data-sort>Port</th>
+                                        <th>Reason</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .SuspiciousTraffic}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}</code></td>
+                                        <td><code>{{.DstIP}}</code></td>
+                                        <td>{{.DstPort}}</td>
+                                        <td class="severity-high">{{.Reason}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                <h4><i class="fas fa-wrench"></i> Recommended Action</h4>
+                                                <ul>
+                                                    <li>Block traffic to/from suspicious endpoints</li>
+                                                    <li>Investigate source device for malware</li>
+                                                    <li>Review firewall and IDS/IPS logs</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{else}}
+                    <div class="alert alert-success"><i class="fas fa-check"></i> No suspicious traffic detected</div>
+                    {{end}}
+                </div>
+
+                <!-- Performance Tab -->
+                <div id="tab-performance" class="tab-content">
+                    {{if .TCPRetransmissions}}
+                    <details open>
+                        <summary><i class="fas fa-redo"></i> TCP Retransmissions ({{len .TCPRetransmissions}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>Source</th>
+                                        <th data-sort>Destination</th>
+                                        <th data-sort>Port</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .TCPRetransmissions}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.DstPort}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="4">
+                                            <div class="action-content">
+                                                <h4><i class="fas fa-wrench"></i> Recommended Action</h4>
+                                                <ul>
+                                                    <li>Check network path between <strong>{{.SrcIP}}</strong> and <strong>{{.DstIP}}</strong></li>
+                                                    <li>Review QoS settings on intermediate devices</li>
+                                                    <li>Check for interface errors or congestion</li>
+                                                    <li>Verify MTU settings along the path</li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{else}}
+                    <div class="alert alert-success"><i class="fas fa-check"></i> No TCP retransmissions detected</div>
+                    {{end}}
+
+                    {{if .HighRTTFlows}}
+                    <details>
+                        <summary><i class="fas fa-clock"></i> High RTT Flows ({{len .HighRTTFlows}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>Source</th>
+                                        <th data-sort>Destination</th>
+                                        <th data-sort>Avg RTT (ms)</th>
+                                        <th data-sort>Max RTT (ms)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .HighRTTFlows}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td class="severity-medium">{{printf "%.1f" .AvgRTT}}</td>
+                                        <td>{{printf "%.1f" .MaxRTT}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+                </div>
+
+                <!-- Traffic Tab -->
+                <div id="tab-traffic" class="tab-content">
+                    {{if .TopFlows}}
+                    <details open>
+                        <summary><i class="fas fa-sort-amount-down"></i> Top Traffic Flows ({{len .TopFlows}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>Source</th>
+                                        <th data-sort>Destination</th>
+                                        <th data-sort>Protocol</th>
+                                        <th data-sort>Bytes</th>
+                                        <th data-sort>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .TopFlows}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.Protocol}}</td>
+                                        <td>{{.BytesFormatted}}</td>
+                                        <td>{{printf "%.1f" .Percentage}}%</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .DeviceFingerprints}}
+                    <details>
+                        <summary><i class="fas fa-fingerprint"></i> Device Fingerprints ({{len .DeviceFingerprints}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-sort>IP Address</th>
+                                        <th data-sort>OS Type</th>
+                                        <th data-sort>OS Name</th>
+                                        <th data-sort>Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .DeviceFingerprints}}
+                                    <tr>
+                                        <td><code>{{.IP}}</code></td>
+                                        <td>{{.OSType}}</td>
+                                        <td>{{.OSName}}</td>
+                                        <td>{{.Confidence}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+                </div>
+
+                <!-- Visualizations Tab -->
+                <div id="tab-visualizations" class="tab-content">
+                    <details open>
+                        <summary><i class="fas fa-project-diagram"></i> Network Topology</summary>
+                        <div>
+                            <div id="network-diagram" class="viz-container" style="height: 500px;"></div>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary><i class="fas fa-clock"></i> Event Timeline</summary>
+                        <div>
+                            <div id="timeline-diagram" class="viz-container" style="height: 300px;"></div>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary><i class="fas fa-stream"></i> Traffic Flow (Sankey)</summary>
+                        <div>
+                            <div id="sankey-diagram" class="viz-container" style="height: 400px;"></div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Generated by SD-WAN Triage Tool v{{.Version}} | &copy; {{.Year}} | <a href="https://github.com/gocisse/sdwan-triage">GitHub</a></p>
+        </div>
+    </div>
+
+    <!-- Visualization Data -->
+    <script>
+        var networkData = {{.NetworkDataJSON}};
+        var timelineData = {{.TimelineDataJSON}};
+        var sankeyData = {{.SankeyDataJSON}};
+    </script>
+
+    <!-- Visualization Scripts -->
+    <script>{{.JS}}</script>
+</body>
+</html>
