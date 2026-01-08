@@ -248,14 +248,26 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 			if avgRTT > 100 {
 				// Parse flow key to get IPs and ports
 				var srcIP, dstIP string
-				var srcPort, dstPort uint16
-				fmt.Sscanf(flowKey, "%[^:]:%d->%[^:]:%d", &srcIP, &srcPort, &dstIP, &dstPort)
+				var srcPort, dstPort int
+
+				// Parse flow key format: "srcIP:srcPort->dstIP:dstPort"
+				parts := strings.Split(flowKey, "->")
+				if len(parts) == 2 {
+					srcParts := strings.Split(parts[0], ":")
+					dstParts := strings.Split(parts[1], ":")
+					if len(srcParts) >= 2 && len(dstParts) >= 2 {
+						srcIP = strings.Join(srcParts[:len(srcParts)-1], ":")
+						fmt.Sscanf(srcParts[len(srcParts)-1], "%d", &srcPort)
+						dstIP = strings.Join(dstParts[:len(dstParts)-1], ":")
+						fmt.Sscanf(dstParts[len(dstParts)-1], "%d", &dstPort)
+					}
+				}
 
 				rttFlow := models.RTTFlow{
 					SrcIP:      srcIP,
-					SrcPort:    srcPort,
+					SrcPort:    uint16(srcPort),
 					DstIP:      dstIP,
-					DstPort:    dstPort,
+					DstPort:    uint16(dstPort),
 					MinRTT:     minRTT,
 					MaxRTT:     maxRTT,
 					AvgRTT:     avgRTT,

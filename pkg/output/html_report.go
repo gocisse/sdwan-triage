@@ -74,11 +74,14 @@ type ReportData struct {
 	FailedHandshakes   []FailedHandshakeView
 
 	// Protocol Analysis
-	DNSDetails         []DNSDetailView
-	HTTP2Flows         []HTTP2FlowView
-	QUICFlows          []QUICFlowView
-	TCPHandshakeStats  TCPHandshakeStatsView
-	AppIdentifications []AppIdentificationView
+	DNSDetails           []DNSDetailView
+	HTTP2Flows           []HTTP2FlowView
+	QUICFlows            []QUICFlowView
+	TCPHandshakeStats    TCPHandshakeStatsView
+	SYNFlows             []TCPHandshakeFlowView
+	SYNACKFlows          []TCPHandshakeFlowView
+	SuccessfulHandshakes []TCPHandshakeFlowView
+	AppIdentifications   []AppIdentificationView
 
 	// Traffic Analysis
 	TopFlows           []TrafficFlowView
@@ -243,6 +246,14 @@ type TCPHandshakeStatsView struct {
 	FailedCount     int
 }
 
+type TCPHandshakeFlowView struct {
+	SrcIP     string
+	SrcPort   uint16
+	DstIP     string
+	DstPort   uint16
+	Timestamp string
+}
+
 type AppIdentificationView struct {
 	Name         string
 	Category     string
@@ -376,6 +387,9 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.HTTP2Flows = convertHTTP2Flows(r.HTTP2Flows)
 	data.QUICFlows = convertQUICFlows(r.QUICFlows)
 	data.TCPHandshakeStats = convertTCPHandshakeStats(r.TCPHandshakes)
+	data.SYNFlows = convertTCPHandshakeFlows(r.TCPHandshakes.SYNFlows)
+	data.SYNACKFlows = convertTCPHandshakeFlows(r.TCPHandshakes.SYNACKFlows)
+	data.SuccessfulHandshakes = convertTCPHandshakeFlows(r.TCPHandshakes.SuccessfulHandshakes)
 	data.AppIdentifications = convertAppIdentifications(r.AppIdentification)
 
 	// Traffic Analysis
@@ -911,6 +925,20 @@ func convertTCPHandshakeStats(hs models.TCPHandshakeAnalysis) TCPHandshakeStatsV
 	}
 }
 
+func convertTCPHandshakeFlows(flows []models.TCPHandshakeFlow) []TCPHandshakeFlowView {
+	result := make([]TCPHandshakeFlowView, len(flows))
+	for i, f := range flows {
+		result[i] = TCPHandshakeFlowView{
+			SrcIP:     html.EscapeString(f.SrcIP),
+			SrcPort:   f.SrcPort,
+			DstIP:     html.EscapeString(f.DstIP),
+			DstPort:   f.DstPort,
+			Timestamp: fmt.Sprintf("%.3f", f.Timestamp),
+		}
+	}
+	return result
+}
+
 func convertAppIdentifications(apps []models.IdentifiedApp) []AppIdentificationView {
 	result := make([]AppIdentificationView, len(apps))
 	for i, a := range apps {
@@ -1340,6 +1368,66 @@ func getTemplateContent() string {
                             </div>
                         </div>
                     </div>
+
+                    {{if .SYNFlows}}
+                    <details>
+                        <summary><i class="fas fa-flag"></i> SYN Flows ({{len .SYNFlows}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Timestamp</th></tr></thead>
+                                <tbody>
+                                    {{range .SYNFlows}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.Timestamp}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .SYNACKFlows}}
+                    <details>
+                        <summary><i class="fas fa-reply"></i> SYN-ACK Flows ({{len .SYNACKFlows}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Timestamp</th></tr></thead>
+                                <tbody>
+                                    {{range .SYNACKFlows}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.Timestamp}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .SuccessfulHandshakes}}
+                    <details>
+                        <summary><i class="fas fa-check-circle"></i> Successful Handshakes ({{len .SuccessfulHandshakes}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Timestamp</th></tr></thead>
+                                <tbody>
+                                    {{range .SuccessfulHandshakes}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.Timestamp}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
 
                     {{if .DNSDetails}}
                     <details open>
