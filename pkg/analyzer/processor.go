@@ -17,18 +17,23 @@ import (
 
 // Processor handles PCAP file processing
 type Processor struct {
-	dnsAnalyzer     *detector.DNSAnalyzer
-	tcpAnalyzer     *detector.TCPAnalyzer
-	arpAnalyzer     *detector.ARPAnalyzer
-	httpAnalyzer    *detector.HTTPAnalyzer
-	tlsAnalyzer     *detector.TLSAnalyzer
-	trafficAnalyzer *detector.TrafficAnalyzer
-	quicAnalyzer    *detector.QUICAnalyzer
-	qosAnalyzer     *detector.QoSAnalyzer
-	qosEnabled      bool
-	verbose         bool
-	skippedPackets  int
-	errorCount      int
+	dnsAnalyzer         *detector.DNSAnalyzer
+	tcpAnalyzer         *detector.TCPAnalyzer
+	arpAnalyzer         *detector.ARPAnalyzer
+	httpAnalyzer        *detector.HTTPAnalyzer
+	tlsAnalyzer         *detector.TLSAnalyzer
+	trafficAnalyzer     *detector.TrafficAnalyzer
+	quicAnalyzer        *detector.QUICAnalyzer
+	qosAnalyzer         *detector.QoSAnalyzer
+	ddosAnalyzer        *detector.DDoSAnalyzer
+	portScanAnalyzer    *detector.PortScanAnalyzer
+	iocAnalyzer         *detector.IOCAnalyzer
+	tlsSecurityAnalyzer *detector.TLSSecurityAnalyzer
+	icmpAnalyzer        *detector.ICMPAnalyzer
+	qosEnabled          bool
+	verbose             bool
+	skippedPackets      int
+	errorCount          int
 }
 
 // NewProcessor creates a new PCAP processor with all analyzers
@@ -39,18 +44,23 @@ func NewProcessor() *Processor {
 // NewProcessorWithOptions creates a processor with configurable options
 func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 	return &Processor{
-		dnsAnalyzer:     detector.NewDNSAnalyzer(),
-		tcpAnalyzer:     detector.NewTCPAnalyzer(),
-		arpAnalyzer:     detector.NewARPAnalyzer(),
-		httpAnalyzer:    detector.NewHTTPAnalyzer(),
-		tlsAnalyzer:     detector.NewTLSAnalyzer(),
-		trafficAnalyzer: detector.NewTrafficAnalyzer(),
-		quicAnalyzer:    detector.NewQUICAnalyzer(),
-		qosAnalyzer:     detector.NewQoSAnalyzer(qosEnabled),
-		qosEnabled:      qosEnabled,
-		verbose:         verbose,
-		skippedPackets:  0,
-		errorCount:      0,
+		dnsAnalyzer:         detector.NewDNSAnalyzer(),
+		tcpAnalyzer:         detector.NewTCPAnalyzer(),
+		arpAnalyzer:         detector.NewARPAnalyzer(),
+		httpAnalyzer:        detector.NewHTTPAnalyzer(),
+		tlsAnalyzer:         detector.NewTLSAnalyzer(),
+		trafficAnalyzer:     detector.NewTrafficAnalyzer(),
+		quicAnalyzer:        detector.NewQUICAnalyzer(),
+		qosAnalyzer:         detector.NewQoSAnalyzer(qosEnabled),
+		ddosAnalyzer:        detector.NewDDoSAnalyzer(),
+		portScanAnalyzer:    detector.NewPortScanAnalyzer(),
+		iocAnalyzer:         detector.NewIOCAnalyzer(),
+		tlsSecurityAnalyzer: detector.NewTLSSecurityAnalyzer(),
+		icmpAnalyzer:        detector.NewICMPAnalyzer(),
+		qosEnabled:          qosEnabled,
+		verbose:             verbose,
+		skippedPackets:      0,
+		errorCount:          0,
 	}
 }
 
@@ -172,6 +182,16 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 
 	// Traffic analysis (app stats, suspicious ports)
 	p.trafficAnalyzer.Analyze(packet, state, report)
+
+	// Security analysis
+	p.ddosAnalyzer.AnalyzeTCP(packet, state, report)
+	p.ddosAnalyzer.AnalyzeUDP(packet, state, report)
+	p.ddosAnalyzer.AnalyzeICMP(packet, state, report)
+	p.portScanAnalyzer.Analyze(packet, state, report)
+	p.iocAnalyzer.AnalyzeIP(packet, state, report)
+	p.iocAnalyzer.AnalyzeDNS(packet, state, report)
+	p.tlsSecurityAnalyzer.Analyze(packet, state, report)
+	p.icmpAnalyzer.Analyze(packet, state, report)
 }
 
 // matchesFilter checks if a packet matches the configured filter

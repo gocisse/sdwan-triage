@@ -83,12 +83,17 @@ type ReportData struct {
 	NextSteps []string
 
 	// Security Findings
-	DNSAnomalies      []DNSAnomalyView
-	ARPConflicts      []ARPConflictView
-	SuspiciousTraffic []SuspiciousFlowView
-	HTTPErrors        []HTTPErrorView
-	TLSCerts          []TLSCertView
-	BGPIndicators     []BGPIndicatorView
+	DNSAnomalies        []DNSAnomalyView
+	ARPConflicts        []ARPConflictView
+	SuspiciousTraffic   []SuspiciousFlowView
+	HTTPErrors          []HTTPErrorView
+	TLSCerts            []TLSCertView
+	BGPIndicators       []BGPIndicatorView
+	DDoSFindings        []DDoSFindingView
+	PortScanFindings    []PortScanFindingView
+	IOCFindings         []IOCFindingView
+	TLSSecurityFindings []TLSSecurityFindingView
+	ICMPFindings        []ICMPFindingView
 
 	// Performance Findings
 	TCPRetransmissions []TCPFlowView
@@ -315,6 +320,62 @@ type QoSMismatchView struct {
 	Reason        string
 }
 
+type DDoSFindingView struct {
+	Timestamp   float64
+	SourceIP    string
+	TargetIP    string
+	Type        string
+	PacketCount int
+	Threshold   int
+	Duration    float64
+	Severity    string
+}
+
+type PortScanFindingView struct {
+	Timestamp    float64
+	SourceIP     string
+	TargetIP     string
+	Type         string
+	PortsScanned int
+	SamplePorts  string
+	Severity     string
+}
+
+type IOCFindingView struct {
+	Timestamp    float64
+	MatchedValue string
+	Type         string
+	IOCType      string
+	SourceIP     string
+	DestIP       string
+	Confidence   string
+	Description  string
+}
+
+type TLSSecurityFindingView struct {
+	Timestamp    float64
+	ServerIP     string
+	ServerPort   uint16
+	ServerName   string
+	TLSVersion   string
+	CipherSuite  string
+	WeaknessType string
+	Severity     string
+	Description  string
+}
+
+type ICMPFindingView struct {
+	Timestamp   float64
+	SourceIP    string
+	DestIP      string
+	Type        uint8
+	Code        uint8
+	TypeName    string
+	Count       int
+	IsAnomaly   bool
+	Description string
+}
+
 // GenerateHTMLReport generates a professional HTML report using templates
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
 	// Prepare template data
@@ -404,6 +465,11 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.HTTPErrors = convertHTTPErrors(r.HTTPErrors)
 	data.TLSCerts = convertTLSCerts(r.TLSCerts)
 	data.BGPIndicators = convertBGPIndicators(r.BGPHijackIndicators)
+	data.DDoSFindings = convertDDoSFindings(r.Security.DDoSFindings)
+	data.PortScanFindings = convertPortScanFindings(r.Security.PortScanFindings)
+	data.IOCFindings = convertIOCFindings(r.Security.IOCFindings)
+	data.TLSSecurityFindings = convertTLSSecurityFindings(r.Security.TLSSecurityFindings)
+	data.ICMPFindings = convertICMPFindings(r.ICMPAnalysis)
 
 	// Performance Findings
 	data.TCPRetransmissions = convertTCPRetransmissions(r.TCPRetransmissions)
@@ -1040,6 +1106,99 @@ func convertQoSMismatches(mismatches []models.QoSMismatch) []QoSMismatchView {
 	return result
 }
 
+func convertDDoSFindings(findings []models.DDoSFinding) []DDoSFindingView {
+	result := make([]DDoSFindingView, len(findings))
+	for i, f := range findings {
+		result[i] = DDoSFindingView{
+			Timestamp:   f.Timestamp,
+			SourceIP:    html.EscapeString(f.SourceIP),
+			TargetIP:    html.EscapeString(f.TargetIP),
+			Type:        html.EscapeString(f.Type),
+			PacketCount: f.PacketCount,
+			Threshold:   f.Threshold,
+			Duration:    f.Duration,
+			Severity:    html.EscapeString(f.Severity),
+		}
+	}
+	return result
+}
+
+func convertPortScanFindings(findings []models.PortScanFinding) []PortScanFindingView {
+	result := make([]PortScanFindingView, len(findings))
+	for i, f := range findings {
+		// Format sample ports as string
+		portStrs := make([]string, len(f.SamplePorts))
+		for j, p := range f.SamplePorts {
+			portStrs[j] = fmt.Sprintf("%d", p)
+		}
+		samplePorts := strings.Join(portStrs, ", ")
+
+		result[i] = PortScanFindingView{
+			Timestamp:    f.Timestamp,
+			SourceIP:     html.EscapeString(f.SourceIP),
+			TargetIP:     html.EscapeString(f.TargetIP),
+			Type:         html.EscapeString(f.Type),
+			PortsScanned: f.PortsScanned,
+			SamplePorts:  samplePorts,
+			Severity:     html.EscapeString(f.Severity),
+		}
+	}
+	return result
+}
+
+func convertIOCFindings(findings []models.IOCFinding) []IOCFindingView {
+	result := make([]IOCFindingView, len(findings))
+	for i, f := range findings {
+		result[i] = IOCFindingView{
+			Timestamp:    f.Timestamp,
+			MatchedValue: html.EscapeString(f.MatchedValue),
+			Type:         html.EscapeString(f.Type),
+			IOCType:      html.EscapeString(f.IOCType),
+			SourceIP:     html.EscapeString(f.SourceIP),
+			DestIP:       html.EscapeString(f.DestIP),
+			Confidence:   html.EscapeString(f.Confidence),
+			Description:  html.EscapeString(f.Description),
+		}
+	}
+	return result
+}
+
+func convertTLSSecurityFindings(findings []models.TLSSecurityFinding) []TLSSecurityFindingView {
+	result := make([]TLSSecurityFindingView, len(findings))
+	for i, f := range findings {
+		result[i] = TLSSecurityFindingView{
+			Timestamp:    f.Timestamp,
+			ServerIP:     html.EscapeString(f.ServerIP),
+			ServerPort:   f.ServerPort,
+			ServerName:   html.EscapeString(f.ServerName),
+			TLSVersion:   html.EscapeString(f.TLSVersion),
+			CipherSuite:  html.EscapeString(f.CipherSuite),
+			WeaknessType: html.EscapeString(f.WeaknessType),
+			Severity:     html.EscapeString(f.Severity),
+			Description:  html.EscapeString(f.Description),
+		}
+	}
+	return result
+}
+
+func convertICMPFindings(findings []models.ICMPFinding) []ICMPFindingView {
+	result := make([]ICMPFindingView, len(findings))
+	for i, f := range findings {
+		result[i] = ICMPFindingView{
+			Timestamp:   f.Timestamp,
+			SourceIP:    html.EscapeString(f.SourceIP),
+			DestIP:      html.EscapeString(f.DestIP),
+			Type:        f.Type,
+			Code:        f.Code,
+			TypeName:    html.EscapeString(f.TypeName),
+			Count:       f.Count,
+			IsAnomaly:   f.IsAnomaly,
+			Description: html.EscapeString(f.Description),
+		}
+	}
+	return result
+}
+
 func getTemplateContent() string {
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -1292,6 +1451,120 @@ func getTemplateContent() string {
                                         <td>{{.NotBefore}}</td>
                                         <td>{{.NotAfter}}</td>
                                         <td><code>{{.ServerIP}}</code> ({{.ServerName}})</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .DDoSFindings}}
+                    <details open>
+                        <summary><i class="fas fa-bomb"></i> DDoS Attacks Detected ({{len .DDoSFindings}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Time</th><th>Source IP</th><th>Target IP</th><th>Type</th><th>Packets</th><th>Severity</th></tr></thead>
+                                <tbody>
+                                    {{range .DDoSFindings}}
+                                    <tr class="severity-row-{{if eq .Severity "Critical"}}critical{{else if eq .Severity "High"}}high{{else}}medium{{end}}">
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
+                                        <td><code>{{.SourceIP}}</code></td>
+                                        <td><code>{{.TargetIP}}</code></td>
+                                        <td><span class="badge badge-danger">{{.Type}}</span></td>
+                                        <td>{{.PacketCount}} (threshold: {{.Threshold}})</td>
+                                        <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .PortScanFindings}}
+                    <details>
+                        <summary><i class="fas fa-search"></i> Port Scanning Detected ({{len .PortScanFindings}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Time</th><th>Source IP</th><th>Target</th><th>Scan Type</th><th>Ports Scanned</th><th>Severity</th></tr></thead>
+                                <tbody>
+                                    {{range .PortScanFindings}}
+                                    <tr>
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
+                                        <td><code>{{.SourceIP}}</code></td>
+                                        <td><code>{{.TargetIP}}</code></td>
+                                        <td><span class="badge badge-warning">{{.Type}}</span></td>
+                                        <td>{{.PortsScanned}} {{if .SamplePorts}}({{.SamplePorts}}){{end}}</td>
+                                        <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .IOCFindings}}
+                    <details open>
+                        <summary><i class="fas fa-skull-crossbones"></i> IOC Matches ({{len .IOCFindings}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Time</th><th>Matched Value</th><th>Type</th><th>Category</th><th>Confidence</th><th>Description</th></tr></thead>
+                                <tbody>
+                                    {{range .IOCFindings}}
+                                    <tr class="severity-row-high">
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
+                                        <td><code>{{.MatchedValue}}</code></td>
+                                        <td>{{.Type}}</td>
+                                        <td><span class="badge badge-danger">{{.IOCType}}</span></td>
+                                        <td>{{.Confidence}}</td>
+                                        <td>{{.Description}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .TLSSecurityFindings}}
+                    <details>
+                        <summary><i class="fas fa-unlock-alt"></i> TLS Security Weaknesses ({{len .TLSSecurityFindings}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Time</th><th>Server</th><th>TLS Version</th><th>Cipher Suite</th><th>Weakness</th><th>Severity</th></tr></thead>
+                                <tbody>
+                                    {{range .TLSSecurityFindings}}
+                                    <tr>
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
+                                        <td><code>{{.ServerIP}}:{{.ServerPort}}</code> {{if .ServerName}}({{.ServerName}}){{end}}</td>
+                                        <td>{{.TLSVersion}}</td>
+                                        <td><code>{{.CipherSuite}}</code></td>
+                                        <td>{{.WeaknessType}}</td>
+                                        <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .ICMPFindings}}
+                    <details>
+                        <summary><i class="fas fa-satellite-dish"></i> ICMP Analysis ({{len .ICMPFindings}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Type</th><th>Count</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    {{range .ICMPFindings}}
+                                    <tr class="{{if .IsAnomaly}}severity-row-medium{{end}}">
+                                        <td><code>{{.SourceIP}}</code></td>
+                                        <td><code>{{.DestIP}}</code></td>
+                                        <td>{{.TypeName}} ({{.Type}}/{{.Code}})</td>
+                                        <td>{{.Count}}</td>
+                                        <td>{{if .IsAnomaly}}<span class="badge badge-warning">Anomaly</span> {{.Description}}{{else}}<span class="badge badge-success">Normal</span>{{end}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>

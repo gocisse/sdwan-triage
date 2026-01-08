@@ -25,6 +25,12 @@ type TriageReport struct {
 	QoSAnalysis          *QoSReport             `json:"qos_analysis,omitempty"`
 	AppIdentification    []IdentifiedApp        `json:"app_identification,omitempty"`
 	TotalBytes           uint64                 `json:"total_bytes"`
+
+	// Security Analysis
+	Security SecurityAnalysis `json:"security"`
+
+	// Network Analysis
+	ICMPAnalysis []ICMPFinding `json:"icmp_analysis,omitempty"`
 }
 
 // TimelineEvent represents a network event in the timeline
@@ -257,4 +263,73 @@ type DeviceFingerprint struct {
 	OSGuess    string `json:"os_guess"`
 	Confidence string `json:"confidence"`
 	Details    string `json:"details"`
+}
+
+// SecurityAnalysis contains all security-related findings
+type SecurityAnalysis struct {
+	DDoSFindings        []DDoSFinding        `json:"ddos_findings,omitempty"`
+	PortScanFindings    []PortScanFinding    `json:"port_scan_findings,omitempty"`
+	IOCFindings         []IOCFinding         `json:"ioc_findings,omitempty"`
+	TLSSecurityFindings []TLSSecurityFinding `json:"tls_security_findings,omitempty"`
+}
+
+// DDoSFinding represents a detected DDoS attack pattern
+type DDoSFinding struct {
+	Timestamp   float64 `json:"timestamp"`
+	SourceIP    string  `json:"source_ip"`
+	TargetIP    string  `json:"target_ip,omitempty"`
+	Type        string  `json:"type"` // "SYN Flood", "UDP Flood", "ICMP Flood"
+	PacketCount int     `json:"packet_count"`
+	Threshold   int     `json:"threshold"`
+	Duration    float64 `json:"duration_seconds"`
+	Severity    string  `json:"severity"` // "Low", "Medium", "High", "Critical"
+}
+
+// PortScanFinding represents a detected port scanning activity
+type PortScanFinding struct {
+	Timestamp    float64  `json:"timestamp"`
+	SourceIP     string   `json:"source_ip"`
+	TargetIP     string   `json:"target_ip,omitempty"`
+	Type         string   `json:"type"` // "Horizontal", "Vertical", "Block"
+	PortsScanned int      `json:"ports_scanned"`
+	SamplePorts  []uint16 `json:"sample_ports,omitempty"`
+	Severity     string   `json:"severity"`
+}
+
+// IOCFinding represents a matched Indicator of Compromise
+type IOCFinding struct {
+	Timestamp    float64 `json:"timestamp"`
+	MatchedValue string  `json:"matched_value"`
+	Type         string  `json:"type"`     // "IP", "Domain", "Hash"
+	IOCType      string  `json:"ioc_type"` // "C2 Server", "Malware", "Phishing"
+	SourceIP     string  `json:"source_ip,omitempty"`
+	DestIP       string  `json:"dest_ip,omitempty"`
+	Confidence   string  `json:"confidence"`
+	Description  string  `json:"description"`
+}
+
+// TLSSecurityFinding represents a TLS security weakness
+type TLSSecurityFinding struct {
+	Timestamp    float64 `json:"timestamp"`
+	ServerIP     string  `json:"server_ip"`
+	ServerPort   uint16  `json:"server_port"`
+	ServerName   string  `json:"server_name,omitempty"`
+	TLSVersion   string  `json:"tls_version"`
+	CipherSuite  string  `json:"cipher_suite,omitempty"`
+	WeaknessType string  `json:"weakness_type"` // "Weak TLS Version", "Weak Cipher", "No PFS"
+	Severity     string  `json:"severity"`
+	Description  string  `json:"description"`
+}
+
+// ICMPFinding represents ICMP traffic analysis results
+type ICMPFinding struct {
+	Timestamp   float64 `json:"timestamp"`
+	SourceIP    string  `json:"source_ip"`
+	DestIP      string  `json:"dest_ip"`
+	Type        uint8   `json:"icmp_type"`
+	Code        uint8   `json:"icmp_code"`
+	TypeName    string  `json:"type_name"`
+	Count       int     `json:"count"`
+	IsAnomaly   bool    `json:"is_anomaly"`
+	Description string  `json:"description,omitempty"`
 }
