@@ -77,6 +77,14 @@ type ReportData struct {
 		DevicesDetected    int
 		DNSQueries         int
 		BGPIndicators      int
+		DDoSAttacks        int
+		PortScans          int
+		IOCMatches         int
+		TLSWeaknesses      int
+		ICMPAnomalies      int
+		TunnelsDetected    int
+		SDWANVendors       int
+		VoIPCalls          int
 	}
 
 	// Next steps
@@ -122,6 +130,12 @@ type ReportData struct {
 	QoSClasses      []QoSClassView
 	QoSMismatches   []QoSMismatchView
 	QoSTotalPackets uint64
+
+	// Advanced Network Analysis
+	VoIPAnalysis   *VoIPAnalysisView
+	TunnelFindings []TunnelFindingView
+	SDWANVendors   []SDWANVendorView
+	GeoLocations   []GeoLocationView
 
 	// Embedded assets
 	CSS template.CSS
@@ -376,6 +390,67 @@ type ICMPFindingView struct {
 	Description string
 }
 
+type VoIPAnalysisView struct {
+	TotalCalls       int
+	EstablishedCalls int
+	FailedCalls      int
+	TotalRTPStreams  int
+	AvgJitter        float64
+	PacketLossRate   float64
+	SIPCalls         []SIPCallView
+	RTPStreams       []RTPStreamView
+}
+
+type SIPCallView struct {
+	CallID    string
+	FromURI   string
+	ToURI     string
+	State     string
+	StartTime float64
+	EndTime   float64
+	SrcIP     string
+	DstIP     string
+}
+
+type RTPStreamView struct {
+	SSRC        uint32
+	SrcIP       string
+	DstIP       string
+	PayloadType string
+	PacketCount uint64
+	ByteCount   uint64
+	LostPackets uint64
+	Jitter      float64
+}
+
+type TunnelFindingView struct {
+	Type        string
+	SrcIP       string
+	DstIP       string
+	SrcPort     uint16
+	DstPort     uint16
+	Identifier  uint32
+	InnerProto  string
+	PacketCount uint64
+	ByteCount   uint64
+	FirstSeen   float64
+	LastSeen    float64
+}
+
+type SDWANVendorView struct {
+	Name        string
+	Confidence  string
+	DetectedBy  string
+	PacketCount int
+	FirstSeen   float64
+	LastSeen    float64
+}
+
+type GeoLocationView struct {
+	Country string
+	Count   int
+}
+
 // GenerateHTMLReport generates a professional HTML report using templates
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
 	// Prepare template data
@@ -420,9 +495,18 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	}
 
 	// Calculate health status and risk score
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts)
+	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.DDoSFindings) + len(r.Security.IOCFindings)
 	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
-	securityConcerns := len(r.SuspiciousTraffic)
+	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings)
+
+	// Count ICMP anomalies
+	icmpAnomalies := 0
+	for _, f := range r.ICMPAnalysis {
+		if f.IsAnomaly {
+			icmpAnomalies++
+		}
+	}
+	securityConcerns += icmpAnomalies
 
 	data.TotalFindings = criticalIssues + performanceIssues + securityConcerns
 
@@ -454,6 +538,16 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.Stats.DevicesDetected = len(r.DeviceFingerprinting)
 	data.Stats.DNSQueries = len(r.DNSDetails)
 	data.Stats.BGPIndicators = len(r.BGPHijackIndicators)
+	data.Stats.DDoSAttacks = len(r.Security.DDoSFindings)
+	data.Stats.PortScans = len(r.Security.PortScanFindings)
+	data.Stats.IOCMatches = len(r.Security.IOCFindings)
+	data.Stats.TLSWeaknesses = len(r.Security.TLSSecurityFindings)
+	data.Stats.ICMPAnomalies = icmpAnomalies
+	data.Stats.TunnelsDetected = len(r.TunnelAnalysis)
+	data.Stats.SDWANVendors = len(r.SDWANVendors)
+	if r.VoIPAnalysis != nil {
+		data.Stats.VoIPCalls = r.VoIPAnalysis.TotalCalls
+	}
 
 	// Generate next steps
 	data.NextSteps = generateNextSteps(r)
@@ -501,6 +595,12 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 		data.QoSClasses = convertQoSClasses(r.QoSAnalysis.ClassDistribution)
 		data.QoSMismatches = convertQoSMismatches(r.QoSAnalysis.MismatchedQoS)
 	}
+
+	// Advanced Network Analysis
+	data.VoIPAnalysis = convertVoIPAnalysis(r.VoIPAnalysis)
+	data.TunnelFindings = convertTunnelFindings(r.TunnelAnalysis)
+	data.SDWANVendors = convertSDWANVendors(r.SDWANVendors)
+	data.GeoLocations = convertGeoLocations(r.LocationSummary)
 
 	// Generate visualization data
 	data.NetworkDataJSON = template.JS(generateNetworkJSON(r))
@@ -1199,6 +1299,102 @@ func convertICMPFindings(findings []models.ICMPFinding) []ICMPFindingView {
 	return result
 }
 
+func convertVoIPAnalysis(v *models.VoIPAnalysis) *VoIPAnalysisView {
+	if v == nil {
+		return nil
+	}
+
+	view := &VoIPAnalysisView{
+		TotalCalls:       v.TotalCalls,
+		EstablishedCalls: v.EstablishedCalls,
+		FailedCalls:      v.FailedCalls,
+		TotalRTPStreams:  v.TotalRTPStreams,
+		AvgJitter:        v.AvgJitter,
+		PacketLossRate:   v.PacketLossRate,
+	}
+
+	for _, call := range v.SIPCalls {
+		view.SIPCalls = append(view.SIPCalls, SIPCallView{
+			CallID:    html.EscapeString(call.CallID),
+			FromURI:   html.EscapeString(call.FromURI),
+			ToURI:     html.EscapeString(call.ToURI),
+			State:     html.EscapeString(call.State),
+			StartTime: call.StartTime,
+			EndTime:   call.EndTime,
+			SrcIP:     html.EscapeString(call.SrcIP),
+			DstIP:     html.EscapeString(call.DstIP),
+		})
+	}
+
+	for _, stream := range v.RTPStreams {
+		view.RTPStreams = append(view.RTPStreams, RTPStreamView{
+			SSRC:        stream.SSRC,
+			SrcIP:       html.EscapeString(stream.SrcIP),
+			DstIP:       html.EscapeString(stream.DstIP),
+			PayloadType: html.EscapeString(stream.PayloadType),
+			PacketCount: stream.PacketCount,
+			ByteCount:   stream.ByteCount,
+			LostPackets: stream.LostPackets,
+			Jitter:      stream.Jitter,
+		})
+	}
+
+	return view
+}
+
+func convertTunnelFindings(tunnels []models.TunnelFinding) []TunnelFindingView {
+	result := make([]TunnelFindingView, len(tunnels))
+	for i, t := range tunnels {
+		result[i] = TunnelFindingView{
+			Type:        html.EscapeString(t.Type),
+			SrcIP:       html.EscapeString(t.SrcIP),
+			DstIP:       html.EscapeString(t.DstIP),
+			SrcPort:     t.SrcPort,
+			DstPort:     t.DstPort,
+			Identifier:  t.Identifier,
+			InnerProto:  html.EscapeString(t.InnerProto),
+			PacketCount: t.PacketCount,
+			ByteCount:   t.ByteCount,
+			FirstSeen:   t.FirstSeen,
+			LastSeen:    t.LastSeen,
+		}
+	}
+	return result
+}
+
+func convertSDWANVendors(vendors []models.SDWANVendor) []SDWANVendorView {
+	result := make([]SDWANVendorView, len(vendors))
+	for i, v := range vendors {
+		result[i] = SDWANVendorView{
+			Name:        html.EscapeString(v.Name),
+			Confidence:  html.EscapeString(v.Confidence),
+			DetectedBy:  html.EscapeString(v.DetectedBy),
+			PacketCount: v.PacketCount,
+			FirstSeen:   v.FirstSeen,
+			LastSeen:    v.LastSeen,
+		}
+	}
+	return result
+}
+
+func convertGeoLocations(locations map[string]int) []GeoLocationView {
+	if locations == nil {
+		return nil
+	}
+	result := make([]GeoLocationView, 0, len(locations))
+	for country, count := range locations {
+		result = append(result, GeoLocationView{
+			Country: html.EscapeString(country),
+			Count:   count,
+		})
+	}
+	// Sort by count descending
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Count > result[j].Count
+	})
+	return result
+}
+
 func getTemplateContent() string {
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -1317,6 +1513,7 @@ func getTemplateContent() string {
                     <button class="tab active" data-tab="tab-security"><i class="fas fa-shield-alt"></i> Security</button>
                     <button class="tab" data-tab="tab-performance"><i class="fas fa-tachometer-alt"></i> Performance</button>
                     <button class="tab" data-tab="tab-protocols"><i class="fas fa-layer-group"></i> Protocols</button>
+                    <button class="tab" data-tab="tab-network"><i class="fas fa-sitemap"></i> Network</button>
                     <button class="tab" data-tab="tab-traffic"><i class="fas fa-exchange-alt"></i> Traffic</button>
                     <button class="tab" data-tab="tab-visualizations"><i class="fas fa-project-diagram"></i> Visualizations</button>
                 </div>
@@ -1880,6 +2077,141 @@ func getTemplateContent() string {
                         </div>
                     </details>
                     {{end}}
+                </div>
+
+                <div id="tab-network" class="tab-content">
+                    {{if .SDWANVendors}}
+                    <details open>
+                        <summary><i class="fas fa-building"></i> SD-WAN Vendors Detected ({{len .SDWANVendors}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Vendor</th><th>Confidence</th><th>Detection Method</th><th>Packets</th><th>First Seen</th><th>Last Seen</th></tr></thead>
+                                <tbody>
+                                    {{range .SDWANVendors}}
+                                    <tr>
+                                        <td><strong>{{.Name}}</strong></td>
+                                        <td><span class="badge badge-{{if eq .Confidence "High"}}success{{else}}info{{end}}">{{.Confidence}}</span></td>
+                                        <td>{{.DetectedBy}}</td>
+                                        <td>{{.PacketCount}}</td>
+                                        <td>{{formatUnixTimeShort .FirstSeen}}</td>
+                                        <td>{{formatUnixTimeShort .LastSeen}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .TunnelFindings}}
+                    <details>
+                        <summary><i class="fas fa-tunnel"></i> Tunnel/Encapsulation Protocols ({{len .TunnelFindings}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Identifier</th><th>Inner Protocol</th><th>Packets</th><th>Bytes</th></tr></thead>
+                                <tbody>
+                                    {{range .TunnelFindings}}
+                                    <tr>
+                                        <td><span class="badge badge-primary">{{.Type}}</span></td>
+                                        <td><code>{{.SrcIP}}{{if .SrcPort}}:{{.SrcPort}}{{end}}</code></td>
+                                        <td><code>{{.DstIP}}{{if .DstPort}}:{{.DstPort}}{{end}}</code></td>
+                                        <td>{{if .Identifier}}{{.Identifier}}{{else}}-{{end}}</td>
+                                        <td>{{if .InnerProto}}{{.InnerProto}}{{else}}-{{end}}</td>
+                                        <td>{{.PacketCount}}</td>
+                                        <td>{{.ByteCount}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .VoIPAnalysis}}
+                    <details>
+                        <summary><i class="fas fa-phone"></i> VoIP/SIP Analysis ({{.VoIPAnalysis.TotalCalls}} calls, {{.VoIPAnalysis.TotalRTPStreams}} streams)</summary>
+                        <div>
+                            <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+                                <div class="stat-card">
+                                    <span class="stat-value">{{.VoIPAnalysis.TotalCalls}}</span>
+                                    <span class="stat-label">Total Calls</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-value">{{.VoIPAnalysis.EstablishedCalls}}</span>
+                                    <span class="stat-label">Established</span>
+                                </div>
+                                <div class="stat-card {{if gt .VoIPAnalysis.FailedCalls 0}}stat-warning{{end}}">
+                                    <span class="stat-value">{{.VoIPAnalysis.FailedCalls}}</span>
+                                    <span class="stat-label">Failed</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-value">{{printf "%.2f" .VoIPAnalysis.AvgJitter}} ms</span>
+                                    <span class="stat-label">Avg Jitter</span>
+                                </div>
+                            </div>
+                            {{if .VoIPAnalysis.SIPCalls}}
+                            <h4><i class="fas fa-phone-alt"></i> SIP Calls</h4>
+                            <table class="data-table">
+                                <thead><tr><th>Call ID</th><th>From</th><th>To</th><th>State</th><th>Source</th><th>Destination</th></tr></thead>
+                                <tbody>
+                                    {{range .VoIPAnalysis.SIPCalls}}
+                                    <tr>
+                                        <td><code>{{.CallID}}</code></td>
+                                        <td>{{.FromURI}}</td>
+                                        <td>{{.ToURI}}</td>
+                                        <td><span class="badge badge-{{if eq .State "ESTABLISHED"}}success{{else if eq .State "FAILED_CLIENT"}}danger{{else if eq .State "FAILED_SERVER"}}danger{{else}}info{{end}}">{{.State}}</span></td>
+                                        <td><code>{{.SrcIP}}</code></td>
+                                        <td><code>{{.DstIP}}</code></td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                            {{end}}
+                            {{if .VoIPAnalysis.RTPStreams}}
+                            <h4 style="margin-top: 20px;"><i class="fas fa-broadcast-tower"></i> RTP Streams</h4>
+                            <table class="data-table">
+                                <thead><tr><th>SSRC</th><th>Source</th><th>Destination</th><th>Codec</th><th>Packets</th><th>Lost</th><th>Jitter (ms)</th></tr></thead>
+                                <tbody>
+                                    {{range .VoIPAnalysis.RTPStreams}}
+                                    <tr>
+                                        <td><code>{{.SSRC}}</code></td>
+                                        <td><code>{{.SrcIP}}</code></td>
+                                        <td><code>{{.DstIP}}</code></td>
+                                        <td>{{.PayloadType}}</td>
+                                        <td>{{.PacketCount}}</td>
+                                        <td class="{{if gt .LostPackets 0}}severity-medium{{end}}">{{.LostPackets}}</td>
+                                        <td>{{printf "%.2f" .Jitter}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                            {{end}}
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .GeoLocations}}
+                    <details>
+                        <summary><i class="fas fa-globe-americas"></i> Geographic Distribution ({{len .GeoLocations}} locations)</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Location</th><th>IP Count</th></tr></thead>
+                                <tbody>
+                                    {{range .GeoLocations}}
+                                    <tr>
+                                        <td><strong>{{.Country}}</strong></td>
+                                        <td>{{.Count}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if not .SDWANVendors}}{{if not .TunnelFindings}}{{if not .VoIPAnalysis}}{{if not .GeoLocations}}
+                    <div class="alert alert-info"><i class="fas fa-info-circle"></i> No advanced network features detected in this capture</div>
+                    {{end}}{{end}}{{end}}{{end}}
                 </div>
 
                 <div id="tab-traffic" class="tab-content">

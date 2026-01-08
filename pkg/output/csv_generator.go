@@ -134,6 +134,87 @@ func GenerateCSVReports(r *models.TriageReport, baseFilename string) (*CSVExport
 		result.Files = append(result.Files, handshakeFile)
 	}
 
+	// Generate DDoS findings CSV if any exist
+	if len(r.Security.DDoSFindings) > 0 {
+		ddosFile := filepath.Join(dir, baseName+"_ddos_findings.csv")
+		if err := generateDDoSFindingsCSV(r.Security.DDoSFindings, ddosFile); err != nil {
+			return nil, fmt.Errorf("failed to generate DDoS findings CSV: %w", err)
+		}
+		result.Files = append(result.Files, ddosFile)
+	}
+
+	// Generate port scan findings CSV if any exist
+	if len(r.Security.PortScanFindings) > 0 {
+		portScanFile := filepath.Join(dir, baseName+"_port_scan_findings.csv")
+		if err := generatePortScanFindingsCSV(r.Security.PortScanFindings, portScanFile); err != nil {
+			return nil, fmt.Errorf("failed to generate port scan findings CSV: %w", err)
+		}
+		result.Files = append(result.Files, portScanFile)
+	}
+
+	// Generate IOC findings CSV if any exist
+	if len(r.Security.IOCFindings) > 0 {
+		iocFile := filepath.Join(dir, baseName+"_ioc_findings.csv")
+		if err := generateIOCFindingsCSV(r.Security.IOCFindings, iocFile); err != nil {
+			return nil, fmt.Errorf("failed to generate IOC findings CSV: %w", err)
+		}
+		result.Files = append(result.Files, iocFile)
+	}
+
+	// Generate TLS security findings CSV if any exist
+	if len(r.Security.TLSSecurityFindings) > 0 {
+		tlsSecFile := filepath.Join(dir, baseName+"_tls_security_findings.csv")
+		if err := generateTLSSecurityFindingsCSV(r.Security.TLSSecurityFindings, tlsSecFile); err != nil {
+			return nil, fmt.Errorf("failed to generate TLS security findings CSV: %w", err)
+		}
+		result.Files = append(result.Files, tlsSecFile)
+	}
+
+	// Generate ICMP analysis CSV if any exist
+	if len(r.ICMPAnalysis) > 0 {
+		icmpFile := filepath.Join(dir, baseName+"_icmp_analysis.csv")
+		if err := generateICMPAnalysisCSV(r.ICMPAnalysis, icmpFile); err != nil {
+			return nil, fmt.Errorf("failed to generate ICMP analysis CSV: %w", err)
+		}
+		result.Files = append(result.Files, icmpFile)
+	}
+
+	// Generate tunnel findings CSV if any exist
+	if len(r.TunnelAnalysis) > 0 {
+		tunnelFile := filepath.Join(dir, baseName+"_tunnel_findings.csv")
+		if err := generateTunnelFindingsCSV(r.TunnelAnalysis, tunnelFile); err != nil {
+			return nil, fmt.Errorf("failed to generate tunnel findings CSV: %w", err)
+		}
+		result.Files = append(result.Files, tunnelFile)
+	}
+
+	// Generate SD-WAN vendors CSV if any exist
+	if len(r.SDWANVendors) > 0 {
+		sdwanFile := filepath.Join(dir, baseName+"_sdwan_vendors.csv")
+		if err := generateSDWANVendorsCSV(r.SDWANVendors, sdwanFile); err != nil {
+			return nil, fmt.Errorf("failed to generate SD-WAN vendors CSV: %w", err)
+		}
+		result.Files = append(result.Files, sdwanFile)
+	}
+
+	// Generate VoIP analysis CSV if any exist
+	if r.VoIPAnalysis != nil && (len(r.VoIPAnalysis.SIPCalls) > 0 || len(r.VoIPAnalysis.RTPStreams) > 0) {
+		voipFile := filepath.Join(dir, baseName+"_voip_analysis.csv")
+		if err := generateVoIPAnalysisCSV(r.VoIPAnalysis, voipFile); err != nil {
+			return nil, fmt.Errorf("failed to generate VoIP analysis CSV: %w", err)
+		}
+		result.Files = append(result.Files, voipFile)
+	}
+
+	// Generate GeoIP summary CSV if any exist
+	if len(r.LocationSummary) > 0 {
+		geoFile := filepath.Join(dir, baseName+"_geo_locations.csv")
+		if err := generateGeoLocationsCSV(r.LocationSummary, geoFile); err != nil {
+			return nil, fmt.Errorf("failed to generate geo locations CSV: %w", err)
+		}
+		result.Files = append(result.Files, geoFile)
+	}
+
 	return result, nil
 }
 
@@ -839,4 +920,480 @@ func GenerateSingleCSV(r *models.TriageReport, filename string) error {
 	}
 
 	return nil
+}
+
+// generateDDoSFindingsCSV creates a CSV for DDoS attack findings
+func generateDDoSFindingsCSV(findings []models.DDoSFinding, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Timestamp (UTC)",
+		"Source IP",
+		"Target IP",
+		"Attack Type",
+		"Packet Count",
+		"Threshold",
+		"Duration (s)",
+		"Severity",
+		"Description",
+		"Recommended Action",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, f := range findings {
+		ts := formatTimestampForCSV(f.Timestamp)
+		description := fmt.Sprintf("%s attack detected from %s with %d packets (threshold: %d)",
+			f.Type, f.SourceIP, f.PacketCount, f.Threshold)
+		action := "Block source IP; enable rate limiting; configure DDoS protection"
+
+		row := []string{
+			ts,
+			f.SourceIP,
+			f.TargetIP,
+			f.Type,
+			fmt.Sprintf("%d", f.PacketCount),
+			fmt.Sprintf("%d", f.Threshold),
+			fmt.Sprintf("%.2f", f.Duration),
+			f.Severity,
+			description,
+			action,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generatePortScanFindingsCSV creates a CSV for port scan findings
+func generatePortScanFindingsCSV(findings []models.PortScanFinding, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Timestamp (UTC)",
+		"Source IP",
+		"Target IP",
+		"Scan Type",
+		"Ports Scanned",
+		"Sample Ports",
+		"Severity",
+		"Description",
+		"Recommended Action",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, f := range findings {
+		ts := formatTimestampForCSV(f.Timestamp)
+		samplePorts := ""
+		for i, p := range f.SamplePorts {
+			if i > 0 {
+				samplePorts += ","
+			}
+			samplePorts += fmt.Sprintf("%d", p)
+			if i >= 9 {
+				samplePorts += "..."
+				break
+			}
+		}
+		description := fmt.Sprintf("%s port scan from %s targeting %d ports",
+			f.Type, f.SourceIP, f.PortsScanned)
+		action := "Block source IP; review firewall rules; enable IDS/IPS"
+
+		row := []string{
+			ts,
+			f.SourceIP,
+			f.TargetIP,
+			f.Type,
+			fmt.Sprintf("%d", f.PortsScanned),
+			samplePorts,
+			f.Severity,
+			description,
+			action,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateIOCFindingsCSV creates a CSV for IOC match findings
+func generateIOCFindingsCSV(findings []models.IOCFinding, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Timestamp (UTC)",
+		"Matched Value",
+		"Match Type",
+		"IOC Category",
+		"Source IP",
+		"Destination IP",
+		"Confidence",
+		"Description",
+		"Recommended Action",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, f := range findings {
+		ts := formatTimestampForCSV(f.Timestamp)
+		action := "Block communication; isolate affected systems; investigate for compromise"
+
+		row := []string{
+			ts,
+			f.MatchedValue,
+			f.Type,
+			f.IOCType,
+			f.SourceIP,
+			f.DestIP,
+			f.Confidence,
+			f.Description,
+			action,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateTLSSecurityFindingsCSV creates a CSV for TLS security findings
+func generateTLSSecurityFindingsCSV(findings []models.TLSSecurityFinding, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Timestamp (UTC)",
+		"Server IP",
+		"Server Port",
+		"Server Name",
+		"TLS Version",
+		"Cipher Suite",
+		"Weakness Type",
+		"Severity",
+		"Description",
+		"Recommended Action",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, f := range findings {
+		ts := formatTimestampForCSV(f.Timestamp)
+		action := "Upgrade TLS version; disable weak ciphers; enable PFS"
+
+		row := []string{
+			ts,
+			f.ServerIP,
+			fmt.Sprintf("%d", f.ServerPort),
+			f.ServerName,
+			f.TLSVersion,
+			f.CipherSuite,
+			f.WeaknessType,
+			f.Severity,
+			f.Description,
+			action,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateICMPAnalysisCSV creates a CSV for ICMP analysis findings
+func generateICMPAnalysisCSV(findings []models.ICMPFinding, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Timestamp (UTC)",
+		"Source IP",
+		"Destination IP",
+		"ICMP Type",
+		"ICMP Code",
+		"Type Name",
+		"Count",
+		"Is Anomaly",
+		"Description",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, f := range findings {
+		ts := formatTimestampForCSV(f.Timestamp)
+		isAnomaly := "No"
+		if f.IsAnomaly {
+			isAnomaly = "Yes"
+		}
+
+		row := []string{
+			ts,
+			f.SourceIP,
+			f.DestIP,
+			fmt.Sprintf("%d", f.Type),
+			fmt.Sprintf("%d", f.Code),
+			f.TypeName,
+			fmt.Sprintf("%d", f.Count),
+			isAnomaly,
+			f.Description,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateTunnelFindingsCSV creates a CSV for tunnel/encapsulation findings
+func generateTunnelFindingsCSV(tunnels []models.TunnelFinding, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Tunnel Type",
+		"Source IP",
+		"Source Port",
+		"Destination IP",
+		"Destination Port",
+		"Identifier (VNI/Key/Label)",
+		"Inner Protocol",
+		"Packet Count",
+		"Byte Count",
+		"First Seen (UTC)",
+		"Last Seen (UTC)",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, t := range tunnels {
+		firstSeen := formatTimestampForCSV(t.FirstSeen)
+		lastSeen := formatTimestampForCSV(t.LastSeen)
+		srcPort := ""
+		dstPort := ""
+		if t.SrcPort > 0 {
+			srcPort = fmt.Sprintf("%d", t.SrcPort)
+		}
+		if t.DstPort > 0 {
+			dstPort = fmt.Sprintf("%d", t.DstPort)
+		}
+		identifier := ""
+		if t.Identifier > 0 {
+			identifier = fmt.Sprintf("%d", t.Identifier)
+		}
+
+		row := []string{
+			t.Type,
+			t.SrcIP,
+			srcPort,
+			t.DstIP,
+			dstPort,
+			identifier,
+			t.InnerProto,
+			fmt.Sprintf("%d", t.PacketCount),
+			fmt.Sprintf("%d", t.ByteCount),
+			firstSeen,
+			lastSeen,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateSDWANVendorsCSV creates a CSV for SD-WAN vendor detection
+func generateSDWANVendorsCSV(vendors []models.SDWANVendor, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Vendor Name",
+		"Confidence",
+		"Detection Method",
+		"Packet Count",
+		"First Seen (UTC)",
+		"Last Seen (UTC)",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, v := range vendors {
+		firstSeen := formatTimestampForCSV(v.FirstSeen)
+		lastSeen := formatTimestampForCSV(v.LastSeen)
+
+		row := []string{
+			v.Name,
+			v.Confidence,
+			v.DetectedBy,
+			fmt.Sprintf("%d", v.PacketCount),
+			firstSeen,
+			lastSeen,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateVoIPAnalysisCSV creates a CSV for VoIP/SIP/RTP analysis
+func generateVoIPAnalysisCSV(voip *models.VoIPAnalysis, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// Write summary section
+	writer.Write([]string{"VoIP Analysis Summary"})
+	writer.Write([]string{"Metric", "Value"})
+	writer.Write([]string{"Total SIP Calls", fmt.Sprintf("%d", voip.TotalCalls)})
+	writer.Write([]string{"Established Calls", fmt.Sprintf("%d", voip.EstablishedCalls)})
+	writer.Write([]string{"Failed Calls", fmt.Sprintf("%d", voip.FailedCalls)})
+	writer.Write([]string{"Total RTP Streams", fmt.Sprintf("%d", voip.TotalRTPStreams)})
+	writer.Write([]string{"Average Jitter (ms)", fmt.Sprintf("%.2f", voip.AvgJitter)})
+	writer.Write([]string{"Packet Loss Rate (%)", fmt.Sprintf("%.2f", voip.PacketLossRate)})
+	writer.Write([]string{""})
+
+	// Write SIP calls section
+	if len(voip.SIPCalls) > 0 {
+		writer.Write([]string{"SIP Calls"})
+		writer.Write([]string{"Call ID", "From URI", "To URI", "State", "Source IP", "Destination IP", "Start Time (UTC)", "End Time (UTC)"})
+		for _, call := range voip.SIPCalls {
+			startTime := formatTimestampForCSV(call.StartTime)
+			endTime := formatTimestampForCSV(call.EndTime)
+			writer.Write([]string{
+				call.CallID,
+				call.FromURI,
+				call.ToURI,
+				call.State,
+				call.SrcIP,
+				call.DstIP,
+				startTime,
+				endTime,
+			})
+		}
+		writer.Write([]string{""})
+	}
+
+	// Write RTP streams section
+	if len(voip.RTPStreams) > 0 {
+		writer.Write([]string{"RTP Streams"})
+		writer.Write([]string{"SSRC", "Source IP", "Destination IP", "Payload Type", "Packet Count", "Byte Count", "Lost Packets", "Jitter (ms)"})
+		for _, stream := range voip.RTPStreams {
+			writer.Write([]string{
+				fmt.Sprintf("%d", stream.SSRC),
+				stream.SrcIP,
+				stream.DstIP,
+				stream.PayloadType,
+				fmt.Sprintf("%d", stream.PacketCount),
+				fmt.Sprintf("%d", stream.ByteCount),
+				fmt.Sprintf("%d", stream.LostPackets),
+				fmt.Sprintf("%.2f", stream.Jitter),
+			})
+		}
+	}
+
+	return nil
+}
+
+// generateGeoLocationsCSV creates a CSV for geographic location summary
+func generateGeoLocationsCSV(locations map[string]int, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{"Location", "IP Count"}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for location, count := range locations {
+		row := []string{location, fmt.Sprintf("%d", count)}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// formatTimestampForCSV converts Unix timestamp to human-readable format for CSV
+func formatTimestampForCSV(unixTime float64) string {
+	if unixTime == 0 {
+		return ""
+	}
+	sec := int64(unixTime)
+	nsec := int64((unixTime - float64(sec)) * 1e9)
+	t := time.Unix(sec, nsec).UTC()
+	return t.Format("2006-01-02 15:04:05")
 }
