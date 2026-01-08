@@ -5,7 +5,7 @@ import (
 	"regexp"
 )
 
-// Private IP blocks (RFC 1918 + localhost + link-local)
+// Private IP blocks (RFC 1918 + localhost + link-local) for IPv4
 var PrivateIPBlocks = []*net.IPNet{
 	{IP: net.IP{10, 0, 0, 0}, Mask: net.CIDRMask(8, 32)},
 	{IP: net.IP{172, 16, 0, 0}, Mask: net.CIDRMask(12, 32)},
@@ -13,6 +13,29 @@ var PrivateIPBlocks = []*net.IPNet{
 	{IP: net.IP{127, 0, 0, 0}, Mask: net.CIDRMask(8, 32)},
 	{IP: net.IP{169, 254, 0, 0}, Mask: net.CIDRMask(16, 32)},
 	{IP: net.ParseIP("::1"), Mask: net.CIDRMask(128, 128)},
+}
+
+// IPv6 private/reserved address blocks
+var IPv6PrivateBlocks []*net.IPNet
+
+func init() {
+	// Initialize IPv6 private blocks
+	// Note: Do NOT include ::ffff:0:0/96 (IPv4-mapped IPv6) as it matches all IPv4 addresses
+	ipv6Ranges := []string{
+		"::1/128",       // Loopback
+		"fe80::/10",     // Link-Local
+		"fc00::/7",      // Unique Local Address (ULA) - RFC 4193
+		"fd00::/8",      // Unique Local Address (more specific)
+		"64:ff9b::/96",  // IPv4/IPv6 translation (NAT64) - well-known prefix
+		"100::/64",      // Discard prefix
+		"2001:db8::/32", // Documentation
+	}
+	for _, cidr := range ipv6Ranges {
+		_, block, err := net.ParseCIDR(cidr)
+		if err == nil {
+			IPv6PrivateBlocks = append(IPv6PrivateBlocks, block)
+		}
+	}
 }
 
 // Public TLD regex

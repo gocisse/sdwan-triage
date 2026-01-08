@@ -29,15 +29,14 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		return
 	}
 
-	// Get IP layer info
-	var srcIP, dstIP string
-	var ttl uint8
-	if ip4Layer := packet.Layer(layers.LayerTypeIPv4); ip4Layer != nil {
-		ip4 := ip4Layer.(*layers.IPv4)
-		srcIP = ip4.SrcIP.String()
-		dstIP = ip4.DstIP.String()
-		ttl = ip4.TTL
+	// Get IP layer info (supports IPv4 and IPv6)
+	ipInfo := ExtractIPInfo(packet)
+	if ipInfo == nil {
+		return
 	}
+	srcIP := ipInfo.SrcIP
+	dstIP := ipInfo.DstIP
+	ttl := ipInfo.TTL
 
 	srcPort := uint16(tcp.SrcPort)
 	dstPort := uint16(tcp.DstPort)

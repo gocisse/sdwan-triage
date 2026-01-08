@@ -30,21 +30,32 @@ func (q *QoSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		return
 	}
 
-	ip4Layer := packet.Layer(layers.LayerTypeIPv4)
-	if ip4Layer == nil {
+	var dscp uint8
+	var packetSize uint64
+	var srcIP, dstIP string
+
+	// Try IPv4 first
+	if ip4Layer := packet.Layer(layers.LayerTypeIPv4); ip4Layer != nil {
+		ip4 := ip4Layer.(*layers.IPv4)
+		// Extract DSCP value (top 6 bits of TOS field)
+		dscp = ip4.TOS >> 2
+		packetSize = uint64(ip4.Length)
+		srcIP = ip4.SrcIP.String()
+		dstIP = ip4.DstIP.String()
+	} else if ip6Layer := packet.Layer(layers.LayerTypeIPv6); ip6Layer != nil {
+		// IPv6 uses Traffic Class field (similar to TOS)
+		ip6 := ip6Layer.(*layers.IPv6)
+		// Extract DSCP from Traffic Class (top 6 bits)
+		dscp = ip6.TrafficClass >> 2
+		packetSize = uint64(ip6.Length) + 40 // Add IPv6 header size
+		srcIP = ip6.SrcIP.String()
+		dstIP = ip6.DstIP.String()
+	} else {
 		return
 	}
 
-	ip4 := ip4Layer.(*layers.IPv4)
-
-	// Extract DSCP value (top 6 bits of TOS field)
-	dscp := ip4.TOS >> 2
-
 	// Get class name
 	className := getDSCPClassName(dscp)
-
-	// Get packet size
-	packetSize := uint64(ip4.Length)
 
 	// Update class metrics
 	if q.classes[className] == nil {
@@ -58,11 +69,7 @@ func (q *QoSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	q.classes[className].ByteCount += packetSize
 
 	// Track per-flow DSCP for mismatch detection
-	var srcIP, dstIP string
 	var srcPort, dstPort uint16
-
-	srcIP = ip4.SrcIP.String()
-	dstIP = ip4.DstIP.String()
 
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)

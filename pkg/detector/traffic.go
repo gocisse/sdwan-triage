@@ -18,36 +18,26 @@ func NewTrafficAnalyzer() *TrafficAnalyzer {
 
 // Analyze processes packets for traffic analysis and suspicious activity detection
 func (t *TrafficAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
-	// Get IP layer info
-	var srcIP, dstIP string
-	var payloadLen uint64
+	// Get IP layer info (supports IPv4 and IPv6)
+	ipInfo := ExtractIPInfo(packet)
+	if ipInfo == nil {
+		return
+	}
+	srcIP := ipInfo.SrcIP
+	dstIP := ipInfo.DstIP
 
+	// Get payload length from packet metadata
+	var payloadLen uint64
 	if ip4Layer := packet.Layer(layers.LayerTypeIPv4); ip4Layer != nil {
 		ip4 := ip4Layer.(*layers.IPv4)
-		srcIP = ip4.SrcIP.String()
-		dstIP = ip4.DstIP.String()
 		payloadLen = uint64(ip4.Length)
-	}
-
-	if srcIP == "" || dstIP == "" {
-		return
+	} else if ip6Layer := packet.Layer(layers.LayerTypeIPv6); ip6Layer != nil {
+		ip6 := ip6Layer.(*layers.IPv6)
+		payloadLen = uint64(ip6.Length) + 40 // Add IPv6 header size
 	}
 
 	// Get transport layer info
-	var srcPort, dstPort uint16
-	var protocol string
-
-	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-		tcp := tcpLayer.(*layers.TCP)
-		srcPort = uint16(tcp.SrcPort)
-		dstPort = uint16(tcp.DstPort)
-		protocol = "TCP"
-	} else if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
-		udp := udpLayer.(*layers.UDP)
-		srcPort = uint16(udp.SrcPort)
-		dstPort = uint16(udp.DstPort)
-		protocol = "UDP"
-	}
+	srcPort, dstPort, protocol := GetTransportPorts(packet)
 
 	// Track application statistics
 	t.trackAppStats(srcPort, dstPort, protocol, payloadLen, state, report)

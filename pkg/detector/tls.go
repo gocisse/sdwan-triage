@@ -32,13 +32,13 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		return
 	}
 
-	// Get IP info
-	var srcIP, dstIP string
-	if ip4Layer := packet.Layer(layers.LayerTypeIPv4); ip4Layer != nil {
-		ip4 := ip4Layer.(*layers.IPv4)
-		srcIP = ip4.SrcIP.String()
-		dstIP = ip4.DstIP.String()
+	// Get IP info (supports IPv4 and IPv6)
+	ipInfo := ExtractIPInfo(packet)
+	if ipInfo == nil {
+		return
 	}
+	srcIP := ipInfo.SrcIP
+	dstIP := ipInfo.DstIP
 
 	srcPort := uint16(tcp.SrcPort)
 	dstPort := uint16(tcp.DstPort)
