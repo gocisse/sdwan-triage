@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -46,26 +47,51 @@ type ReportData struct {
 		SuspiciousTraffic  int
 		TLSCerts           int
 		TotalTraffic       string
+		HTTPErrors         int
+		FailedHandshakes   int
+		HTTP2Flows         int
+		QUICFlows          int
+		HighRTTFlows       int
+		DevicesDetected    int
+		DNSQueries         int
+		BGPIndicators      int
 	}
 
 	// Next steps
 	NextSteps []string
 
-	// Findings
-	DNSAnomalies       []DNSAnomalyView
-	ARPConflicts       []ARPConflictView
-	SuspiciousTraffic  []SuspiciousFlowView
+	// Security Findings
+	DNSAnomalies      []DNSAnomalyView
+	ARPConflicts      []ARPConflictView
+	SuspiciousTraffic []SuspiciousFlowView
+	HTTPErrors        []HTTPErrorView
+	TLSCerts          []TLSCertView
+	BGPIndicators     []BGPIndicatorView
+
+	// Performance Findings
 	TCPRetransmissions []TCPFlowView
 	HighRTTFlows       []RTTFlowView
-	TopFlows           []TrafficFlowView
-	DeviceFingerprints []DeviceFingerprintView
-	HTTPErrors         []HTTPErrorView
-	TLSCerts           []TLSCertView
 	FailedHandshakes   []FailedHandshakeView
 
-	// Protocol and traffic stats for visualizations
-	ProtocolStats []ProtocolStatView
-	TopTalkers    []TopTalkerView
+	// Protocol Analysis
+	DNSDetails         []DNSDetailView
+	HTTP2Flows         []HTTP2FlowView
+	QUICFlows          []QUICFlowView
+	TCPHandshakeStats  TCPHandshakeStatsView
+	AppIdentifications []AppIdentificationView
+
+	// Traffic Analysis
+	TopFlows           []TrafficFlowView
+	DeviceFingerprints []DeviceFingerprintView
+	ProtocolStats      []ProtocolStatView
+	TopTalkers         []TopTalkerView
+	ApplicationStats   []AppStatView
+
+	// QoS Analysis
+	QoSEnabled      bool
+	QoSClasses      []QoSClassView
+	QoSMismatches   []QoSMismatchView
+	QoSTotalPackets uint64
 
 	// Embedded assets
 	CSS template.CSS
@@ -172,6 +198,90 @@ type TopTalkerView struct {
 	Type    string
 }
 
+type BGPIndicatorView struct {
+	IPAddress      string
+	IPPrefix       string
+	ExpectedASN    int
+	ExpectedASName string
+	ObservedASN    int
+	ObservedASName string
+	Confidence     string
+	Reason         string
+	IsAnomaly      bool
+}
+
+type DNSDetailView struct {
+	QueryName     string
+	QueryType     string
+	SourceIP      string
+	DestinationIP string
+	AnswerIPs     string
+	ResponseCode  string
+	IsAnomalous   bool
+	Detail        string
+}
+
+type HTTP2FlowView struct {
+	SrcIP   string
+	SrcPort uint16
+	DstIP   string
+	DstPort uint16
+}
+
+type QUICFlowView struct {
+	SrcIP      string
+	SrcPort    uint16
+	DstIP      string
+	DstPort    uint16
+	ServerName string
+}
+
+type TCPHandshakeStatsView struct {
+	TotalSYN        int
+	TotalSYNACK     int
+	SuccessfulCount int
+	FailedCount     int
+}
+
+type AppIdentificationView struct {
+	Name         string
+	Category     string
+	Protocol     string
+	Port         uint16
+	SNI          string
+	ByteCount    string
+	PacketCount  uint64
+	Confidence   string
+	IdentifiedBy string
+	IsSuspicious bool
+	Reason       string
+}
+
+type AppStatView struct {
+	Name        string
+	Port        uint16
+	Protocol    string
+	PacketCount uint64
+	ByteCount   string
+}
+
+type QoSClassView struct {
+	ClassName       string
+	DSCPValue       uint8
+	PacketCount     uint64
+	ByteCount       string
+	Percentage      float64
+	RetransmitCount uint64
+	RetransmitRate  float64
+}
+
+type QoSMismatchView struct {
+	Flow          string
+	ExpectedClass string
+	ActualClass   string
+	Reason        string
+}
+
 // GenerateHTMLReport generates a professional HTML report using templates
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
 	// Prepare template data
@@ -229,31 +339,60 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 		data.HealthStatus = "critical"
 	}
 
-	// Statistics
+	// Statistics - comprehensive
 	data.Stats.DNSAnomalies = len(r.DNSAnomalies)
 	data.Stats.TCPRetransmissions = len(r.TCPRetransmissions)
 	data.Stats.ARPConflicts = len(r.ARPConflicts)
 	data.Stats.SuspiciousTraffic = len(r.SuspiciousTraffic)
 	data.Stats.TLSCerts = len(r.TLSCerts)
 	data.Stats.TotalTraffic = formatBytesForTemplate(r.TotalBytes)
+	data.Stats.HTTPErrors = len(r.HTTPErrors)
+	data.Stats.FailedHandshakes = len(r.FailedHandshakes)
+	data.Stats.HTTP2Flows = len(r.HTTP2Flows)
+	data.Stats.QUICFlows = len(r.QUICFlows)
+	data.Stats.HighRTTFlows = len(r.RTTAnalysis)
+	data.Stats.DevicesDetected = len(r.DeviceFingerprinting)
+	data.Stats.DNSQueries = len(r.DNSDetails)
+	data.Stats.BGPIndicators = len(r.BGPHijackIndicators)
 
 	// Generate next steps
 	data.NextSteps = generateNextSteps(r)
 
-	// Convert findings to view structs (with escaping)
+	// Security Findings
 	data.DNSAnomalies = convertDNSAnomalies(r.DNSAnomalies)
 	data.ARPConflicts = convertARPConflicts(r.ARPConflicts)
 	data.SuspiciousTraffic = convertSuspiciousTraffic(r.SuspiciousTraffic)
-	data.TCPRetransmissions = convertTCPRetransmissions(r.TCPRetransmissions)
-	data.HighRTTFlows = convertRTTFlows(r.RTTAnalysis)
-	data.TopFlows = convertTopFlows(r.TrafficAnalysis, r.TotalBytes)
-	data.DeviceFingerprints = convertDeviceFingerprints(r.DeviceFingerprinting)
 	data.HTTPErrors = convertHTTPErrors(r.HTTPErrors)
 	data.TLSCerts = convertTLSCerts(r.TLSCerts)
+	data.BGPIndicators = convertBGPIndicators(r.BGPHijackIndicators)
+
+	// Performance Findings
+	data.TCPRetransmissions = convertTCPRetransmissions(r.TCPRetransmissions)
+	data.HighRTTFlows = convertRTTFlows(r.RTTAnalysis)
 	data.FailedHandshakes = convertFailedHandshakes(r.FailedHandshakes)
+
+	// Protocol Analysis
+	data.DNSDetails = convertDNSDetails(r.DNSDetails)
+	data.HTTP2Flows = convertHTTP2Flows(r.HTTP2Flows)
+	data.QUICFlows = convertQUICFlows(r.QUICFlows)
+	data.TCPHandshakeStats = convertTCPHandshakeStats(r.TCPHandshakes)
+	data.AppIdentifications = convertAppIdentifications(r.AppIdentification)
+
+	// Traffic Analysis
+	data.TopFlows = convertTopFlows(r.TrafficAnalysis, r.TotalBytes)
+	data.DeviceFingerprints = convertDeviceFingerprints(r.DeviceFingerprinting)
+	data.ApplicationStats = convertApplicationStats(r.ApplicationBreakdown)
 
 	// Generate protocol stats and top talkers
 	data.ProtocolStats, data.TopTalkers = generateTrafficStats(r)
+
+	// QoS Analysis
+	if r.QoSAnalysis != nil {
+		data.QoSEnabled = true
+		data.QoSTotalPackets = r.QoSAnalysis.TotalPackets
+		data.QoSClasses = convertQoSClasses(r.QoSAnalysis.ClassDistribution)
+		data.QoSMismatches = convertQoSMismatches(r.QoSAnalysis.MismatchedQoS)
+	}
 
 	// Generate visualization data
 	data.NetworkDataJSON = template.JS(generateNetworkJSON(r))
@@ -693,6 +832,158 @@ func generateTopTalkersJSON(talkers []TopTalkerView) string {
 	return string(jsonBytes)
 }
 
+func convertBGPIndicators(indicators []models.BGPIndicator) []BGPIndicatorView {
+	result := make([]BGPIndicatorView, len(indicators))
+	for i, ind := range indicators {
+		result[i] = BGPIndicatorView{
+			IPAddress:      html.EscapeString(ind.IPAddress),
+			IPPrefix:       html.EscapeString(ind.IPPrefix),
+			ExpectedASN:    ind.ExpectedASN,
+			ExpectedASName: html.EscapeString(ind.ExpectedASName),
+			ObservedASN:    ind.ObservedASN,
+			ObservedASName: html.EscapeString(ind.ObservedASName),
+			Confidence:     html.EscapeString(ind.Confidence),
+			Reason:         html.EscapeString(ind.Reason),
+			IsAnomaly:      ind.IsAnomaly,
+		}
+	}
+	return result
+}
+
+func convertDNSDetails(records []models.DNSRecord) []DNSDetailView {
+	result := make([]DNSDetailView, len(records))
+	for i, r := range records {
+		answerIPs := ""
+		if len(r.AnswerIPs) > 0 {
+			answerIPs = strings.Join(r.AnswerIPs, ", ")
+		}
+		respCode := ""
+		if r.ResponseCode != nil {
+			respCode = fmt.Sprintf("%d", *r.ResponseCode)
+		}
+		result[i] = DNSDetailView{
+			QueryName:     html.EscapeString(r.QueryName),
+			QueryType:     html.EscapeString(r.QueryType),
+			SourceIP:      html.EscapeString(r.SourceIP),
+			DestinationIP: html.EscapeString(r.DestinationIP),
+			AnswerIPs:     html.EscapeString(answerIPs),
+			ResponseCode:  respCode,
+			IsAnomalous:   r.IsAnomalous,
+			Detail:        html.EscapeString(r.Detail),
+		}
+	}
+	return result
+}
+
+func convertHTTP2Flows(flows []models.TCPFlow) []HTTP2FlowView {
+	result := make([]HTTP2FlowView, len(flows))
+	for i, f := range flows {
+		result[i] = HTTP2FlowView{
+			SrcIP:   html.EscapeString(f.SrcIP),
+			SrcPort: f.SrcPort,
+			DstIP:   html.EscapeString(f.DstIP),
+			DstPort: f.DstPort,
+		}
+	}
+	return result
+}
+
+func convertQUICFlows(flows []models.UDPFlow) []QUICFlowView {
+	result := make([]QUICFlowView, len(flows))
+	for i, f := range flows {
+		result[i] = QUICFlowView{
+			SrcIP:      html.EscapeString(f.SrcIP),
+			SrcPort:    f.SrcPort,
+			DstIP:      html.EscapeString(f.DstIP),
+			DstPort:    f.DstPort,
+			ServerName: html.EscapeString(f.ServerName),
+		}
+	}
+	return result
+}
+
+func convertTCPHandshakeStats(hs models.TCPHandshakeAnalysis) TCPHandshakeStatsView {
+	return TCPHandshakeStatsView{
+		TotalSYN:        len(hs.SYNFlows),
+		TotalSYNACK:     len(hs.SYNACKFlows),
+		SuccessfulCount: len(hs.SuccessfulHandshakes),
+		FailedCount:     len(hs.FailedHandshakeAttempts),
+	}
+}
+
+func convertAppIdentifications(apps []models.IdentifiedApp) []AppIdentificationView {
+	result := make([]AppIdentificationView, len(apps))
+	for i, a := range apps {
+		result[i] = AppIdentificationView{
+			Name:         html.EscapeString(a.Name),
+			Category:     html.EscapeString(a.Category),
+			Protocol:     html.EscapeString(a.Protocol),
+			Port:         a.Port,
+			SNI:          html.EscapeString(a.SNI),
+			ByteCount:    formatBytesForTemplate(a.ByteCount),
+			PacketCount:  a.PacketCount,
+			Confidence:   html.EscapeString(a.Confidence),
+			IdentifiedBy: html.EscapeString(a.IdentifiedBy),
+			IsSuspicious: a.IsSuspicious,
+			Reason:       html.EscapeString(a.SuspiciousReason),
+		}
+	}
+	return result
+}
+
+func convertApplicationStats(breakdown map[string]models.AppCategory) []AppStatView {
+	var result []AppStatView
+	for _, app := range breakdown {
+		result = append(result, AppStatView{
+			Name:        html.EscapeString(app.Name),
+			Port:        app.Port,
+			Protocol:    html.EscapeString(app.Protocol),
+			PacketCount: app.PacketCount,
+			ByteCount:   formatBytesForTemplate(app.ByteCount),
+		})
+	}
+	// Sort by packet count descending
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].PacketCount > result[j].PacketCount
+	})
+	return result
+}
+
+func convertQoSClasses(classes map[string]*models.QoSClassMetrics) []QoSClassView {
+	var result []QoSClassView
+	for _, c := range classes {
+		if c != nil {
+			result = append(result, QoSClassView{
+				ClassName:       html.EscapeString(c.ClassName),
+				DSCPValue:       c.DSCPValue,
+				PacketCount:     c.PacketCount,
+				ByteCount:       formatBytesForTemplate(c.ByteCount),
+				Percentage:      c.Percentage,
+				RetransmitCount: c.RetransmitCount,
+				RetransmitRate:  c.RetransmitRate,
+			})
+		}
+	}
+	// Sort by packet count descending
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].PacketCount > result[j].PacketCount
+	})
+	return result
+}
+
+func convertQoSMismatches(mismatches []models.QoSMismatch) []QoSMismatchView {
+	result := make([]QoSMismatchView, len(mismatches))
+	for i, m := range mismatches {
+		result[i] = QoSMismatchView{
+			Flow:          html.EscapeString(m.Flow),
+			ExpectedClass: html.EscapeString(m.ExpectedClass),
+			ActualClass:   html.EscapeString(m.ActualClass),
+			Reason:        html.EscapeString(m.Reason),
+		}
+	}
+	return result
+}
+
 func getTemplateContent() string {
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -744,28 +1035,52 @@ func getTemplateContent() string {
 
                     <div class="stats-grid">
                         <div class="stat-card">
+                            <span class="stat-value">{{.Stats.TotalTraffic}}</span>
+                            <span class="stat-label"><i class="fas fa-database"></i> Total Traffic</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.DevicesDetected}}</span>
+                            <span class="stat-label"><i class="fas fa-laptop"></i> Devices Detected</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.DNSAnomalies 0}}stat-warning{{end}}">
                             <span class="stat-value">{{.Stats.DNSAnomalies}}</span>
-                            <span class="stat-label">DNS Anomalies</span>
+                            <span class="stat-label"><i class="fas fa-globe"></i> DNS Anomalies</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card {{if gt .Stats.TCPRetransmissions 10}}stat-warning{{end}}">
                             <span class="stat-value">{{.Stats.TCPRetransmissions}}</span>
-                            <span class="stat-label">TCP Retransmissions</span>
+                            <span class="stat-label"><i class="fas fa-redo"></i> TCP Retransmissions</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card {{if gt .Stats.ARPConflicts 0}}stat-danger{{end}}">
                             <span class="stat-value">{{.Stats.ARPConflicts}}</span>
-                            <span class="stat-label">ARP Conflicts</span>
+                            <span class="stat-label"><i class="fas fa-network-wired"></i> ARP Conflicts</span>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card {{if gt .Stats.SuspiciousTraffic 0}}stat-danger{{end}}">
                             <span class="stat-value">{{.Stats.SuspiciousTraffic}}</span>
-                            <span class="stat-label">Suspicious Traffic</span>
+                            <span class="stat-label"><i class="fas fa-exclamation-triangle"></i> Suspicious Traffic</span>
                         </div>
                         <div class="stat-card">
                             <span class="stat-value">{{.Stats.TLSCerts}}</span>
-                            <span class="stat-label">TLS Certificates</span>
+                            <span class="stat-label"><i class="fas fa-lock"></i> TLS Certificates</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.HTTPErrors 0}}stat-warning{{end}}">
+                            <span class="stat-value">{{.Stats.HTTPErrors}}</span>
+                            <span class="stat-label"><i class="fas fa-globe"></i> HTTP Errors</span>
                         </div>
                         <div class="stat-card">
-                            <span class="stat-value">{{.Stats.TotalTraffic}}</span>
-                            <span class="stat-label">Total Traffic</span>
+                            <span class="stat-value">{{.Stats.HTTP2Flows}}</span>
+                            <span class="stat-label"><i class="fas fa-bolt"></i> HTTP/2 Flows</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.QUICFlows}}</span>
+                            <span class="stat-label"><i class="fas fa-rocket"></i> QUIC Flows</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.HighRTTFlows 0}}stat-warning{{end}}">
+                            <span class="stat-value">{{.Stats.HighRTTFlows}}</span>
+                            <span class="stat-label"><i class="fas fa-clock"></i> High RTT Flows</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.DNSQueries}}</span>
+                            <span class="stat-label"><i class="fas fa-search"></i> DNS Queries</span>
                         </div>
                     </div>
 
@@ -786,6 +1101,7 @@ func getTemplateContent() string {
                 <div class="tabs">
                     <button class="tab active" data-tab="tab-security"><i class="fas fa-shield-alt"></i> Security</button>
                     <button class="tab" data-tab="tab-performance"><i class="fas fa-tachometer-alt"></i> Performance</button>
+                    <button class="tab" data-tab="tab-protocols"><i class="fas fa-layer-group"></i> Protocols</button>
                     <button class="tab" data-tab="tab-traffic"><i class="fas fa-exchange-alt"></i> Traffic</button>
                     <button class="tab" data-tab="tab-visualizations"><i class="fas fa-project-diagram"></i> Visualizations</button>
                 </div>
@@ -993,6 +1309,181 @@ func getTemplateContent() string {
                                     </tr>
                                     <tr class="action-row">
                                         <td colspan="4"><div class="action-content"><h4>Recommended Action</h4><ul><li>Check if destination service is running</li><li>Verify firewall rules allow connection</li><li>Check for network connectivity issues</li></ul></div></td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+                </div>
+
+                <div id="tab-protocols" class="tab-content">
+                    <div class="protocol-summary">
+                        <h3><i class="fas fa-handshake"></i> TCP Handshake Analysis</h3>
+                        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="stat-card">
+                                <span class="stat-value">{{.TCPHandshakeStats.TotalSYN}}</span>
+                                <span class="stat-label">SYN Packets</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-value">{{.TCPHandshakeStats.TotalSYNACK}}</span>
+                                <span class="stat-label">SYN-ACK Packets</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-value">{{.TCPHandshakeStats.SuccessfulCount}}</span>
+                                <span class="stat-label">Successful Handshakes</span>
+                            </div>
+                            <div class="stat-card {{if gt .TCPHandshakeStats.FailedCount 0}}stat-warning{{end}}">
+                                <span class="stat-value">{{.TCPHandshakeStats.FailedCount}}</span>
+                                <span class="stat-label">Failed Handshakes</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{if .DNSDetails}}
+                    <details open>
+                        <summary><i class="fas fa-globe"></i> DNS Query Details ({{len .DNSDetails}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Query Name</th><th>Type</th><th>Source</th><th>DNS Server</th><th>Answer IPs</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    {{range .DNSDetails}}
+                                    <tr class="{{if .IsAnomalous}}severity-row-high{{end}}">
+                                        <td><code>{{.QueryName}}</code></td>
+                                        <td>{{.QueryType}}</td>
+                                        <td><code>{{.SourceIP}}</code></td>
+                                        <td><code>{{.DestinationIP}}</code></td>
+                                        <td><code>{{.AnswerIPs}}</code></td>
+                                        <td>{{if .IsAnomalous}}<span class="badge badge-danger">Anomaly</span>{{else}}<span class="badge badge-success">OK</span>{{end}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{else}}
+                    <div class="alert alert-info"><i class="fas fa-info-circle"></i> No DNS queries recorded</div>
+                    {{end}}
+
+                    {{if .HTTP2Flows}}
+                    <details>
+                        <summary><i class="fas fa-bolt"></i> HTTP/2 Flows ({{len .HTTP2Flows}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Port</th></tr></thead>
+                                <tbody>
+                                    {{range .HTTP2Flows}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.DstPort}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .QUICFlows}}
+                    <details>
+                        <summary><i class="fas fa-rocket"></i> QUIC Flows ({{len .QUICFlows}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Server Name (SNI)</th></tr></thead>
+                                <tbody>
+                                    {{range .QUICFlows}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.ServerName}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .ApplicationStats}}
+                    <details>
+                        <summary><i class="fas fa-cubes"></i> Application Breakdown ({{len .ApplicationStats}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Application</th><th>Protocol</th><th>Port</th><th>Packets</th><th>Bytes</th></tr></thead>
+                                <tbody>
+                                    {{range .ApplicationStats}}
+                                    <tr>
+                                        <td><strong>{{.Name}}</strong></td>
+                                        <td>{{.Protocol}}</td>
+                                        <td>{{.Port}}</td>
+                                        <td>{{.PacketCount}}</td>
+                                        <td>{{.ByteCount}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .QoSEnabled}}
+                    <details>
+                        <summary><i class="fas fa-sliders-h"></i> QoS/DSCP Analysis ({{.QoSTotalPackets}} packets)</summary>
+                        <div>
+                            {{if .QoSClasses}}
+                            <table class="data-table">
+                                <thead><tr><th>Traffic Class</th><th>DSCP</th><th>Packets</th><th>Bytes</th><th>%</th><th>Retransmits</th></tr></thead>
+                                <tbody>
+                                    {{range .QoSClasses}}
+                                    <tr>
+                                        <td><strong>{{.ClassName}}</strong></td>
+                                        <td>{{.DSCPValue}}</td>
+                                        <td>{{.PacketCount}}</td>
+                                        <td>{{.ByteCount}}</td>
+                                        <td>{{printf "%.1f" .Percentage}}%</td>
+                                        <td>{{.RetransmitCount}} ({{printf "%.2f" .RetransmitRate}}%)</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                            {{end}}
+                            {{if .QoSMismatches}}
+                            <h4 style="margin-top: 20px;"><i class="fas fa-exclamation-triangle"></i> QoS Mismatches</h4>
+                            <table class="data-table">
+                                <thead><tr><th>Flow</th><th>Expected</th><th>Actual</th><th>Reason</th></tr></thead>
+                                <tbody>
+                                    {{range .QoSMismatches}}
+                                    <tr class="severity-row-medium">
+                                        <td><code>{{.Flow}}</code></td>
+                                        <td>{{.ExpectedClass}}</td>
+                                        <td>{{.ActualClass}}</td>
+                                        <td>{{.Reason}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                            {{end}}
+                        </div>
+                    </details>
+                    {{end}}
+
+                    {{if .BGPIndicators}}
+                    <details>
+                        <summary><i class="fas fa-route"></i> BGP Hijack Indicators ({{len .BGPIndicators}})</summary>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>IP Address</th><th>Prefix</th><th>Expected AS</th><th>Observed AS</th><th>Confidence</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    {{range .BGPIndicators}}
+                                    <tr class="{{if .IsAnomaly}}severity-row-high{{end}}">
+                                        <td><code>{{.IPAddress}}</code></td>
+                                        <td>{{.IPPrefix}}</td>
+                                        <td>AS{{.ExpectedASN}} ({{.ExpectedASName}})</td>
+                                        <td>{{if .ObservedASN}}AS{{.ObservedASN}} ({{.ObservedASName}}){{else}}-{{end}}</td>
+                                        <td>{{.Confidence}}</td>
+                                        <td>{{if .IsAnomaly}}<span class="badge badge-danger">Anomaly</span>{{else}}<span class="badge badge-success">OK</span>{{end}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
