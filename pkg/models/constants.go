@@ -77,3 +77,72 @@ var SuspiciousPorts = map[uint16]string{
 	7777:  "Common backdoor port",
 	8888:  "Common proxy/malware port",
 }
+
+// DSCP class mappings for QoS analysis
+var DSCPClasses = map[uint8]string{
+	0:  "BE",   // Best Effort (Default)
+	8:  "CS1",  // Class Selector 1 (Scavenger)
+	10: "AF11", // Assured Forwarding 11
+	12: "AF12", // Assured Forwarding 12
+	14: "AF13", // Assured Forwarding 13
+	16: "CS2",  // Class Selector 2
+	18: "AF21", // Assured Forwarding 21
+	20: "AF22", // Assured Forwarding 22
+	22: "AF23", // Assured Forwarding 23
+	24: "CS3",  // Class Selector 3
+	26: "AF31", // Assured Forwarding 31
+	28: "AF32", // Assured Forwarding 32
+	30: "AF33", // Assured Forwarding 33
+	32: "CS4",  // Class Selector 4
+	34: "AF41", // Assured Forwarding 41
+	36: "AF42", // Assured Forwarding 42
+	38: "AF43", // Assured Forwarding 43
+	40: "CS5",  // Class Selector 5
+	46: "EF",   // Expedited Forwarding (VoIP)
+	48: "CS6",  // Class Selector 6 (Network Control)
+	56: "CS7",  // Class Selector 7 (Network Control)
+}
+
+// DSCP class descriptions for reporting
+var DSCPDescriptions = map[string]string{
+	"BE":   "Best Effort - Default traffic class",
+	"CS1":  "Scavenger - Low priority background traffic",
+	"AF11": "Assured Forwarding 11 - Low drop probability",
+	"AF12": "Assured Forwarding 12 - Medium drop probability",
+	"AF13": "Assured Forwarding 13 - High drop probability",
+	"CS2":  "Class Selector 2 - OAM traffic",
+	"AF21": "Assured Forwarding 21 - Low drop probability",
+	"AF22": "Assured Forwarding 22 - Medium drop probability",
+	"AF23": "Assured Forwarding 23 - High drop probability",
+	"CS3":  "Class Selector 3 - Signaling",
+	"AF31": "Assured Forwarding 31 - Low drop probability",
+	"AF32": "Assured Forwarding 32 - Medium drop probability",
+	"AF33": "Assured Forwarding 33 - High drop probability",
+	"CS4":  "Class Selector 4 - Real-time interactive",
+	"AF41": "Assured Forwarding 41 - Low drop probability",
+	"AF42": "Assured Forwarding 42 - Medium drop probability",
+	"AF43": "Assured Forwarding 43 - High drop probability",
+	"CS5":  "Class Selector 5 - Broadcast video",
+	"EF":   "Expedited Forwarding - VoIP/Real-time",
+	"CS6":  "Class Selector 6 - Network control",
+	"CS7":  "Class Selector 7 - Network control",
+}
+
+// AppSignature holds application signature information
+type AppSignature struct {
+	Pattern     string
+	Category    string
+	Description string
+}
+
+// AppSignatures for heuristic identification
+var AppSignatures = map[string]AppSignature{
+	"SSH":        {Pattern: "SSH-", Category: "Remote Access", Description: "Secure Shell"},
+	"HTTP":       {Pattern: "HTTP/", Category: "Web", Description: "Hypertext Transfer Protocol"},
+	"TLS":        {Pattern: "\x16\x03", Category: "Encrypted", Description: "TLS Handshake"},
+	"DNS":        {Pattern: "", Category: "Network", Description: "Domain Name System"},
+	"SMB":        {Pattern: "\xffSMB", Category: "File Sharing", Description: "Server Message Block"},
+	"RDP":        {Pattern: "\x03\x00", Category: "Remote Access", Description: "Remote Desktop Protocol"},
+	"MySQL":      {Pattern: "", Category: "Database", Description: "MySQL Database"},
+	"PostgreSQL": {Pattern: "", Category: "Database", Description: "PostgreSQL Database"},
+}
