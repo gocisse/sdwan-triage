@@ -3,6 +3,8 @@ package analyzer
 import (
 	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -24,25 +26,18 @@ type Processor struct {
 	quicAnalyzer    *detector.QUICAnalyzer
 	qosAnalyzer     *detector.QoSAnalyzer
 	qosEnabled      bool
+	verbose         bool
+	skippedPackets  int
+	errorCount      int
 }
 
 // NewProcessor creates a new PCAP processor with all analyzers
 func NewProcessor() *Processor {
-	return &Processor{
-		dnsAnalyzer:     detector.NewDNSAnalyzer(),
-		tcpAnalyzer:     detector.NewTCPAnalyzer(),
-		arpAnalyzer:     detector.NewARPAnalyzer(),
-		httpAnalyzer:    detector.NewHTTPAnalyzer(),
-		tlsAnalyzer:     detector.NewTLSAnalyzer(),
-		trafficAnalyzer: detector.NewTrafficAnalyzer(),
-		quicAnalyzer:    detector.NewQUICAnalyzer(),
-		qosAnalyzer:     detector.NewQoSAnalyzer(false),
-		qosEnabled:      false,
-	}
+	return NewProcessorWithOptions(false, false)
 }
 
 // NewProcessorWithOptions creates a processor with configurable options
-func NewProcessorWithOptions(qosEnabled bool) *Processor {
+func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 	return &Processor{
 		dnsAnalyzer:     detector.NewDNSAnalyzer(),
 		tcpAnalyzer:     detector.NewTCPAnalyzer(),
@@ -53,7 +48,22 @@ func NewProcessorWithOptions(qosEnabled bool) *Processor {
 		quicAnalyzer:    detector.NewQUICAnalyzer(),
 		qosAnalyzer:     detector.NewQoSAnalyzer(qosEnabled),
 		qosEnabled:      qosEnabled,
+		verbose:         verbose,
+		skippedPackets:  0,
+		errorCount:      0,
 	}
+}
+
+// logDebug logs a debug message if verbose mode is enabled
+func (p *Processor) logDebug(format string, args ...interface{}) {
+	if p.verbose {
+		fmt.Fprintf(os.Stderr, "[DEBUG] "+format+"\n", args...)
+	}
+}
+
+// logWarning logs a warning message
+func (p *Processor) logWarning(format string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, "[WARNING] "+format+"\n", args...)
 }
 
 // Process reads and analyzes all packets from a PCAP file
@@ -67,21 +77,38 @@ func (p *Processor) Process(reader *pcapgo.Reader, state *models.AnalysisState, 
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading packet: %w", err)
-		}
-
-		packet := gopacket.NewPacket(data, reader.LinkType(), gopacket.Default)
-		packet.Metadata().Timestamp = ci.Timestamp
-		packet.Metadata().CaptureLength = ci.CaptureLength
-		packet.Metadata().Length = ci.Length
-
-		// Apply filter if set
-		if !filter.IsEmpty() && !p.matchesFilter(packet, filter) {
+			// Don't fail on individual packet read errors, log and continue
+			p.errorCount++
+			if p.errorCount <= 5 {
+				p.logWarning("Error reading packet %d: %v", packetCount+1, err)
+			} else if p.errorCount == 6 {
+				p.logWarning("Suppressing further packet read errors...")
+			}
 			continue
 		}
 
-		// Run all analyzers
-		p.analyzePacket(packet, state, report)
+		// Safely create packet with error handling
+		packet := gopacket.NewPacket(data, reader.LinkType(), gopacket.Default)
+		if packet == nil {
+			p.skippedPackets++
+			p.logDebug("Skipping nil packet at position %d", packetCount+1)
+			continue
+		}
+
+		// Safely set metadata
+		if packet.Metadata() != nil {
+			packet.Metadata().Timestamp = ci.Timestamp
+			packet.Metadata().CaptureLength = ci.CaptureLength
+			packet.Metadata().Length = ci.Length
+		}
+
+		// Apply filter if set
+		if filter != nil && !filter.IsEmpty() && !p.matchesFilter(packet, filter) {
+			continue
+		}
+
+		// Run all analyzers with panic recovery
+		p.safeAnalyzePacket(packet, state, report, packetCount)
 		packetCount++
 
 		// Progress indicator every 10000 packets
@@ -91,12 +118,33 @@ func (p *Processor) Process(reader *pcapgo.Reader, state *models.AnalysisState, 
 		}
 	}
 
+	// Print summary
 	fmt.Printf("\rProcessed %d packets in %v\n", packetCount, time.Since(startTime).Round(time.Millisecond))
+
+	// Report any issues encountered
+	if p.skippedPackets > 0 || p.errorCount > 0 {
+		p.logWarning("Analysis completed with issues: %d packets skipped, %d read errors", p.skippedPackets, p.errorCount)
+	}
 
 	// Finalize report
 	p.finalizeReport(state, report)
 
 	return nil
+}
+
+// safeAnalyzePacket wraps analyzePacket with panic recovery
+func (p *Processor) safeAnalyzePacket(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport, packetNum int) {
+	defer func() {
+		if r := recover(); r != nil {
+			p.skippedPackets++
+			p.logWarning("Panic recovered during packet %d analysis: %v", packetNum, r)
+			if p.verbose {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Stack trace:\n%s\n", debug.Stack())
+			}
+		}
+	}()
+
+	p.analyzePacket(packet, state, report)
 }
 
 // analyzePacket runs all protocol analyzers on a packet
