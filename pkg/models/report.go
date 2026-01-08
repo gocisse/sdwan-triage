@@ -30,7 +30,11 @@ type TriageReport struct {
 	Security SecurityAnalysis `json:"security"`
 
 	// Network Analysis
-	ICMPAnalysis []ICMPFinding `json:"icmp_analysis,omitempty"`
+	ICMPAnalysis    []ICMPFinding   `json:"icmp_analysis,omitempty"`
+	VoIPAnalysis    *VoIPAnalysis   `json:"voip_analysis,omitempty"`
+	TunnelAnalysis  []TunnelFinding `json:"tunnel_analysis,omitempty"`
+	SDWANVendors    []SDWANVendor   `json:"sdwan_vendors,omitempty"`
+	LocationSummary map[string]int  `json:"location_summary,omitempty"`
 }
 
 // TimelineEvent represents a network event in the timeline
@@ -332,4 +336,65 @@ type ICMPFinding struct {
 	Count       int     `json:"count"`
 	IsAnomaly   bool    `json:"is_anomaly"`
 	Description string  `json:"description,omitempty"`
+}
+
+// VoIPAnalysis contains VoIP/SIP/RTP analysis results
+type VoIPAnalysis struct {
+	SIPCalls         []SIPCallInfo   `json:"sip_calls,omitempty"`
+	RTPStreams       []RTPStreamInfo `json:"rtp_streams,omitempty"`
+	TotalCalls       int             `json:"total_calls"`
+	EstablishedCalls int             `json:"established_calls"`
+	FailedCalls      int             `json:"failed_calls"`
+	TotalRTPStreams  int             `json:"total_rtp_streams"`
+	AvgJitter        float64         `json:"avg_jitter_ms"`
+	PacketLossRate   float64         `json:"packet_loss_rate"`
+}
+
+// SIPCallInfo represents a SIP call
+type SIPCallInfo struct {
+	CallID    string  `json:"call_id"`
+	FromURI   string  `json:"from_uri"`
+	ToURI     string  `json:"to_uri"`
+	State     string  `json:"state"`
+	StartTime float64 `json:"start_time"`
+	EndTime   float64 `json:"end_time,omitempty"`
+	SrcIP     string  `json:"src_ip"`
+	DstIP     string  `json:"dst_ip"`
+}
+
+// RTPStreamInfo represents an RTP media stream
+type RTPStreamInfo struct {
+	SSRC        uint32  `json:"ssrc"`
+	SrcIP       string  `json:"src_ip"`
+	DstIP       string  `json:"dst_ip"`
+	PayloadType string  `json:"payload_type"`
+	PacketCount uint64  `json:"packet_count"`
+	ByteCount   uint64  `json:"byte_count"`
+	LostPackets uint64  `json:"lost_packets"`
+	Jitter      float64 `json:"jitter_ms"`
+}
+
+// TunnelFinding represents a detected tunnel/encapsulation
+type TunnelFinding struct {
+	Type        string  `json:"type"`
+	SrcIP       string  `json:"src_ip"`
+	DstIP       string  `json:"dst_ip"`
+	SrcPort     uint16  `json:"src_port,omitempty"`
+	DstPort     uint16  `json:"dst_port,omitempty"`
+	Identifier  uint32  `json:"identifier,omitempty"` // VNI, GRE Key, MPLS Label, etc.
+	InnerProto  string  `json:"inner_protocol,omitempty"`
+	PacketCount uint64  `json:"packet_count"`
+	ByteCount   uint64  `json:"byte_count"`
+	FirstSeen   float64 `json:"first_seen"`
+	LastSeen    float64 `json:"last_seen"`
+}
+
+// SDWANVendor represents a detected SD-WAN vendor
+type SDWANVendor struct {
+	Name        string  `json:"name"`
+	Confidence  string  `json:"confidence"`
+	DetectedBy  string  `json:"detected_by"`
+	PacketCount int     `json:"packet_count"`
+	FirstSeen   float64 `json:"first_seen"`
+	LastSeen    float64 `json:"last_seen"`
 }

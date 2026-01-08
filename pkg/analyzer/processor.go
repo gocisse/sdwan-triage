@@ -30,6 +30,11 @@ type Processor struct {
 	iocAnalyzer         *detector.IOCAnalyzer
 	tlsSecurityAnalyzer *detector.TLSSecurityAnalyzer
 	icmpAnalyzer        *detector.ICMPAnalyzer
+	geoipAnalyzer       *detector.GeoIPAnalyzer
+	sdwanAnalyzer       *detector.SDWANVendorAnalyzer
+	sipAnalyzer         *detector.SIPAnalyzer
+	rtpAnalyzer         *detector.RTPAnalyzer
+	tunnelAnalyzer      *detector.TunnelAnalyzer
 	qosEnabled          bool
 	verbose             bool
 	skippedPackets      int
@@ -57,6 +62,11 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		iocAnalyzer:         detector.NewIOCAnalyzer(),
 		tlsSecurityAnalyzer: detector.NewTLSSecurityAnalyzer(),
 		icmpAnalyzer:        detector.NewICMPAnalyzer(),
+		geoipAnalyzer:       detector.NewGeoIPAnalyzer(),
+		sdwanAnalyzer:       detector.NewSDWANVendorAnalyzer(),
+		sipAnalyzer:         detector.NewSIPAnalyzer(),
+		rtpAnalyzer:         detector.NewRTPAnalyzer(),
+		tunnelAnalyzer:      detector.NewTunnelAnalyzer(),
 		qosEnabled:          qosEnabled,
 		verbose:             verbose,
 		skippedPackets:      0,
@@ -192,6 +202,13 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	p.iocAnalyzer.AnalyzeDNS(packet, state, report)
 	p.tlsSecurityAnalyzer.Analyze(packet, state, report)
 	p.icmpAnalyzer.Analyze(packet, state, report)
+
+	// Advanced network analysis
+	p.geoipAnalyzer.Analyze(packet, state, report)
+	p.sdwanAnalyzer.Analyze(packet, state, report)
+	p.sipAnalyzer.Analyze(packet, state, report)
+	p.rtpAnalyzer.Analyze(packet, state, report)
+	p.tunnelAnalyzer.Analyze(packet, state, report)
 }
 
 // matchesFilter checks if a packet matches the configured filter
@@ -385,5 +402,118 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 			flows[i].Percentage = float64(flows[i].TotalBytes) / float64(totalBytes) * 100
 		}
 		report.TrafficAnalysis = append(report.TrafficAnalysis, flows[i])
+	}
+
+	// Finalize VoIP analysis
+	p.finalizeVoIPAnalysis(report)
+
+	// Finalize tunnel analysis
+	p.finalizeTunnelAnalysis(report)
+
+	// Finalize SD-WAN vendor detection
+	p.finalizeSDWANAnalysis(report)
+
+	// Finalize GeoIP analysis
+	report.LocationSummary = p.geoipAnalyzer.GetLocationSummary()
+}
+
+// finalizeVoIPAnalysis populates VoIP analysis results
+func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
+	sipCalls := p.sipAnalyzer.GetCalls()
+	rtpStreams := p.rtpAnalyzer.GetStreams()
+
+	if len(sipCalls) == 0 && len(rtpStreams) == 0 {
+		return
+	}
+
+	voip := &models.VoIPAnalysis{}
+
+	// Convert SIP calls
+	for _, call := range sipCalls {
+		voip.TotalCalls++
+		switch call.State {
+		case "ESTABLISHED":
+			voip.EstablishedCalls++
+		case "FAILED_CLIENT", "FAILED_SERVER", "FAILED_GLOBAL":
+			voip.FailedCalls++
+		}
+
+		voip.SIPCalls = append(voip.SIPCalls, models.SIPCallInfo{
+			CallID:    call.CallID,
+			FromURI:   call.FromURI,
+			ToURI:     call.ToURI,
+			State:     call.State,
+			StartTime: float64(call.StartTime.UnixNano()) / 1e9,
+			EndTime:   float64(call.EndTime.UnixNano()) / 1e9,
+			SrcIP:     call.SrcIP,
+			DstIP:     call.DstIP,
+		})
+	}
+
+	// Convert RTP streams
+	var totalJitter float64
+	var totalLost, totalPackets uint64
+	for _, stream := range rtpStreams {
+		voip.TotalRTPStreams++
+		totalJitter += stream.Jitter
+		totalLost += stream.LostPackets
+		totalPackets += stream.PacketCount
+
+		voip.RTPStreams = append(voip.RTPStreams, models.RTPStreamInfo{
+			SSRC:        stream.SSRC,
+			SrcIP:       stream.SrcIP,
+			DstIP:       stream.DstIP,
+			PayloadType: stream.PayloadName,
+			PacketCount: stream.PacketCount,
+			ByteCount:   stream.ByteCount,
+			LostPackets: stream.LostPackets,
+			Jitter:      stream.Jitter,
+		})
+	}
+
+	if voip.TotalRTPStreams > 0 {
+		voip.AvgJitter = totalJitter / float64(voip.TotalRTPStreams)
+	}
+	if totalPackets > 0 {
+		voip.PacketLossRate = float64(totalLost) / float64(totalPackets) * 100
+	}
+
+	report.VoIPAnalysis = voip
+}
+
+// finalizeTunnelAnalysis populates tunnel analysis results
+func (p *Processor) finalizeTunnelAnalysis(report *models.TriageReport) {
+	tunnels := p.tunnelAnalyzer.GetTunnels()
+
+	for _, tunnel := range tunnels {
+		report.TunnelAnalysis = append(report.TunnelAnalysis, models.TunnelFinding{
+			Type:        tunnel.Type,
+			SrcIP:       tunnel.SrcIP,
+			DstIP:       tunnel.DstIP,
+			SrcPort:     tunnel.SrcPort,
+			DstPort:     tunnel.DstPort,
+			Identifier:  tunnel.VNI,
+			InnerProto:  tunnel.InnerProto,
+			PacketCount: tunnel.PacketCount,
+			ByteCount:   tunnel.ByteCount,
+			FirstSeen:   float64(tunnel.FirstSeen.UnixNano()) / 1e9,
+			LastSeen:    float64(tunnel.LastSeen.UnixNano()) / 1e9,
+		})
+	}
+}
+
+// finalizeSDWANAnalysis populates SD-WAN vendor detection results
+func (p *Processor) finalizeSDWANAnalysis(report *models.TriageReport) {
+	vendors := p.sdwanAnalyzer.GetDetectedVendors()
+
+	for _, vendor := range vendors {
+		report.SDWANVendors = append(report.SDWANVendors, models.SDWANVendor{
+			Name:        vendor.Vendor,
+			Confidence:  vendor.Confidence,
+			DetectedBy:  vendor.DetectedBy,
+			PacketCount: vendor.PacketCount,
+			FirstSeen:   float64(vendor.FirstSeen.UnixNano()) / 1e9,
+			LastSeen:    float64(vendor.LastSeen.UnixNano()) / 1e9,
+		})
 	}
 }
