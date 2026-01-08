@@ -78,7 +78,10 @@ type Filter struct {
 	Protocol string
 }
 
-// IsEmpty returns true if no filters are set
+// IsEmpty returns true if no filters are set or filter is nil
 func (f *Filter) IsEmpty() bool {
+	if f == nil {
+		return true
+	}
 	return f.SrcIP == "" && f.DstIP == "" && f.Service == "" && f.Protocol == ""
 }
