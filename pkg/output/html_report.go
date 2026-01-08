@@ -24,6 +24,28 @@ var jsContent string
 //go:embed assets/templates/report.html
 var templateContent embed.FS
 
+// formatUnixTime converts a Unix timestamp (float64 seconds since epoch) to human-readable format
+func formatUnixTime(unixTimeFloat float64) string {
+	if unixTimeFloat == 0 {
+		return "-"
+	}
+	sec := int64(unixTimeFloat)
+	nsec := int64((unixTimeFloat - float64(sec)) * 1e9)
+	t := time.Unix(sec, nsec).UTC()
+	return t.Format("Monday, January 2, 2006 15:04:05 UTC")
+}
+
+// formatUnixTimeShort converts a Unix timestamp to a shorter format for tables
+func formatUnixTimeShort(unixTimeFloat float64) string {
+	if unixTimeFloat == 0 {
+		return "-"
+	}
+	sec := int64(unixTimeFloat)
+	nsec := int64((unixTimeFloat - float64(sec)) * 1e9)
+	t := time.Unix(sec, nsec).UTC()
+	return t.Format("2006-01-02 15:04:05")
+}
+
 // ReportData holds all data needed for the HTML template
 type ReportData struct {
 	// Header info
@@ -251,7 +273,7 @@ type TCPHandshakeFlowView struct {
 	SrcPort   uint16
 	DstIP     string
 	DstPort   uint16
-	Timestamp string
+	Timestamp float64
 }
 
 type AppIdentificationView struct {
@@ -298,8 +320,14 @@ func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string
 	// Prepare template data
 	data := prepareReportData(r, pcapFile)
 
-	// Parse template
-	tmpl, err := template.New("report").Parse(getTemplateContent())
+	// Create template with custom functions
+	funcMap := template.FuncMap{
+		"formatUnixTime":      formatUnixTime,
+		"formatUnixTimeShort": formatUnixTimeShort,
+	}
+
+	// Parse template with functions
+	tmpl, err := template.New("report").Funcs(funcMap).Parse(getTemplateContent())
 	if err != nil {
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -933,7 +961,7 @@ func convertTCPHandshakeFlows(flows []models.TCPHandshakeFlow) []TCPHandshakeFlo
 			SrcPort:   f.SrcPort,
 			DstIP:     html.EscapeString(f.DstIP),
 			DstPort:   f.DstPort,
-			Timestamp: fmt.Sprintf("%.3f", f.Timestamp),
+			Timestamp: f.Timestamp,
 		}
 	}
 	return result
@@ -1380,7 +1408,7 @@ func getTemplateContent() string {
                                     <tr>
                                         <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                        <td>{{.Timestamp}}</td>
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -1400,7 +1428,7 @@ func getTemplateContent() string {
                                     <tr>
                                         <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                        <td>{{.Timestamp}}</td>
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -1420,7 +1448,7 @@ func getTemplateContent() string {
                                     <tr>
                                         <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                        <td>{{.Timestamp}}</td>
+                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
