@@ -2,6 +2,7 @@ package output
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -301,6 +302,7 @@ func ExportToHTML(r *models.TriageReport, filename string) error {
 	html := GetD3HTMLTemplate()
 	html += generateReportContent(r)
 	html += GetD3ScriptsTemplate()
+	html += generateD3DataInit(r)
 	html += `</body></html>`
 
 	_, err = file.WriteString(html)
@@ -384,4 +386,162 @@ func formatBytes(bytes uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// generateD3DataInit creates JavaScript to initialize D3.js visualizations with actual data
+func generateD3DataInit(r *models.TriageReport) string {
+	// Build network nodes and links from traffic analysis
+	nodes := []map[string]interface{}{}
+	links := []map[string]interface{}{}
+	nodeMap := make(map[string]bool)
+
+	// Add nodes from traffic flows
+	for _, flow := range r.TrafficAnalysis {
+		if !nodeMap[flow.SrcIP] {
+			nodeMap[flow.SrcIP] = true
+			nodes = append(nodes, map[string]interface{}{
+				"id":    flow.SrcIP,
+				"label": flow.SrcIP,
+				"group": categorizeIPForD3(flow.SrcIP),
+			})
+		}
+		if !nodeMap[flow.DstIP] {
+			nodeMap[flow.DstIP] = true
+			nodes = append(nodes, map[string]interface{}{
+				"id":    flow.DstIP,
+				"label": flow.DstIP,
+				"group": categorizeIPForD3(flow.DstIP),
+			})
+		}
+		links = append(links, map[string]interface{}{
+			"source":   flow.SrcIP,
+			"target":   flow.DstIP,
+			"value":    5,
+			"hasIssue": false,
+		})
+	}
+
+	// Add nodes from TCP retransmissions (mark as issues)
+	for _, flow := range r.TCPRetransmissions {
+		if !nodeMap[flow.SrcIP] {
+			nodeMap[flow.SrcIP] = true
+			nodes = append(nodes, map[string]interface{}{
+				"id":    flow.SrcIP,
+				"label": flow.SrcIP,
+				"group": categorizeIPForD3(flow.SrcIP),
+			})
+		}
+		if !nodeMap[flow.DstIP] {
+			nodeMap[flow.DstIP] = true
+			nodes = append(nodes, map[string]interface{}{
+				"id":    flow.DstIP,
+				"label": flow.DstIP,
+				"group": categorizeIPForD3(flow.DstIP),
+			})
+		}
+	}
+
+	nodesJSON, _ := json.Marshal(nodes)
+	linksJSON, _ := json.Marshal(links)
+
+	// Build timeline events
+	timelineEvents := []map[string]interface{}{}
+	for _, event := range r.Timeline {
+		timelineEvents = append(timelineEvents, map[string]interface{}{
+			"timestamp": event.Timestamp,
+			"type":      event.EventType,
+			"source":    event.SourceIP,
+			"target":    event.DestinationIP,
+			"detail":    event.Detail,
+		})
+	}
+	timelineJSON, _ := json.Marshal(timelineEvents)
+
+	// Build Sankey data
+	sankeyNodes := []map[string]string{
+		{"name": "Internal Network"},
+		{"name": "Gateway"},
+		{"name": "Internet"},
+	}
+	sankeyLinks := []map[string]interface{}{}
+
+	totalBytes := uint64(0)
+	for _, flow := range r.TrafficAnalysis {
+		totalBytes += flow.TotalBytes
+	}
+
+	if totalBytes > 0 {
+		sankeyLinks = append(sankeyLinks, map[string]interface{}{
+			"source": 0,
+			"target": 1,
+			"value":  float64(totalBytes),
+		})
+		sankeyLinks = append(sankeyLinks, map[string]interface{}{
+			"source": 1,
+			"target": 2,
+			"value":  float64(totalBytes),
+		})
+	}
+
+	sankeyData := map[string]interface{}{
+		"nodes": sankeyNodes,
+		"links": sankeyLinks,
+	}
+	sankeyJSON, _ := json.Marshal(sankeyData)
+
+	return fmt.Sprintf(`
+        <script>
+            // Initialize D3.js visualizations with data
+            document.addEventListener('DOMContentLoaded', function() {
+                try {
+                    // Network Diagram
+                    const networkData = {
+                        nodes: %s,
+                        links: %s
+                    };
+                    if (networkData.nodes.length > 0 && typeof createNetworkDiagram === 'function') {
+                        createNetworkDiagram(networkData.nodes, networkData.links);
+                    }
+                    
+                    // Timeline
+                    const timelineData = %s;
+                    if (timelineData.length > 0 && typeof createTimeline === 'function') {
+                        createTimeline(timelineData);
+                    }
+                    
+                    // Sankey Diagram
+                    const sankeyData = %s;
+                    if (sankeyData.nodes.length > 0 && typeof createSankeyDiagram === 'function') {
+                        createSankeyDiagram(sankeyData);
+                    }
+                } catch (error) {
+                    console.error("Error initializing D3 visualizations:", error);
+                }
+            });
+        </script>
+    `, string(nodesJSON), string(linksJSON), string(timelineJSON), string(sankeyJSON))
+}
+
+// categorizeIPForD3 categorizes an IP for D3 visualization
+func categorizeIPForD3(ip string) string {
+	if models.IsPrivateOrReservedIP(ip) {
+		// Check if it's a gateway (.1 or .254)
+		if len(ip) > 0 {
+			lastDot := -1
+			for i := len(ip) - 1; i >= 0; i-- {
+				if ip[i] == '.' {
+					lastDot = i
+					break
+				}
+			}
+			if lastDot > 0 {
+				lastOctet := ip[lastDot+1:]
+				if lastOctet == "1" || lastOctet == "254" {
+					return "router"
+				}
+			}
+		}
+		return "internal"
+	}
+	return "external"
 }
