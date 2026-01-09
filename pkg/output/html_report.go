@@ -1493,6 +1493,42 @@ func getTemplateContent() string {
                             <span class="stat-value">{{.Stats.DNSQueries}}</span>
                             <span class="stat-label"><i class="fas fa-search"></i> DNS Queries</span>
                         </div>
+                        <div class="stat-card {{if gt .Stats.DDoSAttacks 0}}stat-danger{{end}}">
+                            <span class="stat-value">{{.Stats.DDoSAttacks}}</span>
+                            <span class="stat-label"><i class="fas fa-bomb"></i> DDoS Attacks</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.PortScans 0}}stat-warning{{end}}">
+                            <span class="stat-value">{{.Stats.PortScans}}</span>
+                            <span class="stat-label"><i class="fas fa-crosshairs"></i> Port Scans</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.IOCMatches 0}}stat-danger{{end}}">
+                            <span class="stat-value">{{.Stats.IOCMatches}}</span>
+                            <span class="stat-label"><i class="fas fa-biohazard"></i> IOC Matches</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.TLSWeaknesses 0}}stat-warning{{end}}">
+                            <span class="stat-value">{{.Stats.TLSWeaknesses}}</span>
+                            <span class="stat-label"><i class="fas fa-unlock"></i> TLS Weaknesses</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.ICMPAnomalies 0}}stat-warning{{end}}">
+                            <span class="stat-value">{{.Stats.ICMPAnomalies}}</span>
+                            <span class="stat-label"><i class="fas fa-heartbeat"></i> ICMP Anomalies</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.TunnelsDetected}}</span>
+                            <span class="stat-label"><i class="fas fa-project-diagram"></i> Tunnels</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.SDWANVendors}}</span>
+                            <span class="stat-label"><i class="fas fa-building"></i> SD-WAN Vendors</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-value">{{.Stats.VoIPCalls}}</span>
+                            <span class="stat-label"><i class="fas fa-phone"></i> VoIP Calls</span>
+                        </div>
+                        <div class="stat-card {{if gt .Stats.BGPIndicators 0}}stat-warning{{end}}">
+                            <span class="stat-value">{{.Stats.BGPIndicators}}</span>
+                            <span class="stat-label"><i class="fas fa-route"></i> BGP Indicators</span>
+                        </div>
                     </div>
 
                     {{if .NextSteps}}

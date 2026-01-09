@@ -215,6 +215,33 @@ func GenerateCSVReports(r *models.TriageReport, baseFilename string) (*CSVExport
 		result.Files = append(result.Files, geoFile)
 	}
 
+	// Generate DNS details CSV if any exist
+	if len(r.DNSDetails) > 0 {
+		dnsDetailsFile := filepath.Join(dir, baseName+"_dns_details.csv")
+		if err := generateDNSDetailsCSV(r.DNSDetails, dnsDetailsFile); err != nil {
+			return nil, fmt.Errorf("failed to generate DNS details CSV: %w", err)
+		}
+		result.Files = append(result.Files, dnsDetailsFile)
+	}
+
+	// Generate BGP indicators CSV if any exist
+	if len(r.BGPHijackIndicators) > 0 {
+		bgpFile := filepath.Join(dir, baseName+"_bgp_indicators.csv")
+		if err := generateBGPIndicatorsCSV(r.BGPHijackIndicators, bgpFile); err != nil {
+			return nil, fmt.Errorf("failed to generate BGP indicators CSV: %w", err)
+		}
+		result.Files = append(result.Files, bgpFile)
+	}
+
+	// Generate app identification CSV if any exist
+	if len(r.AppIdentification) > 0 {
+		appFile := filepath.Join(dir, baseName+"_app_identification.csv")
+		if err := generateAppIdentificationCSV(r.AppIdentification, appFile); err != nil {
+			return nil, fmt.Errorf("failed to generate app identification CSV: %w", err)
+		}
+		result.Files = append(result.Files, appFile)
+	}
+
 	return result, nil
 }
 
@@ -235,9 +262,23 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 	}
 
 	// Calculate health status
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts)
+	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.DDoSFindings) + len(r.Security.IOCFindings)
 	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
-	securityConcerns := len(r.SuspiciousTraffic)
+	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings)
+
+	// Count ICMP anomalies
+	icmpAnomalyCount := 0
+	for _, f := range r.ICMPAnalysis {
+		if f.IsAnomaly {
+			icmpAnomalyCount++
+		}
+	}
+
+	// Count VoIP calls
+	voipCallCount := 0
+	if r.VoIPAnalysis != nil {
+		voipCallCount = r.VoIPAnalysis.TotalCalls
+	}
 
 	healthStatus := "GOOD"
 	if criticalIssues > 0 {
@@ -252,6 +293,7 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		{"Network Health Status", healthStatus, "Overall network health assessment"},
 		{"Total Packets Analyzed", "N/A", "Number of packets processed"},
 		{"Total Traffic Volume", formatBytesForCSV(r.TotalBytes), "Total bytes transferred"},
+		// Original metrics
 		{"DNS Anomalies", fmt.Sprintf("%d", len(r.DNSAnomalies)), "Suspicious DNS responses detected"},
 		{"TCP Retransmissions", fmt.Sprintf("%d", len(r.TCPRetransmissions)), "TCP packets requiring retransmission"},
 		{"Failed TCP Handshakes", fmt.Sprintf("%d", len(r.FailedHandshakes)), "TCP connections that failed to establish"},
@@ -262,6 +304,20 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		{"High RTT Flows", fmt.Sprintf("%d", len(r.RTTAnalysis)), "Flows with high round-trip time"},
 		{"HTTP/2 Flows", fmt.Sprintf("%d", len(r.HTTP2Flows)), "HTTP/2 connections detected"},
 		{"QUIC Flows", fmt.Sprintf("%d", len(r.QUICFlows)), "QUIC connections detected"},
+		// Security Analysis metrics
+		{"DDoS Attacks Detected", fmt.Sprintf("%d", len(r.Security.DDoSFindings)), "DDoS attack patterns identified"},
+		{"Port Scans Detected", fmt.Sprintf("%d", len(r.Security.PortScanFindings)), "Port scanning activities detected"},
+		{"IOC Matches", fmt.Sprintf("%d", len(r.Security.IOCFindings)), "Indicators of Compromise matched"},
+		{"TLS Security Weaknesses", fmt.Sprintf("%d", len(r.Security.TLSSecurityFindings)), "Weak TLS configurations detected"},
+		// Network Analysis metrics
+		{"ICMP Anomalies", fmt.Sprintf("%d", icmpAnomalyCount), "Anomalous ICMP traffic patterns"},
+		{"Tunnels Detected", fmt.Sprintf("%d", len(r.TunnelAnalysis)), "Encapsulation protocols detected (VXLAN, GRE, IPsec, etc.)"},
+		{"SD-WAN Vendors Detected", fmt.Sprintf("%d", len(r.SDWANVendors)), "SD-WAN vendor signatures identified"},
+		{"VoIP Calls", fmt.Sprintf("%d", voipCallCount), "SIP/RTP voice calls detected"},
+		{"Geographic Locations", fmt.Sprintf("%d", len(r.LocationSummary)), "Unique geographic locations observed"},
+		// Protocol Analysis metrics
+		{"BGP Hijack Indicators", fmt.Sprintf("%d", len(r.BGPHijackIndicators)), "Potential BGP hijack indicators"},
+		{"DNS Queries Recorded", fmt.Sprintf("%d", len(r.DNSDetails)), "Total DNS queries captured"},
 	}
 
 	for _, row := range rows {
@@ -1396,4 +1452,186 @@ func formatTimestampForCSV(unixTime float64) string {
 	nsec := int64((unixTime - float64(sec)) * 1e9)
 	t := time.Unix(sec, nsec).UTC()
 	return t.Format("2006-01-02 15:04:05")
+}
+
+// generateDNSDetailsCSV creates a CSV for full DNS query/response details
+func generateDNSDetailsCSV(records []models.DNSRecord, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Query Timestamp (UTC)",
+		"Query Name",
+		"Query Type",
+		"Source IP",
+		"Destination IP",
+		"Response Timestamp (UTC)",
+		"Response Code",
+		"Answer IPs",
+		"Answer Names",
+		"Is Anomalous",
+		"Detail",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, r := range records {
+		queryTs := formatTimestampForCSV(r.QueryTimestamp)
+		responseTs := ""
+		if r.ResponseTimestamp != nil {
+			responseTs = formatTimestampForCSV(*r.ResponseTimestamp)
+		}
+		responseCode := ""
+		if r.ResponseCode != nil {
+			responseCode = fmt.Sprintf("%d", *r.ResponseCode)
+		}
+		answerIPs := strings.Join(r.AnswerIPs, ";")
+		answerNames := strings.Join(r.AnswerNames, ";")
+		isAnomalous := "No"
+		if r.IsAnomalous {
+			isAnomalous = "Yes"
+		}
+
+		row := []string{
+			queryTs,
+			r.QueryName,
+			r.QueryType,
+			r.SourceIP,
+			r.DestinationIP,
+			responseTs,
+			responseCode,
+			answerIPs,
+			answerNames,
+			isAnomalous,
+			r.Detail,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateBGPIndicatorsCSV creates a CSV for BGP hijack indicators
+func generateBGPIndicatorsCSV(indicators []models.BGPIndicator, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"IP Address",
+		"IP Prefix",
+		"Expected ASN",
+		"Expected AS Name",
+		"Observed ASN",
+		"Observed AS Name",
+		"Confidence",
+		"Reason",
+		"Related Domain",
+		"Is Anomaly",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, ind := range indicators {
+		isAnomaly := "No"
+		if ind.IsAnomaly {
+			isAnomaly = "Yes"
+		}
+		observedASN := ""
+		if ind.ObservedASN > 0 {
+			observedASN = fmt.Sprintf("%d", ind.ObservedASN)
+		}
+
+		row := []string{
+			ind.IPAddress,
+			ind.IPPrefix,
+			fmt.Sprintf("%d", ind.ExpectedASN),
+			ind.ExpectedASName,
+			observedASN,
+			ind.ObservedASName,
+			ind.Confidence,
+			ind.Reason,
+			ind.RelatedDomain,
+			isAnomaly,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// generateAppIdentificationCSV creates a CSV for identified applications
+func generateAppIdentificationCSV(apps []models.IdentifiedApp, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	header := []string{
+		"Application Name",
+		"Category",
+		"Protocol",
+		"Port",
+		"SNI/Domain",
+		"Packet Count",
+		"Byte Count",
+		"Confidence",
+		"Identified By",
+		"Is Suspicious",
+		"Suspicious Reason",
+	}
+	if err := writer.Write(header); err != nil {
+		return err
+	}
+
+	for _, app := range apps {
+		port := ""
+		if app.Port > 0 {
+			port = fmt.Sprintf("%d", app.Port)
+		}
+		isSuspicious := "No"
+		if app.IsSuspicious {
+			isSuspicious = "Yes"
+		}
+
+		row := []string{
+			app.Name,
+			app.Category,
+			app.Protocol,
+			port,
+			app.SNI,
+			fmt.Sprintf("%d", app.PacketCount),
+			fmt.Sprintf("%d", app.ByteCount),
+			app.Confidence,
+			app.IdentifiedBy,
+			isSuspicious,
+			app.SuspiciousReason,
+		}
+		if err := writer.Write(row); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
