@@ -77,61 +77,99 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	}
 
 	// Analyze DNS responses
-	if dns.QR == true && len(dns.Answers) > 0 {
+	if dns.QR == true {
 		queryName := state.DNSQueries[dns.ID]
 		if queryName == "" && len(dns.Questions) > 0 {
 			queryName = string(dns.Questions[0].Name)
 		}
 
-		for _, answer := range dns.Answers {
-			if answer.Type == layers.DNSTypeA || answer.Type == layers.DNSTypeAAAA {
-				answerIP := answer.IP.String()
+		// Find and update the corresponding DNS query record
+		responseCode := uint16(dns.ResponseCode)
+		for i := range report.DNSDetails {
+			if report.DNSDetails[i].QueryName == queryName && report.DNSDetails[i].ResponseTimestamp == nil {
+				// Update the record with response data
+				report.DNSDetails[i].ResponseTimestamp = &timestamp
+				report.DNSDetails[i].ResponseCode = &responseCode
 
-				// Check for anomalies
+				// Collect all answer IPs and names
+				for _, answer := range dns.Answers {
+					if answer.Type == layers.DNSTypeA || answer.Type == layers.DNSTypeAAAA {
+						if answer.IP != nil {
+							report.DNSDetails[i].AnswerIPs = append(report.DNSDetails[i].AnswerIPs, answer.IP.String())
+						}
+					} else if answer.Type == layers.DNSTypeCNAME {
+						report.DNSDetails[i].AnswerNames = append(report.DNSDetails[i].AnswerNames, string(answer.CNAME))
+					}
+				}
+
+				// Check for anomalies and mark the record
 				isAnomalous := false
 				reason := ""
 
-				// Check if DNS server is non-standard (not a known DNS server)
-				if !models.IsPrivateOrReservedIP(srcIP) && !isKnownDNSServer(srcIP) {
-					isAnomalous = true
-					reason = "Response from non-standard DNS server"
-				}
+				for _, answer := range dns.Answers {
+					if answer.Type == layers.DNSTypeA || answer.Type == layers.DNSTypeAAAA {
+						answerIP := answer.IP.String()
 
-				// Check for private IP in response to public domain query
-				if models.IsPublicDomain(queryName) && models.IsPrivateOrReservedIP(answerIP) {
-					isAnomalous = true
-					reason = "Private IP returned for public domain (possible DNS hijacking)"
-				}
+						// Check if DNS server is non-standard (not a known DNS server)
+						if !models.IsPrivateOrReservedIP(srcIP) && !isKnownDNSServer(srcIP) {
+							isAnomalous = true
+							reason = "Response from non-standard DNS server"
+						}
 
-				// Check for suspicious TLDs
-				if isSuspiciousDomain(queryName) {
-					isAnomalous = true
-					reason = "Suspicious domain pattern detected"
-				}
+						// Check for private IP in response to public domain query
+						if models.IsPublicDomain(queryName) && models.IsPrivateOrReservedIP(answerIP) {
+							isAnomalous = true
+							reason = "Private IP returned for public domain (possible DNS hijacking)"
+						}
 
-				if isAnomalous {
-					anomaly := models.DNSAnomaly{
-						Timestamp: timestamp,
-						Query:     queryName,
-						AnswerIP:  answerIP,
-						ServerIP:  srcIP,
-						ServerMAC: srcMAC,
-						Reason:    reason,
+						// Check for suspicious TLDs
+						if isSuspiciousDomain(queryName) {
+							isAnomalous = true
+							reason = "Suspicious domain pattern detected"
+						}
+
+						if isAnomalous {
+							anomaly := models.DNSAnomaly{
+								Timestamp: timestamp,
+								Query:     queryName,
+								AnswerIP:  answerIP,
+								ServerIP:  srcIP,
+								ServerMAC: srcMAC,
+								Reason:    reason,
+							}
+							report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
+						}
 					}
-					report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
 				}
 
-				// Add timeline event for response
-				event := models.TimelineEvent{
-					Timestamp:     timestamp,
-					EventType:     "DNS Response",
-					SourceIP:      srcIP,
-					DestinationIP: dstIP,
-					Protocol:      "DNS",
-					Detail:        fmt.Sprintf("Response: %s -> %s", queryName, answerIP),
+				// Update anomaly status on the record
+				if isAnomalous {
+					report.DNSDetails[i].IsAnomalous = true
+					report.DNSDetails[i].Detail = reason
 				}
-				report.Timeline = append(report.Timeline, event)
+
+				break // Found and updated the matching query
 			}
+		}
+
+		// Add timeline event for response
+		if len(dns.Answers) > 0 {
+			var firstAnswerIP string
+			for _, answer := range dns.Answers {
+				if answer.Type == layers.DNSTypeA || answer.Type == layers.DNSTypeAAAA {
+					firstAnswerIP = answer.IP.String()
+					break
+				}
+			}
+			event := models.TimelineEvent{
+				Timestamp:     timestamp,
+				EventType:     "DNS Response",
+				SourceIP:      srcIP,
+				DestinationIP: dstIP,
+				Protocol:      "DNS",
+				Detail:        fmt.Sprintf("Response: %s -> %s (code: %d)", queryName, firstAnswerIP, responseCode),
+			}
+			report.Timeline = append(report.Timeline, event)
 		}
 	}
 }
