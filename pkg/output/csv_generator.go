@@ -954,12 +954,8 @@ func GenerateSingleCSV(r *models.TriageReport, filename string) error {
 		writer.Write(row)
 	}
 
-	// Traffic Flows (top 20)
-	count := 0
+	// Traffic Flows (all)
 	for _, f := range r.TrafficAnalysis {
-		if count >= 20 {
-			break
-		}
 		row := []string{
 			"Traffic",
 			"Traffic Flow",
@@ -972,7 +968,6 @@ func GenerateSingleCSV(r *models.TriageReport, filename string) error {
 			"",
 		}
 		writer.Write(row)
-		count++
 	}
 
 	return nil

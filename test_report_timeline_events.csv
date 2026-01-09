@@ -1,0 +1,46 @@
+Timestamp,Event Type,Source IP,Destination IP,Detail
+2026-01-07 17:53:50.000,TCP SYN,192.168.100.203,141.226.224.32,Connection attempt to port 443
+2026-01-07 17:53:55.000,TCP SYN,192.168.100.203,8.8.8.8,Connection attempt to port 443
+2026-01-07 17:53:56.000,DNS Query,192.168.100.203,8.8.8.8,Query: easylist-downloads.adblockplus.org (Unknown)
+2026-01-07 17:53:56.000,DNS Query,192.168.100.203,8.8.8.8,Query: easylist-downloads.adblockplus.org (A)
+2026-01-07 17:53:56.000,DNS Response,8.8.8.8,192.168.100.203,Response: easylist-downloads.adblockplus.org ->  (code: 0)
+2026-01-07 17:53:56.000,DNS Response,8.8.8.8,192.168.100.203,Response: easylist-downloads.adblockplus.org -> 2.21.74.74 (code: 0)
+2026-01-07 17:53:56.000,TCP SYN,192.168.100.203,2.21.74.59,Connection attempt to port 443
+2026-01-07 17:53:56.000,DNS Query,192.168.100.203,8.8.8.8,Query: onatel.bf (A)
+2026-01-07 17:53:56.000,DNS Response,8.8.8.8,192.168.100.203,Response: onatel.bf -> 196.28.243.151 (code: 0)
+2026-01-07 17:54:01.000,TCP SYN,192.168.100.203,35.223.238.178,Connection attempt to port 443
+2026-01-07 17:54:01.000,TCP SYN,192.168.100.203,35.223.238.178,Connection attempt to port 443
+2026-01-07 17:54:08.000,DNS Query,192.168.100.203,8.8.8.8,Query: yahoo.com (A)
+2026-01-07 17:54:08.000,DNS Response,8.8.8.8,192.168.100.203,Response: yahoo.com -> 74.6.231.20 (code: 0)
+2026-01-07 17:54:09.000,TCP SYN,192.168.100.203,8.8.8.8,Connection attempt to port 443
+2026-01-07 17:54:09.000,TCP SYN,192.168.100.203,142.251.38.131,Connection attempt to port 443
+2026-01-07 17:54:12.000,TCP SYN,192.168.100.203,178.250.7.136,Connection attempt to port 443
+2026-01-07 17:54:12.000,TCP SYN,192.168.100.203,3.124.64.248,Connection attempt to port 443
+2026-01-07 17:54:12.000,TCP SYN,192.168.100.203,69.173.156.138,Connection attempt to port 443
+2026-01-07 17:54:12.000,TCP SYN,192.168.100.203,185.89.210.212,Connection attempt to port 443
+2026-01-07 17:54:13.000,TCP SYN,192.168.100.203,141.226.224.32,Connection attempt to port 443
+2026-01-07 17:54:16.000,TCP SYN,192.168.100.203,35.223.238.178,Connection attempt to port 443
+2026-01-07 17:54:21.000,DNS Query,192.168.100.203,8.8.8.8,Query: stream-production.avcdn.net (A)
+2026-01-07 17:54:21.000,DNS Query,192.168.100.203,8.8.8.8,Query: stream-production.avcdn.net (AAAA)
+2026-01-07 17:54:21.000,DNS Response,8.8.8.8,192.168.100.203,Response: stream-production.avcdn.net -> 2a02:26f0:4700::210:27b (code: 0)
+2026-01-07 17:54:21.000,DNS Response,8.8.8.8,192.168.100.203,Response: stream-production.avcdn.net -> 23.44.215.200 (code: 0)
+2026-01-07 17:54:21.000,TCP SYN,192.168.100.203,23.44.215.200,Connection attempt to port 443
+2026-01-07 17:54:21.000,DNS Query,192.168.100.203,8.8.8.8,Query: cisco.com (A)
+2026-01-07 17:54:21.000,DNS Response,8.8.8.8,192.168.100.203,Response: cisco.com -> 72.163.4.185 (code: 0)
+2026-01-07 17:54:21.000,TCP SYN,192.168.100.203,8.8.8.8,Connection attempt to port 443
+2026-01-07 17:54:21.000,TCP SYN,192.168.100.203,172.217.19.10,Connection attempt to port 443
+2026-01-07 17:54:21.000,TCP SYN,192.168.100.203,104.18.41.41,Connection attempt to port 443
+2026-01-07 17:54:21.000,TCP SYN,192.168.100.203,34.8.63.254,Connection attempt to port 443
+2026-01-07 17:54:23.000,TCP SYN,192.168.100.203,104.16.102.112,Connection attempt to port 443
+2026-01-07 17:54:24.000,TCP SYN,192.168.100.203,35.223.238.178,Connection attempt to port 443
+2026-01-07 17:54:24.000,TCP SYN,192.168.100.203,18.97.36.68,Connection attempt to port 443
+2026-01-07 17:54:35.000,TCP SYN,192.168.100.203,178.250.7.136,Connection attempt to port 443
+2026-01-07 17:54:35.000,TCP SYN,192.168.100.203,185.89.210.212,Connection attempt to port 443
+2026-01-07 17:54:35.000,TCP SYN,192.168.100.203,69.173.156.138,Connection attempt to port 443
+2026-01-07 17:54:36.000,TCP SYN,192.168.100.203,141.226.224.32,Connection attempt to port 443
+2026-01-07 17:54:40.000,TCP SYN,192.168.100.203,52.110.4.150,Connection attempt to port 443
+2026-01-07 17:54:40.000,TCP SYN,192.168.100.203,52.110.4.150,Connection attempt to port 443
+2026-01-07 17:54:40.000,TCP SYN,192.168.100.203,52.110.4.150,Connection attempt to port 443
+2026-01-07 17:54:40.000,TCP SYN,192.168.100.203,52.110.4.150,Connection attempt to port 443
+2026-01-07 17:54:41.000,TCP SYN,192.168.100.203,52.110.4.150,Connection attempt to port 443
+2026-01-07 17:54:42.000,TCP SYN,192.168.100.203,52.110.4.150,Connection attempt to port 443

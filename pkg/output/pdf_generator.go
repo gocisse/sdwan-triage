@@ -274,30 +274,19 @@ func (g *PDFGenerator) addRecommendedActions(report *models.TriageReport) {
 // addDNSAnomaliesTable adds the DNS anomalies table
 func (g *PDFGenerator) addDNSAnomaliesTable(report *models.TriageReport) {
 	g.checkPageBreak(50)
-	g.addSectionHeader("DNS Anomalies")
+	g.addSectionHeader(fmt.Sprintf("DNS Anomalies (%d total)", len(report.DNSAnomalies)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(55, 8, "Query", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Answer IP", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(30, 8, "Server", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(60, 8, "Reason", "1", 1, "L", true, 0, "")
+	g.addTableHeader([]string{"Query", "Answer IP", "Server", "Reason"}, []float64{55, 35, 30, 60})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.DNSAnomalies))
-	for i := 0; i < maxRows; i++ {
-		anomaly := report.DNSAnomalies[i]
+	for _, anomaly := range report.DNSAnomalies {
+		g.checkPageBreakWithHeader(7, []string{"Query", "Answer IP", "Server", "Reason"}, []float64{55, 35, 30, 60})
 		g.pdf.CellFormat(55, 7, truncateString(anomaly.Query, 30), "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(35, 7, anomaly.AnswerIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(30, 7, anomaly.ServerIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(60, 7, truncateString(anomaly.Reason, 35), "1", 1, "L", false, 0, "")
-	}
-
-	if len(report.DNSAnomalies) > 10 {
-		g.pdf.SetFont("Arial", "I", 8)
-		g.pdf.CellFormat(0, 6, fmt.Sprintf("... and %d more", len(report.DNSAnomalies)-10), "", 1, "L", false, 0, "")
 	}
 
 	g.pdf.Ln(5)
@@ -306,30 +295,19 @@ func (g *PDFGenerator) addDNSAnomaliesTable(report *models.TriageReport) {
 // addTCPRetransmissionsTable adds the TCP retransmissions table
 func (g *PDFGenerator) addTCPRetransmissionsTable(report *models.TriageReport) {
 	g.checkPageBreak(50)
-	g.addSectionHeader("TCP Retransmissions")
+	g.addSectionHeader(fmt.Sprintf("TCP Retransmissions (%d total)", len(report.TCPRetransmissions)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(55, 8, "Source", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(55, 8, "Destination", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Source Port", "1", 0, "C", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Dest Port", "1", 1, "C", true, 0, "")
+	g.addTableHeader([]string{"Source", "Destination", "Source Port", "Dest Port"}, []float64{55, 55, 35, 35})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.TCPRetransmissions))
-	for i := 0; i < maxRows; i++ {
-		retrans := report.TCPRetransmissions[i]
+	for _, retrans := range report.TCPRetransmissions {
+		g.checkPageBreakWithHeader(7, []string{"Source", "Destination", "Source Port", "Dest Port"}, []float64{55, 55, 35, 35})
 		g.pdf.CellFormat(55, 7, retrans.SrcIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(55, 7, retrans.DstIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(35, 7, fmt.Sprintf("%d", retrans.SrcPort), "1", 0, "C", false, 0, "")
 		g.pdf.CellFormat(35, 7, fmt.Sprintf("%d", retrans.DstPort), "1", 1, "C", false, 0, "")
-	}
-
-	if len(report.TCPRetransmissions) > 10 {
-		g.pdf.SetFont("Arial", "I", 8)
-		g.pdf.CellFormat(0, 6, fmt.Sprintf("... and %d more", len(report.TCPRetransmissions)-10), "", 1, "L", false, 0, "")
 	}
 
 	g.pdf.Ln(5)
@@ -338,20 +316,15 @@ func (g *PDFGenerator) addTCPRetransmissionsTable(report *models.TriageReport) {
 // addARPConflictsTable adds the ARP conflicts table
 func (g *PDFGenerator) addARPConflictsTable(report *models.TriageReport) {
 	g.checkPageBreak(40)
-	g.addSectionHeader("ARP Conflicts")
+	g.addSectionHeader(fmt.Sprintf("ARP Conflicts (%d total)", len(report.ARPConflicts)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(50, 8, "IP Address", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(65, 8, "MAC Address 1", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(65, 8, "MAC Address 2", "1", 1, "L", true, 0, "")
+	g.addTableHeader([]string{"IP Address", "MAC Address 1", "MAC Address 2"}, []float64{50, 65, 65})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.ARPConflicts))
-	for i := 0; i < maxRows; i++ {
-		conflict := report.ARPConflicts[i]
+	for _, conflict := range report.ARPConflicts {
+		g.checkPageBreakWithHeader(7, []string{"IP Address", "MAC Address 1", "MAC Address 2"}, []float64{50, 65, 65})
 		g.pdf.CellFormat(50, 7, conflict.IP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(65, 7, conflict.MAC1, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(65, 7, conflict.MAC2, "1", 1, "L", false, 0, "")
@@ -363,28 +336,18 @@ func (g *PDFGenerator) addARPConflictsTable(report *models.TriageReport) {
 // addSuspiciousTrafficTable adds the suspicious traffic table
 func (g *PDFGenerator) addSuspiciousTrafficTable(report *models.TriageReport) {
 	g.checkPageBreak(50)
-	g.addSectionHeader("Suspicious Traffic")
+	g.addSectionHeader(fmt.Sprintf("Suspicious Traffic (%d total)", len(report.SuspiciousTraffic)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(45, 8, "Source", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(45, 8, "Destination", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(90, 8, "Reason", "1", 1, "L", true, 0, "")
+	g.addTableHeader([]string{"Source", "Destination", "Reason"}, []float64{45, 45, 90})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.SuspiciousTraffic))
-	for i := 0; i < maxRows; i++ {
-		traffic := report.SuspiciousTraffic[i]
+	for _, traffic := range report.SuspiciousTraffic {
+		g.checkPageBreakWithHeader(7, []string{"Source", "Destination", "Reason"}, []float64{45, 45, 90})
 		g.pdf.CellFormat(45, 7, traffic.SrcIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(45, 7, traffic.DstIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(90, 7, truncateString(traffic.Reason, 50), "1", 1, "L", false, 0, "")
-	}
-
-	if len(report.SuspiciousTraffic) > 10 {
-		g.pdf.SetFont("Arial", "I", 8)
-		g.pdf.CellFormat(0, 6, fmt.Sprintf("... and %d more", len(report.SuspiciousTraffic)-10), "", 1, "L", false, 0, "")
 	}
 
 	g.pdf.Ln(5)
@@ -393,30 +356,19 @@ func (g *PDFGenerator) addSuspiciousTrafficTable(report *models.TriageReport) {
 // addFailedHandshakesTable adds the failed handshakes table
 func (g *PDFGenerator) addFailedHandshakesTable(report *models.TriageReport) {
 	g.checkPageBreak(50)
-	g.addSectionHeader("Failed TCP Handshakes")
+	g.addSectionHeader(fmt.Sprintf("Failed TCP Handshakes (%d total)", len(report.FailedHandshakes)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(55, 8, "Source", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(55, 8, "Destination", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Source Port", "1", 0, "C", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Dest Port", "1", 1, "C", true, 0, "")
+	g.addTableHeader([]string{"Source", "Destination", "Source Port", "Dest Port"}, []float64{55, 55, 35, 35})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.FailedHandshakes))
-	for i := 0; i < maxRows; i++ {
-		handshake := report.FailedHandshakes[i]
+	for _, handshake := range report.FailedHandshakes {
+		g.checkPageBreakWithHeader(7, []string{"Source", "Destination", "Source Port", "Dest Port"}, []float64{55, 55, 35, 35})
 		g.pdf.CellFormat(55, 7, handshake.SrcIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(55, 7, handshake.DstIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(35, 7, fmt.Sprintf("%d", handshake.SrcPort), "1", 0, "C", false, 0, "")
 		g.pdf.CellFormat(35, 7, fmt.Sprintf("%d", handshake.DstPort), "1", 1, "C", false, 0, "")
-	}
-
-	if len(report.FailedHandshakes) > 10 {
-		g.pdf.SetFont("Arial", "I", 8)
-		g.pdf.CellFormat(0, 6, fmt.Sprintf("... and %d more", len(report.FailedHandshakes)-10), "", 1, "L", false, 0, "")
 	}
 
 	g.pdf.Ln(5)
@@ -425,22 +377,15 @@ func (g *PDFGenerator) addFailedHandshakesTable(report *models.TriageReport) {
 // addDDoSFindingsTable adds the DDoS findings table
 func (g *PDFGenerator) addDDoSFindingsTable(report *models.TriageReport) {
 	g.checkPageBreak(50)
-	g.addSectionHeader("DDoS Attack Indicators")
+	g.addSectionHeader(fmt.Sprintf("DDoS Attack Indicators (%d total)", len(report.Security.DDoSFindings)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(40, 8, "Source IP", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(40, 8, "Target IP", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Type", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(30, 8, "Packets", "1", 0, "C", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Severity", "1", 1, "L", true, 0, "")
+	g.addTableHeader([]string{"Source IP", "Target IP", "Type", "Packets", "Severity"}, []float64{40, 40, 35, 30, 35})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.Security.DDoSFindings))
-	for i := 0; i < maxRows; i++ {
-		finding := report.Security.DDoSFindings[i]
+	for _, finding := range report.Security.DDoSFindings {
+		g.checkPageBreakWithHeader(7, []string{"Source IP", "Target IP", "Type", "Packets", "Severity"}, []float64{40, 40, 35, 30, 35})
 		g.pdf.CellFormat(40, 7, finding.SourceIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(40, 7, finding.TargetIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(35, 7, finding.Type, "1", 0, "L", false, 0, "")
@@ -454,21 +399,15 @@ func (g *PDFGenerator) addDDoSFindingsTable(report *models.TriageReport) {
 // addPortScanFindingsTable adds the port scan findings table
 func (g *PDFGenerator) addPortScanFindingsTable(report *models.TriageReport) {
 	g.checkPageBreak(50)
-	g.addSectionHeader("Port Scan Indicators")
+	g.addSectionHeader(fmt.Sprintf("Port Scan Indicators (%d total)", len(report.Security.PortScanFindings)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(50, 8, "Source IP", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(50, 8, "Target IP", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(40, 8, "Type", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(40, 8, "Ports Scanned", "1", 1, "C", true, 0, "")
+	g.addTableHeader([]string{"Source IP", "Target IP", "Type", "Ports Scanned"}, []float64{50, 50, 40, 40})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.Security.PortScanFindings))
-	for i := 0; i < maxRows; i++ {
-		finding := report.Security.PortScanFindings[i]
+	for _, finding := range report.Security.PortScanFindings {
+		g.checkPageBreakWithHeader(7, []string{"Source IP", "Target IP", "Type", "Ports Scanned"}, []float64{50, 50, 40, 40})
 		g.pdf.CellFormat(50, 7, finding.SourceIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(50, 7, finding.TargetIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(40, 7, finding.Type, "1", 0, "L", false, 0, "")
@@ -485,22 +424,15 @@ func (g *PDFGenerator) addTrafficSummary(report *models.TriageReport) {
 	}
 
 	g.checkPageBreak(60)
-	g.addSectionHeader("Top Traffic Flows")
+	g.addSectionHeader(fmt.Sprintf("Traffic Flows (%d total)", len(report.TrafficAnalysis)))
 
 	// Table header
-	g.pdf.SetFont("Arial", "B", 9)
-	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
-	g.pdf.CellFormat(45, 8, "Source", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(45, 8, "Destination", "1", 0, "L", true, 0, "")
-	g.pdf.CellFormat(25, 8, "Protocol", "1", 0, "C", true, 0, "")
-	g.pdf.CellFormat(35, 8, "Bytes", "1", 0, "R", true, 0, "")
-	g.pdf.CellFormat(30, 8, "Percentage", "1", 1, "R", true, 0, "")
+	g.addTableHeader([]string{"Source", "Destination", "Protocol", "Bytes", "Percentage"}, []float64{45, 45, 25, 35, 30})
 
-	// Table rows
+	// Table rows - all items
 	g.pdf.SetFont("Arial", "", 8)
-	maxRows := minInt(10, len(report.TrafficAnalysis))
-	for i := 0; i < maxRows; i++ {
-		flow := report.TrafficAnalysis[i]
+	for _, flow := range report.TrafficAnalysis {
+		g.checkPageBreakWithHeader(7, []string{"Source", "Destination", "Protocol", "Bytes", "Percentage"}, []float64{45, 45, 25, 35, 30})
 		srcAddr := fmt.Sprintf("%s:%d", flow.SrcIP, flow.SrcPort)
 		dstAddr := fmt.Sprintf("%s:%d", flow.DstIP, flow.DstPort)
 
@@ -552,6 +484,27 @@ func (g *PDFGenerator) addStatCell(label, value string, isWarning bool) {
 func (g *PDFGenerator) checkPageBreak(height float64) {
 	if g.pdf.GetY()+height > 280 {
 		g.pdf.AddPage()
+	}
+}
+
+// checkPageBreakWithHeader checks if we need a new page and re-adds table header
+func (g *PDFGenerator) checkPageBreakWithHeader(height float64, headers []string, widths []float64) {
+	if g.pdf.GetY()+height > 280 {
+		g.pdf.AddPage()
+		g.addTableHeader(headers, widths)
+	}
+}
+
+// addTableHeader adds a table header row
+func (g *PDFGenerator) addTableHeader(headers []string, widths []float64) {
+	g.pdf.SetFont("Arial", "B", 9)
+	g.pdf.SetFillColor(colorTableHead[0], colorTableHead[1], colorTableHead[2])
+	for i, header := range headers {
+		ln := 0
+		if i == len(headers)-1 {
+			ln = 1
+		}
+		g.pdf.CellFormat(widths[i], 8, header, "1", ln, "L", true, 0, "")
 	}
 }
 

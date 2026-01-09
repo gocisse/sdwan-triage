@@ -1,0 +1,26 @@
+Metric,Value,Description
+Report Generated,2026-01-09 18:55:53,Timestamp of report generation
+Network Health Status,WARNING,Overall network health assessment
+Total Packets Analyzed,N/A,Number of packets processed
+Total Traffic Volume,661.94 KB,Total bytes transferred
+DNS Anomalies,0,Suspicious DNS responses detected
+TCP Retransmissions,109,TCP packets requiring retransmission
+Failed TCP Handshakes,0,TCP connections that failed to establish
+ARP Conflicts,0,IP addresses with multiple MAC addresses
+Suspicious Traffic Flows,0,Traffic to/from suspicious ports
+TLS Certificates,0,TLS certificates observed
+Devices Detected,1,Unique devices identified by fingerprint
+High RTT Flows,12,Flows with high round-trip time
+HTTP/2 Flows,0,HTTP/2 connections detected
+QUIC Flows,0,QUIC connections detected
+DDoS Attacks Detected,0,DDoS attack patterns identified
+Port Scans Detected,1,Port scanning activities detected
+IOC Matches,0,Indicators of Compromise matched
+TLS Security Weaknesses,0,Weak TLS configurations detected
+ICMP Anomalies,0,Anomalous ICMP traffic patterns
+Tunnels Detected,0,"Encapsulation protocols detected (VXLAN, GRE, IPsec, etc.)"
+SD-WAN Vendors Detected,1,SD-WAN vendor signatures identified
+VoIP Calls,0,SIP/RTP voice calls detected
+Geographic Locations,5,Unique geographic locations observed
+BGP Hijack Indicators,0,Potential BGP hijack indicators
+DNS Queries Recorded,7,Total DNS queries captured

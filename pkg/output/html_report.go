@@ -758,13 +758,8 @@ func convertSuspiciousTraffic(flows []models.SuspiciousFlow) []SuspiciousFlowVie
 
 func convertTCPRetransmissions(flows []models.TCPFlow) []TCPFlowView {
 	result := make([]TCPFlowView, 0, len(flows))
-	// Limit to first 50 for display
-	limit := len(flows)
-	if limit > 50 {
-		limit = 50
-	}
-	for i := 0; i < limit; i++ {
-		f := flows[i]
+	// Convert all flows
+	for _, f := range flows {
 		result = append(result, TCPFlowView{
 			SrcIP:   html.EscapeString(f.SrcIP),
 			SrcPort: f.SrcPort,
@@ -798,15 +793,9 @@ func convertTopFlows(flows []models.TrafficFlow, totalBytes uint64) []TrafficFlo
 		return sorted[i].TotalBytes > sorted[j].TotalBytes
 	})
 
-	// Limit to top 20
-	limit := len(sorted)
-	if limit > 20 {
-		limit = 20
-	}
-
-	result := make([]TrafficFlowView, limit)
-	for i := 0; i < limit; i++ {
-		f := sorted[i]
+	// Convert all flows
+	result := make([]TrafficFlowView, len(sorted))
+	for i, f := range sorted {
 		pct := float64(0)
 		if totalBytes > 0 {
 			pct = float64(f.TotalBytes) / float64(totalBytes) * 100
@@ -1070,24 +1059,20 @@ func generateTrafficStats(r *models.TriageReport) ([]ProtocolStatView, []TopTalk
 		return ipList[i].bytes > ipList[j].bytes
 	})
 
-	limit := 10
-	if len(ipList) < limit {
-		limit = len(ipList)
-	}
-
-	topTalkers := make([]TopTalkerView, limit)
-	for i := 0; i < limit; i++ {
+	// Convert all top talkers
+	topTalkers := make([]TopTalkerView, len(ipList))
+	for i, ip := range ipList {
 		pct := float64(0)
 		if totalBytes > 0 {
-			pct = float64(ipList[i].bytes) / float64(totalBytes) * 100
+			pct = float64(ip.bytes) / float64(totalBytes) * 100
 		}
 		ipType := "external"
-		if models.IsPrivateOrReservedIP(ipList[i].ip) {
+		if models.IsPrivateOrReservedIP(ip.ip) {
 			ipType = "internal"
 		}
 		topTalkers[i] = TopTalkerView{
-			IP:      ipList[i].ip,
-			Bytes:   ipList[i].bytes,
+			IP:      ip.ip,
+			Bytes:   ip.bytes,
 			Percent: pct,
 			Type:    ipType,
 		}

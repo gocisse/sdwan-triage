@@ -531,7 +531,7 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 		return flows[i].TotalBytes > flows[j].TotalBytes
 	})
 
-	// Calculate percentages and take top 20
+	// Calculate percentages for all flows
 	totalBytes := report.TotalBytes
 	if totalBytes == 0 {
 		for _, f := range flows {
@@ -539,12 +539,8 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 		}
 	}
 
-	limit := 20
-	if len(flows) < limit {
-		limit = len(flows)
-	}
-
-	for i := 0; i < limit; i++ {
+	// Include all flows
+	for i := range flows {
 		if totalBytes > 0 {
 			flows[i].Percentage = float64(flows[i].TotalBytes) / float64(totalBytes) * 100
 		}

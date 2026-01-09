@@ -1,0 +1,13 @@
+VoIP Analysis Summary
+Metric,Value
+Total SIP Calls,0
+Established Calls,0
+Failed Calls,0
+Total RTP Streams,2
+Average Jitter (ms),0.00
+Packet Loss Rate (%),0.00
+
+RTP Streams
+SSRC,Source IP,Destination IP,Payload Type,Packet Count,Byte Count,Lost Packets,Jitter (ms)
+0,8.8.8.8,192.168.100.203,G722,1,209,0,0.00
+0,192.168.100.203,8.8.8.8,G722,1,52,0,0.00

@@ -1,0 +1,5 @@
+Timestamp (UTC),Source IP,Destination IP,ICMP Type,ICMP Code,Type Name,Count,Is Anomaly,Description
+2026-01-07 16:54:32,192.168.100.203,142.251.36.68,8,0,Echo Request,4,No,
+2026-01-07 16:54:32,142.251.36.68,192.168.100.203,0,0,Echo Reply,4,No,
+2026-01-07 16:54:44,fe80::1c69:48a7:a8e1:398d,fe80::18ab:b08f:5e8c:d73c,135,0,Neighbor Solicitation,1,No,
+2026-01-07 16:54:44,fe80::18ab:b08f:5e8c:d73c,fe80::1c69:48a7:a8e1:398d,136,0,Neighbor Advertisement,1,No,
