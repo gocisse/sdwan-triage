@@ -723,6 +723,244 @@ details > div {
     color: #228b22;
 }
 
+/* Handshake Analysis Container */
+.handshake-analysis-container {
+    padding: 10px 0;
+}
+
+.handshake-intro {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.handshake-intro p {
+    margin: 0 0 10px 0;
+    color: #6c757d;
+}
+
+.handshake-legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85em;
+    color: #495057;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+}
+
+.legend-syn {
+    background: #ffe6e6;
+    border-left: 3px solid #ff4444;
+}
+
+.legend-synack {
+    background: #e6f0ff;
+    border-left: 3px solid #4477ff;
+}
+
+.legend-complete {
+    background: #e6ffe6;
+    border-left: 3px solid #44cc44;
+}
+
+/* Collapsible Flow Details */
+.handshake-flow-details {
+    border: 1px solid var(--border-color);
+    margin-bottom: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+}
+
+.handshake-flow-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.handshake-flow-summary:hover {
+    background: #e9ecef;
+}
+
+.handshake-flow-details[open] .handshake-flow-summary {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.handshake-flow-content {
+    padding: 15px;
+}
+
+/* Event with icon and description */
+.event-icon {
+    width: 24px;
+    text-align: center;
+    margin-right: 10px;
+}
+
+.event-desc {
+    margin-left: auto;
+    color: #6c757d;
+    font-size: 0.85em;
+    font-style: italic;
+}
+
+/* Handshake Explanation */
+.handshake-explanation {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-color);
+}
+
+.handshake-explanation h4 {
+    margin: 0 0 10px 0;
+    color: var(--primary-color);
+    font-size: 0.95em;
+}
+
+.handshake-explanation p {
+    margin: 5px 0;
+    font-size: 0.9em;
+    color: #495057;
+}
+
+.handshake-explanation .failure-note {
+    color: #dc3545;
+    background: #fff5f5;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.handshake-explanation .pending-note {
+    color: #856404;
+    background: #fff3cd;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+/* Failed Handshakes Section */
+.failed-handshakes-section {
+    border-color: #f5c6cb;
+}
+
+.failed-handshakes-section > summary {
+    background: #fff5f5;
+    color: #721c24;
+}
+
+.failed-handshakes-section > summary:hover {
+    background: #f8d7da;
+}
+
+.failed-handshakes-container {
+    padding: 15px;
+}
+
+.failed-handshakes-explanation {
+    background: #fff5f5;
+    border: 1px solid #f5c6cb;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.failed-handshakes-explanation h4 {
+    margin: 0 0 10px 0;
+    color: #721c24;
+}
+
+.failed-handshakes-explanation p {
+    margin: 0 0 10px 0;
+    color: #495057;
+}
+
+.failed-handshakes-explanation ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.failed-handshakes-explanation li {
+    margin: 5px 0;
+    color: #495057;
+}
+
+.failed-handshake-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.failed-handshake-item {
+    background: white;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    padding: 12px 15px;
+}
+
+.failed-flow-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.flow-direction {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.flow-direction i {
+    color: #dc3545;
+}
+
+.flow-direction .arrow {
+    color: #6c757d;
+}
+
+.badge-failed {
+    background: #dc3545;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75em;
+    font-weight: 600;
+}
+
+.badge-failed i {
+    margin-right: 4px;
+}
+
+.failed-action-hint {
+    color: #6c757d;
+    padding-left: 24px;
+}
+
+.failed-action-hint i {
+    color: #ffc107;
+    margin-right: 5px;
+}
+
 /* Print Styles */
 @media print {
     body { background: white; padding: 0; }

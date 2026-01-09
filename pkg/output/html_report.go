@@ -46,6 +46,17 @@ func formatUnixTimeShort(unixTimeFloat float64) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
+// formatUnixTimeMs converts a Unix timestamp to a format with millisecond precision
+func formatUnixTimeMs(unixTimeFloat float64) string {
+	if unixTimeFloat == 0 {
+		return "-"
+	}
+	sec := int64(unixTimeFloat)
+	nsec := int64((unixTimeFloat - float64(sec)) * 1e9)
+	t := time.Unix(sec, nsec).UTC()
+	return t.Format("2006-01-02 15:04:05.000")
+}
+
 // ReportData holds all data needed for the HTML template
 type ReportData struct {
 	// Header info
@@ -1180,7 +1191,7 @@ func convertTCPHandshakeCorrelatedFlows(flows []models.TCPHandshakeCorrelatedFlo
 			events[j] = TCPHandshakeEventView{
 				Type:         html.EscapeString(e.Type),
 				Timestamp:    e.Timestamp,
-				TimestampFmt: formatUnixTimeShort(e.Timestamp),
+				TimestampFmt: formatUnixTimeMs(e.Timestamp),
 			}
 		}
 		result[i] = TCPHandshakeCorrelatedFlowView{
@@ -1983,11 +1994,18 @@ func getTemplateContent() string {
                     {{if .TCPHandshakeCorrelatedFlows}}
                     <details open>
                         <summary><i class="fas fa-exchange-alt"></i> TCP Handshake Analysis ({{len .TCPHandshakeCorrelatedFlows}} flows)</summary>
-                        <div>
-                            <p style="color: #6c757d; margin-bottom: 15px;">TCP handshake events grouped by flow for correlation analysis.</p>
+                        <div class="handshake-analysis-container">
+                            <div class="handshake-intro">
+                                <p>TCP handshake events grouped by flow for correlation analysis. Click on each flow to expand/collapse details.</p>
+                                <div class="handshake-legend">
+                                    <span class="legend-item"><span class="legend-color legend-syn"></span> SYN (Connection Request)</span>
+                                    <span class="legend-item"><span class="legend-color legend-synack"></span> SYN-ACK (Server Response)</span>
+                                    <span class="legend-item"><span class="legend-color legend-complete"></span> Handshake Complete</span>
+                                </div>
+                            </div>
                             {{range .TCPHandshakeCorrelatedFlows}}
-                            <div class="handshake-flow">
-                                <div class="handshake-flow-header">
+                            <details class="handshake-flow-details">
+                                <summary class="handshake-flow-summary">
                                     <span class="flow-id"><i class="fas fa-stream"></i> {{.SrcIP}}:{{.SrcPort}} &rarr; {{.DstIP}}:{{.DstPort}}</span>
                                     {{if eq .Status "Complete"}}
                                     <span class="flow-status status-complete"><i class="fas fa-check-circle"></i> Complete</span>
@@ -1996,53 +2014,84 @@ func getTemplateContent() string {
                                     {{else}}
                                     <span class="flow-status status-pending"><i class="fas fa-hourglass-half"></i> Pending</span>
                                     {{end}}
-                                </div>
-                                <div class="handshake-events">
-                                {{range .Events}}
-                                    {{if eq .Type "SYN"}}
-                                    <div class="event event-syn">
-                                        <span class="event-type">SYN</span>
-                                        <span class="event-time">{{.TimestampFmt}}</span>
-                                    </div>
-                                    {{else if eq .Type "SYN-ACK"}}
-                                    <div class="event event-synack">
-                                        <span class="event-type">SYN-ACK</span>
-                                        <span class="event-time">{{.TimestampFmt}}</span>
-                                    </div>
-                                    {{else if eq .Type "Handshake Complete"}}
-                                    <div class="event event-complete">
-                                        <span class="event-type">HANDSHAKE COMPLETE</span>
-                                        <span class="event-time">{{.TimestampFmt}}</span>
-                                    </div>
+                                </summary>
+                                <div class="handshake-flow-content">
+                                    <div class="handshake-events">
+                                    {{range .Events}}
+                                        {{if eq .Type "SYN"}}
+                                        <div class="event event-syn">
+                                            <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
+                                            <span class="event-type">SYN</span>
+                                            <span class="event-time">{{.TimestampFmt}}</span>
+                                            <span class="event-desc">Client initiates connection</span>
+                                        </div>
+                                        {{else if eq .Type "SYN-ACK"}}
+                                        <div class="event event-synack">
+                                            <span class="event-icon"><i class="fas fa-arrow-left"></i></span>
+                                            <span class="event-type">SYN-ACK</span>
+                                            <span class="event-time">{{.TimestampFmt}}</span>
+                                            <span class="event-desc">Server acknowledges</span>
+                                        </div>
+                                        {{else if eq .Type "Handshake Complete"}}
+                                        <div class="event event-complete">
+                                            <span class="event-icon"><i class="fas fa-check"></i></span>
+                                            <span class="event-type">ACK</span>
+                                            <span class="event-time">{{.TimestampFmt}}</span>
+                                            <span class="event-desc">Connection established</span>
+                                        </div>
+                                        {{end}}
                                     {{end}}
-                                {{end}}
+                                    </div>
+                                    <div class="handshake-explanation">
+                                        <h4><i class="fas fa-info-circle"></i> Handshake Explanation</h4>
+                                        <p><strong>SYN:</strong> Client ({{.SrcIP}}) initiates connection to server ({{.DstIP}}) on port {{.DstPort}}.</p>
+                                        <p><strong>SYN-ACK:</strong> Server acknowledges and agrees to establish connection.</p>
+                                        <p><strong>ACK:</strong> Client confirms. Connection is now established.</p>
+                                        {{if eq .Status "Failed"}}
+                                        <p class="failure-note"><i class="fas fa-exclamation-triangle"></i> <strong>Failure:</strong> No SYN-ACK received - destination may be down, unreachable, or blocking connections.</p>
+                                        {{else if eq .Status "Pending"}}
+                                        <p class="pending-note"><i class="fas fa-clock"></i> <strong>Pending:</strong> Handshake incomplete - waiting for final ACK or connection in progress.</p>
+                                        {{end}}
+                                    </div>
                                 </div>
-                            </div>
+                            </details>
                             {{end}}
                         </div>
                     </details>
                     {{end}}
 
                     {{if .FailedHandshakes}}
-                    <details>
+                    <details class="failed-handshakes-section">
                         <summary><i class="fas fa-handshake-slash"></i> Failed TCP Handshakes ({{len .FailedHandshakes}})</summary>
-                        <div>
-                            <table class="data-table">
-                                <thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Action</th></tr></thead>
-                                <tbody>
-                                    {{range .FailedHandshakes}}
-                                    <tr>
-                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
-                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                        <td>{{.DstPort}}</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="4"><div class="action-content"><h4>Recommended Action</h4><ul><li>Check if destination service is running</li><li>Verify firewall rules allow connection</li><li>Check for network connectivity issues</li></ul></div></td>
-                                    </tr>
-                                    {{end}}
-                                </tbody>
-                            </table>
+                        <div class="failed-handshakes-container">
+                            <div class="failed-handshakes-explanation">
+                                <h4><i class="fas fa-exclamation-triangle"></i> What are Failed Handshakes?</h4>
+                                <p>A failed TCP handshake occurs when a client sends a SYN packet to initiate a connection, but does not receive a SYN-ACK response from the server. This indicates the destination host may be:</p>
+                                <ul>
+                                    <li><strong>Down or offline</strong> - The server is not running</li>
+                                    <li><strong>Unreachable</strong> - Network path issues or routing problems</li>
+                                    <li><strong>Blocking connections</strong> - Firewall rules or TCP RST responses</li>
+                                    <li><strong>Port not listening</strong> - Service not bound to the target port</li>
+                                </ul>
+                            </div>
+                            <div class="failed-handshake-list">
+                                {{range .FailedHandshakes}}
+                                <div class="failed-handshake-item">
+                                    <div class="failed-flow-info">
+                                        <span class="flow-direction">
+                                            <i class="fas fa-arrow-right"></i>
+                                            <code>{{.SrcIP}}:{{.SrcPort}}</code>
+                                            <span class="arrow">&rarr;</span>
+                                            <code>{{.DstIP}}:{{.DstPort}}</code>
+                                        </span>
+                                        <span class="status-badge badge-failed"><i class="fas fa-times-circle"></i> FAILED</span>
+                                    </div>
+                                    <div class="failed-action-hint">
+                                        <small><i class="fas fa-lightbulb"></i> Check if service on port {{.DstPort}} is running and firewall allows traffic</small>
+                                    </div>
+                                </div>
+                                {{end}}
+                            </div>
                         </div>
                     </details>
                     {{end}}
