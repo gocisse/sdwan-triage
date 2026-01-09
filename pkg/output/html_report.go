@@ -1881,6 +1881,8 @@ func getTemplateContent() string {
                 </div>
 
                 <div id="tab-security" class="tab-content">
+                    <div id="security-findings"></div>
+                    <div id="dns-analysis">
                     {{if .DNSAnomalies}}
                     <details open>
                         <summary><i class="fas fa-dns"></i> DNS Anomalies ({{len .DNSAnomalies}})</summary>
@@ -1924,7 +1926,9 @@ func getTemplateContent() string {
                     {{else}}
                     <div class="alert alert-success"><i class="fas fa-check"></i> No DNS anomalies detected</div>
                     {{end}}
+                    </div>
 
+                    <div id="arp-conflicts">
                     {{if .ARPConflicts}}
                     <details>
                         <summary><i class="fas fa-network-wired"></i> ARP Conflicts ({{len .ARPConflicts}})</summary>
@@ -1950,6 +1954,7 @@ func getTemplateContent() string {
                     {{else}}
                     <div class="alert alert-success"><i class="fas fa-check"></i> No ARP conflicts detected</div>
                     {{end}}
+                    </div>
 
                     {{if .SuspiciousTraffic}}
                     <details>
@@ -2134,6 +2139,7 @@ func getTemplateContent() string {
                 </div>
 
                 <div id="tab-performance" class="tab-content active">
+                    <div id="tcp-analysis">
                     {{if .TCPRetransmissions}}
                     <details open>
                         <summary><i class="fas fa-redo"></i> TCP Retransmissions ({{len .TCPRetransmissions}})</summary>
@@ -2159,7 +2165,9 @@ func getTemplateContent() string {
                     {{else}}
                     <div class="alert alert-success"><i class="fas fa-check"></i> No TCP retransmissions detected</div>
                     {{end}}
+                    </div>
 
+                    <div id="latency">
                     {{if .HighRTTFlows}}
                     <details>
                         <summary><i class="fas fa-clock"></i> High RTT Flows ({{len .HighRTTFlows}})</summary>
@@ -2180,6 +2188,7 @@ func getTemplateContent() string {
                         </div>
                     </details>
                     {{end}}
+                    </div>
 
                     {{if .TCPHandshakeCorrelatedFlows}}
                     <details open>
@@ -2288,6 +2297,7 @@ func getTemplateContent() string {
                 </div>
 
                 <div id="tab-protocols" class="tab-content">
+                    <div id="protocols"></div>
                     <div class="protocol-summary">
                         <h3><i class="fas fa-handshake"></i> TCP Handshake Analysis</h3>
                         <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
@@ -2514,6 +2524,7 @@ func getTemplateContent() string {
                     </details>
                     {{end}}
 
+                    <div id="qos-analysis">
                     {{if .ApplicationStats}}
                     <details>
                         <summary><i class="fas fa-cubes"></i> Application Breakdown ({{len .ApplicationStats}})</summary>
@@ -2599,6 +2610,7 @@ func getTemplateContent() string {
                         </div>
                     </details>
                     {{end}}
+                    </div>
                 </div>
 
                 <div id="tab-network" class="tab-content">
@@ -2737,6 +2749,7 @@ func getTemplateContent() string {
                 </div>
 
                 <div id="tab-traffic" class="tab-content">
+                    <div id="traffic-flows">
                     {{if .TopFlows}}
                     <details open>
                         <summary><i class="fas fa-sort-amount-down"></i> Top Traffic Flows ({{len .TopFlows}})</summary>
@@ -2758,7 +2771,9 @@ func getTemplateContent() string {
                         </div>
                     </details>
                     {{end}}
+                    </div>
 
+                    <div id="devices">
                     {{if .DeviceFingerprints}}
                     <details>
                         <summary><i class="fas fa-fingerprint"></i> Device Fingerprints ({{len .DeviceFingerprints}})</summary>
@@ -2779,6 +2794,7 @@ func getTemplateContent() string {
                         </div>
                     </details>
                     {{end}}
+                    </div>
                 </div>
 
                 <div id="tab-visualizations" class="tab-content">
