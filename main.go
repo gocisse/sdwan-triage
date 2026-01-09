@@ -27,27 +27,28 @@ import (
 
 // === Data Structures ===
 type TriageReport struct {
-	DNSAnomalies         []DNSAnomaly           `json:"dns_anomalies"`
-	TCPRetransmissions   []TCPFlow              `json:"tcp_retransmissions"`
-	FailedHandshakes     []TCPFlow              `json:"failed_handshakes"`
-	TCPHandshakes        TCPHandshakeAnalysis   `json:"tcp_handshakes"`
-	ARPConflicts         []ARPConflict          `json:"arp_conflicts"`
-	HTTPErrors           []HTTPError            `json:"http_errors"`
-	TLSCerts             []TLSCertInfo          `json:"tls_certs"`
-	HTTP2Flows           []TCPFlow              `json:"http2_flows"`
-	QUICFlows            []UDPFlow              `json:"quic_flows"`
-	TrafficAnalysis      []TrafficFlow          `json:"traffic_analysis"`
-	ApplicationBreakdown map[string]AppCategory `json:"application_breakdown"`
-	SuspiciousTraffic    []SuspiciousFlow       `json:"suspicious_traffic"`
-	RTTAnalysis          []RTTFlow              `json:"rtt_analysis"`
-	DeviceFingerprinting []DeviceFingerprint    `json:"device_fingerprinting"`
-	BandwidthReport      BandwidthReport        `json:"bandwidth_report"`
-	Timeline             []TimelineEvent        `json:"timeline"`
-	DNSDetails           []DNSRecord            `json:"dns_details"`
-	BGPHijackIndicators  []BGPIndicator         `json:"bgp_hijack_indicators,omitempty"`
-	QoSAnalysis          *QoSReport             `json:"qos_analysis,omitempty"`
-	AppIdentification    []IdentifiedApp        `json:"app_identification,omitempty"`
-	TotalBytes           uint64                 `json:"total_bytes"`
+	DNSAnomalies                []DNSAnomaly                 `json:"dns_anomalies"`
+	TCPRetransmissions          []TCPFlow                    `json:"tcp_retransmissions"`
+	FailedHandshakes            []TCPFlow                    `json:"failed_handshakes"`
+	TCPHandshakes               TCPHandshakeAnalysis         `json:"tcp_handshakes"`
+	TCPHandshakeCorrelatedFlows []TCPHandshakeCorrelatedFlow `json:"tcp_handshake_correlated_flows,omitempty"`
+	ARPConflicts                []ARPConflict                `json:"arp_conflicts"`
+	HTTPErrors                  []HTTPError                  `json:"http_errors"`
+	TLSCerts                    []TLSCertInfo                `json:"tls_certs"`
+	HTTP2Flows                  []TCPFlow                    `json:"http2_flows"`
+	QUICFlows                   []UDPFlow                    `json:"quic_flows"`
+	TrafficAnalysis             []TrafficFlow                `json:"traffic_analysis"`
+	ApplicationBreakdown        map[string]AppCategory       `json:"application_breakdown"`
+	SuspiciousTraffic           []SuspiciousFlow             `json:"suspicious_traffic"`
+	RTTAnalysis                 []RTTFlow                    `json:"rtt_analysis"`
+	DeviceFingerprinting        []DeviceFingerprint          `json:"device_fingerprinting"`
+	BandwidthReport             BandwidthReport              `json:"bandwidth_report"`
+	Timeline                    []TimelineEvent              `json:"timeline"`
+	DNSDetails                  []DNSRecord                  `json:"dns_details"`
+	BGPHijackIndicators         []BGPIndicator               `json:"bgp_hijack_indicators,omitempty"`
+	QoSAnalysis                 *QoSReport                   `json:"qos_analysis,omitempty"`
+	AppIdentification           []IdentifiedApp              `json:"app_identification,omitempty"`
+	TotalBytes                  uint64                       `json:"total_bytes"`
 }
 
 type TimelineEvent struct {
@@ -105,6 +106,23 @@ type TCPHandshakeAnalysis struct {
 	SYNACKFlows             []TCPHandshakeFlow `json:"synack_flows"`
 	SuccessfulHandshakes    []TCPHandshakeFlow `json:"successful_handshakes"`
 	FailedHandshakeAttempts []TCPHandshakeFlow `json:"failed_handshake_attempts"`
+}
+
+// TCPHandshakeEvent represents a single event in a TCP handshake sequence
+type TCPHandshakeEvent struct {
+	Type      string  `json:"type"`      // "SYN", "SYN-ACK", "Handshake Complete"
+	Timestamp float64 `json:"timestamp"` // Unix timestamp
+}
+
+// TCPHandshakeCorrelatedFlow represents a TCP handshake flow with all its events grouped together
+type TCPHandshakeCorrelatedFlow struct {
+	FlowID  string              `json:"flow_id"` // e.g., "SrcIP:SrcPort->DstIP:DstPort"
+	SrcIP   string              `json:"src_ip"`
+	SrcPort uint16              `json:"src_port"`
+	DstIP   string              `json:"dst_ip"`
+	DstPort uint16              `json:"dst_port"`
+	Events  []TCPHandshakeEvent `json:"events"` // Ordered list of events for this flow
+	Status  string              `json:"status"` // "Complete", "Failed", "Pending"
 }
 
 type TrafficFlowSummary struct {
@@ -1667,6 +1685,88 @@ VERSION:
 		// If no successful handshake found, mark as failed attempt
 		if !hasSuccess {
 			report.TCPHandshakes.FailedHandshakeAttempts = append(report.TCPHandshakes.FailedHandshakeAttempts, synFlow)
+		}
+	}
+
+	// Build correlated TCP handshake flows for visualization
+	correlatedFlows := make(map[string]*TCPHandshakeCorrelatedFlow)
+
+	// Add SYN events
+	for _, synFlow := range report.TCPHandshakes.SYNFlows {
+		flowID := fmt.Sprintf("%s:%d->%s:%d", synFlow.SrcIP, synFlow.SrcPort, synFlow.DstIP, synFlow.DstPort)
+		if _, exists := correlatedFlows[flowID]; !exists {
+			correlatedFlows[flowID] = &TCPHandshakeCorrelatedFlow{
+				FlowID:  flowID,
+				SrcIP:   synFlow.SrcIP,
+				SrcPort: synFlow.SrcPort,
+				DstIP:   synFlow.DstIP,
+				DstPort: synFlow.DstPort,
+				Events:  []TCPHandshakeEvent{},
+				Status:  "Pending",
+			}
+		}
+		correlatedFlows[flowID].Events = append(correlatedFlows[flowID].Events, TCPHandshakeEvent{
+			Type:      "SYN",
+			Timestamp: synFlow.Timestamp,
+		})
+	}
+
+	// Add SYN-ACK events (note: SYN-ACK comes from the opposite direction)
+	for _, synAckFlow := range report.TCPHandshakes.SYNACKFlows {
+		// SYN-ACK is sent from DstIP:DstPort back to SrcIP:SrcPort
+		// So we need to find the original flow in the opposite direction
+		flowID := fmt.Sprintf("%s:%d->%s:%d", synAckFlow.DstIP, synAckFlow.DstPort, synAckFlow.SrcIP, synAckFlow.SrcPort)
+		if flow, exists := correlatedFlows[flowID]; exists {
+			flow.Events = append(flow.Events, TCPHandshakeEvent{
+				Type:      "SYN-ACK",
+				Timestamp: synAckFlow.Timestamp,
+			})
+		}
+	}
+
+	// Add Handshake Complete events and set status
+	for _, successFlow := range report.TCPHandshakes.SuccessfulHandshakes {
+		flowID := fmt.Sprintf("%s:%d->%s:%d", successFlow.SrcIP, successFlow.SrcPort, successFlow.DstIP, successFlow.DstPort)
+		if flow, exists := correlatedFlows[flowID]; exists {
+			flow.Events = append(flow.Events, TCPHandshakeEvent{
+				Type:      "Handshake Complete",
+				Timestamp: successFlow.Timestamp,
+			})
+			flow.Status = "Complete"
+		}
+	}
+
+	// Mark failed flows
+	for _, failedFlow := range report.TCPHandshakes.FailedHandshakeAttempts {
+		flowID := fmt.Sprintf("%s:%d->%s:%d", failedFlow.SrcIP, failedFlow.SrcPort, failedFlow.DstIP, failedFlow.DstPort)
+		if flow, exists := correlatedFlows[flowID]; exists {
+			if flow.Status != "Complete" {
+				flow.Status = "Failed"
+			}
+		}
+	}
+
+	// Convert map to slice and sort events by timestamp within each flow
+	for _, flow := range correlatedFlows {
+		// Sort events by timestamp
+		for i := 0; i < len(flow.Events); i++ {
+			for j := i + 1; j < len(flow.Events); j++ {
+				if flow.Events[j].Timestamp < flow.Events[i].Timestamp {
+					flow.Events[i], flow.Events[j] = flow.Events[j], flow.Events[i]
+				}
+			}
+		}
+		report.TCPHandshakeCorrelatedFlows = append(report.TCPHandshakeCorrelatedFlows, *flow)
+	}
+
+	// Sort correlated flows by first event timestamp
+	for i := 0; i < len(report.TCPHandshakeCorrelatedFlows); i++ {
+		for j := i + 1; j < len(report.TCPHandshakeCorrelatedFlows); j++ {
+			if len(report.TCPHandshakeCorrelatedFlows[j].Events) > 0 &&
+				len(report.TCPHandshakeCorrelatedFlows[i].Events) > 0 &&
+				report.TCPHandshakeCorrelatedFlows[j].Events[0].Timestamp < report.TCPHandshakeCorrelatedFlows[i].Events[0].Timestamp {
+				report.TCPHandshakeCorrelatedFlows[i], report.TCPHandshakeCorrelatedFlows[j] = report.TCPHandshakeCorrelatedFlows[j], report.TCPHandshakeCorrelatedFlows[i]
+			}
 		}
 	}
 

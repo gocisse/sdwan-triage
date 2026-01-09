@@ -607,6 +607,122 @@ details > div {
     .data-table th, .data-table td { padding: 8px 10px; }
 }
 
+/* TCP Handshake Flow Visualization */
+.handshake-flow {
+    border: 1px solid var(--border-color);
+    margin-bottom: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    background: white;
+}
+
+.handshake-flow-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.flow-id {
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: var(--dark-text);
+}
+
+.flow-id i {
+    margin-right: 8px;
+    color: var(--primary-color);
+}
+
+.flow-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.flow-status i {
+    margin-right: 5px;
+}
+
+.status-complete {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.handshake-events {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.event {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 0.9em;
+    transition: transform 0.2s;
+}
+
+.event:hover {
+    transform: translateX(5px);
+}
+
+.event-type {
+    font-weight: bold;
+    min-width: 160px;
+    margin-right: 15px;
+}
+
+.event-time {
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
+.event-syn {
+    background-color: #ffe6e6;
+    border-left: 4px solid #ff4444;
+}
+
+.event-syn .event-type {
+    color: #cc0000;
+}
+
+.event-synack {
+    background-color: #e6f0ff;
+    border-left: 4px solid #4477ff;
+}
+
+.event-synack .event-type {
+    color: #0044cc;
+}
+
+.event-complete {
+    background-color: #e6ffe6;
+    border-left: 4px solid #44cc44;
+}
+
+.event-complete .event-type {
+    color: #228b22;
+}
+
 /* Print Styles */
 @media print {
     body { background: white; padding: 0; }

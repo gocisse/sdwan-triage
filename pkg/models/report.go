@@ -4,27 +4,28 @@ import "time"
 
 // TriageReport contains all detected network anomalies and analysis results
 type TriageReport struct {
-	DNSAnomalies         []DNSAnomaly           `json:"dns_anomalies"`
-	TCPRetransmissions   []TCPFlow              `json:"tcp_retransmissions"`
-	FailedHandshakes     []TCPFlow              `json:"failed_handshakes"`
-	TCPHandshakes        TCPHandshakeAnalysis   `json:"tcp_handshakes"`
-	ARPConflicts         []ARPConflict          `json:"arp_conflicts"`
-	HTTPErrors           []HTTPError            `json:"http_errors"`
-	TLSCerts             []TLSCertInfo          `json:"tls_certs"`
-	HTTP2Flows           []TCPFlow              `json:"http2_flows"`
-	QUICFlows            []UDPFlow              `json:"quic_flows"`
-	TrafficAnalysis      []TrafficFlow          `json:"traffic_analysis"`
-	ApplicationBreakdown map[string]AppCategory `json:"application_breakdown"`
-	SuspiciousTraffic    []SuspiciousFlow       `json:"suspicious_traffic"`
-	RTTAnalysis          []RTTFlow              `json:"rtt_analysis"`
-	DeviceFingerprinting []DeviceFingerprint    `json:"device_fingerprinting"`
-	BandwidthReport      BandwidthReport        `json:"bandwidth_report"`
-	Timeline             []TimelineEvent        `json:"timeline"`
-	DNSDetails           []DNSRecord            `json:"dns_details"`
-	BGPHijackIndicators  []BGPIndicator         `json:"bgp_hijack_indicators,omitempty"`
-	QoSAnalysis          *QoSReport             `json:"qos_analysis,omitempty"`
-	AppIdentification    []IdentifiedApp        `json:"app_identification,omitempty"`
-	TotalBytes           uint64                 `json:"total_bytes"`
+	DNSAnomalies                []DNSAnomaly                 `json:"dns_anomalies"`
+	TCPRetransmissions          []TCPFlow                    `json:"tcp_retransmissions"`
+	FailedHandshakes            []TCPFlow                    `json:"failed_handshakes"`
+	TCPHandshakes               TCPHandshakeAnalysis         `json:"tcp_handshakes"`
+	TCPHandshakeCorrelatedFlows []TCPHandshakeCorrelatedFlow `json:"tcp_handshake_correlated_flows,omitempty"`
+	ARPConflicts                []ARPConflict                `json:"arp_conflicts"`
+	HTTPErrors                  []HTTPError                  `json:"http_errors"`
+	TLSCerts                    []TLSCertInfo                `json:"tls_certs"`
+	HTTP2Flows                  []TCPFlow                    `json:"http2_flows"`
+	QUICFlows                   []UDPFlow                    `json:"quic_flows"`
+	TrafficAnalysis             []TrafficFlow                `json:"traffic_analysis"`
+	ApplicationBreakdown        map[string]AppCategory       `json:"application_breakdown"`
+	SuspiciousTraffic           []SuspiciousFlow             `json:"suspicious_traffic"`
+	RTTAnalysis                 []RTTFlow                    `json:"rtt_analysis"`
+	DeviceFingerprinting        []DeviceFingerprint          `json:"device_fingerprinting"`
+	BandwidthReport             BandwidthReport              `json:"bandwidth_report"`
+	Timeline                    []TimelineEvent              `json:"timeline"`
+	DNSDetails                  []DNSRecord                  `json:"dns_details"`
+	BGPHijackIndicators         []BGPIndicator               `json:"bgp_hijack_indicators,omitempty"`
+	QoSAnalysis                 *QoSReport                   `json:"qos_analysis,omitempty"`
+	AppIdentification           []IdentifiedApp              `json:"app_identification,omitempty"`
+	TotalBytes                  uint64                       `json:"total_bytes"`
 
 	// Security Analysis
 	Security SecurityAnalysis `json:"security"`
@@ -80,6 +81,23 @@ type TCPHandshakeAnalysis struct {
 	SYNACKFlows             []TCPHandshakeFlow `json:"synack_flows"`
 	SuccessfulHandshakes    []TCPHandshakeFlow `json:"successful_handshakes"`
 	FailedHandshakeAttempts []TCPHandshakeFlow `json:"failed_handshake_attempts"`
+}
+
+// TCPHandshakeEvent represents a single event in a TCP handshake sequence
+type TCPHandshakeEvent struct {
+	Type      string  `json:"type"`      // "SYN", "SYN-ACK", "Handshake Complete"
+	Timestamp float64 `json:"timestamp"` // Unix timestamp
+}
+
+// TCPHandshakeCorrelatedFlow represents a TCP handshake flow with all its events grouped together
+type TCPHandshakeCorrelatedFlow struct {
+	FlowID  string              `json:"flow_id"` // e.g., "SrcIP:SrcPort->DstIP:DstPort"
+	SrcIP   string              `json:"src_ip"`
+	SrcPort uint16              `json:"src_port"`
+	DstIP   string              `json:"dst_ip"`
+	DstPort uint16              `json:"dst_port"`
+	Events  []TCPHandshakeEvent `json:"events"` // Ordered list of events for this flow
+	Status  string              `json:"status"` // "Complete", "Failed", "Pending"
 }
 
 // TrafficFlowSummary represents a summarized traffic flow for bandwidth analysis

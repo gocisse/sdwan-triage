@@ -109,14 +109,15 @@ type ReportData struct {
 	FailedHandshakes   []FailedHandshakeView
 
 	// Protocol Analysis
-	DNSDetails           []DNSDetailView
-	HTTP2Flows           []HTTP2FlowView
-	QUICFlows            []QUICFlowView
-	TCPHandshakeStats    TCPHandshakeStatsView
-	SYNFlows             []TCPHandshakeFlowView
-	SYNACKFlows          []TCPHandshakeFlowView
-	SuccessfulHandshakes []TCPHandshakeFlowView
-	AppIdentifications   []AppIdentificationView
+	DNSDetails                  []DNSDetailView
+	HTTP2Flows                  []HTTP2FlowView
+	QUICFlows                   []QUICFlowView
+	TCPHandshakeStats           TCPHandshakeStatsView
+	SYNFlows                    []TCPHandshakeFlowView
+	SYNACKFlows                 []TCPHandshakeFlowView
+	SuccessfulHandshakes        []TCPHandshakeFlowView
+	TCPHandshakeCorrelatedFlows []TCPHandshakeCorrelatedFlowView
+	AppIdentifications          []AppIdentificationView
 
 	// Traffic Analysis
 	TopFlows           []TrafficFlowView
@@ -132,10 +133,11 @@ type ReportData struct {
 	QoSTotalPackets uint64
 
 	// Advanced Network Analysis
-	VoIPAnalysis   *VoIPAnalysisView
-	TunnelFindings []TunnelFindingView
-	SDWANVendors   []SDWANVendorView
-	GeoLocations   []GeoLocationView
+	VoIPAnalysis    *VoIPAnalysisView
+	TunnelFindings  []TunnelFindingView
+	SDWANVendors    []SDWANVendorView
+	GeoLocations    []GeoLocationView
+	BandwidthReport *BandwidthReportView
 
 	// Embedded assets
 	CSS template.CSS
@@ -295,6 +297,24 @@ type TCPHandshakeFlowView struct {
 	Timestamp float64
 }
 
+// TCPHandshakeEventView represents a single event in a TCP handshake sequence for display
+type TCPHandshakeEventView struct {
+	Type         string
+	Timestamp    float64
+	TimestampFmt string // Formatted timestamp for display
+}
+
+// TCPHandshakeCorrelatedFlowView represents a correlated TCP handshake flow for display
+type TCPHandshakeCorrelatedFlowView struct {
+	FlowID  string
+	SrcIP   string
+	SrcPort uint16
+	DstIP   string
+	DstPort uint16
+	Events  []TCPHandshakeEventView
+	Status  string // "Complete", "Failed", "Pending"
+}
+
 type AppIdentificationView struct {
 	Name         string
 	Category     string
@@ -451,6 +471,23 @@ type GeoLocationView struct {
 	Count   int
 }
 
+type BandwidthReportView struct {
+	TopByBytes   []BandwidthFlowView
+	TopByPackets []BandwidthFlowView
+}
+
+type BandwidthFlowView struct {
+	SrcIP        string
+	SrcPort      uint16
+	DstIP        string
+	DstPort      uint16
+	Protocol     string
+	TotalBytes   string // Formatted
+	TotalPackets uint64
+	Duration     string // Formatted
+	AvgBitrate   string // Formatted as Mbps/Kbps
+}
+
 // GenerateHTMLReport generates a professional HTML report using templates
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
 	// Prepare template data
@@ -578,6 +615,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.SYNFlows = convertTCPHandshakeFlows(r.TCPHandshakes.SYNFlows)
 	data.SYNACKFlows = convertTCPHandshakeFlows(r.TCPHandshakes.SYNACKFlows)
 	data.SuccessfulHandshakes = convertTCPHandshakeFlows(r.TCPHandshakes.SuccessfulHandshakes)
+	data.TCPHandshakeCorrelatedFlows = convertTCPHandshakeCorrelatedFlows(r.TCPHandshakeCorrelatedFlows)
 	data.AppIdentifications = convertAppIdentifications(r.AppIdentification)
 
 	// Traffic Analysis
@@ -601,6 +639,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.TunnelFindings = convertTunnelFindings(r.TunnelAnalysis)
 	data.SDWANVendors = convertSDWANVendors(r.SDWANVendors)
 	data.GeoLocations = convertGeoLocations(r.LocationSummary)
+	data.BandwidthReport = convertBandwidthReport(r.BandwidthReport)
 
 	// Generate visualization data
 	data.NetworkDataJSON = template.JS(generateNetworkJSON(r))
@@ -1133,6 +1172,30 @@ func convertTCPHandshakeFlows(flows []models.TCPHandshakeFlow) []TCPHandshakeFlo
 	return result
 }
 
+func convertTCPHandshakeCorrelatedFlows(flows []models.TCPHandshakeCorrelatedFlow) []TCPHandshakeCorrelatedFlowView {
+	result := make([]TCPHandshakeCorrelatedFlowView, len(flows))
+	for i, f := range flows {
+		events := make([]TCPHandshakeEventView, len(f.Events))
+		for j, e := range f.Events {
+			events[j] = TCPHandshakeEventView{
+				Type:         html.EscapeString(e.Type),
+				Timestamp:    e.Timestamp,
+				TimestampFmt: formatUnixTimeShort(e.Timestamp),
+			}
+		}
+		result[i] = TCPHandshakeCorrelatedFlowView{
+			FlowID:  html.EscapeString(f.FlowID),
+			SrcIP:   html.EscapeString(f.SrcIP),
+			SrcPort: f.SrcPort,
+			DstIP:   html.EscapeString(f.DstIP),
+			DstPort: f.DstPort,
+			Events:  events,
+			Status:  html.EscapeString(f.Status),
+		}
+	}
+	return result
+}
+
 func convertAppIdentifications(apps []models.IdentifiedApp) []AppIdentificationView {
 	result := make([]AppIdentificationView, len(apps))
 	for i, a := range apps {
@@ -1393,6 +1456,68 @@ func convertGeoLocations(locations map[string]int) []GeoLocationView {
 		return result[i].Count > result[j].Count
 	})
 	return result
+}
+
+func convertBandwidthReport(br models.BandwidthReport) *BandwidthReportView {
+	if len(br.TopConversationsByBytes) == 0 && len(br.TopConversationsByPackets) == 0 {
+		return nil
+	}
+
+	result := &BandwidthReportView{}
+
+	// Convert top by bytes
+	for _, flow := range br.TopConversationsByBytes {
+		result.TopByBytes = append(result.TopByBytes, BandwidthFlowView{
+			SrcIP:        html.EscapeString(flow.SrcIP),
+			SrcPort:      flow.SrcPort,
+			DstIP:        html.EscapeString(flow.DstIP),
+			DstPort:      flow.DstPort,
+			Protocol:     html.EscapeString(flow.Protocol),
+			TotalBytes:   formatBytesForTemplate(flow.TotalBytes),
+			TotalPackets: flow.TotalPackets,
+			Duration:     formatDuration(flow.Duration),
+			AvgBitrate:   formatBitrate(flow.AvgBitsPerSecond),
+		})
+	}
+
+	// Convert top by packets
+	for _, flow := range br.TopConversationsByPackets {
+		result.TopByPackets = append(result.TopByPackets, BandwidthFlowView{
+			SrcIP:        html.EscapeString(flow.SrcIP),
+			SrcPort:      flow.SrcPort,
+			DstIP:        html.EscapeString(flow.DstIP),
+			DstPort:      flow.DstPort,
+			Protocol:     html.EscapeString(flow.Protocol),
+			TotalBytes:   formatBytesForTemplate(flow.TotalBytes),
+			TotalPackets: flow.TotalPackets,
+			Duration:     formatDuration(flow.Duration),
+			AvgBitrate:   formatBitrate(flow.AvgBitsPerSecond),
+		})
+	}
+
+	return result
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	} else if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	} else if d < time.Hour {
+		return fmt.Sprintf("%.1fm", d.Minutes())
+	}
+	return fmt.Sprintf("%.1fh", d.Hours())
+}
+
+func formatBitrate(bitsPerSecond float64) string {
+	if bitsPerSecond >= 1e9 {
+		return fmt.Sprintf("%.2f Gbps", bitsPerSecond/1e9)
+	} else if bitsPerSecond >= 1e6 {
+		return fmt.Sprintf("%.2f Mbps", bitsPerSecond/1e6)
+	} else if bitsPerSecond >= 1e3 {
+		return fmt.Sprintf("%.2f Kbps", bitsPerSecond/1e3)
+	}
+	return fmt.Sprintf("%.0f bps", bitsPerSecond)
 }
 
 func getTemplateContent() string {
