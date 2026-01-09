@@ -262,6 +262,9 @@ func (p *Processor) matchesFilter(packet gopacket.Packet, filter *models.Filter)
 
 // finalizeReport processes collected state into final report data
 func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.TriageReport) {
+	// Build correlated TCP handshake flows for visualization
+	p.buildTCPHandshakeCorrelatedFlows(report)
+
 	// Calculate RTT statistics from TCP flows
 	for flowKey, flowState := range state.TCPFlows {
 		if len(flowState.RTTSamples) > 0 {
@@ -516,4 +519,81 @@ func (p *Processor) finalizeSDWANAnalysis(report *models.TriageReport) {
 			LastSeen:    float64(vendor.LastSeen.UnixNano()) / 1e9,
 		})
 	}
+}
+
+// buildTCPHandshakeCorrelatedFlows creates correlated TCP handshake flows for visualization
+func (p *Processor) buildTCPHandshakeCorrelatedFlows(report *models.TriageReport) {
+	correlatedFlows := make(map[string]*models.TCPHandshakeCorrelatedFlow)
+
+	// Add SYN events
+	for _, synFlow := range report.TCPHandshakes.SYNFlows {
+		flowID := fmt.Sprintf("%s:%d->%s:%d", synFlow.SrcIP, synFlow.SrcPort, synFlow.DstIP, synFlow.DstPort)
+		if _, exists := correlatedFlows[flowID]; !exists {
+			correlatedFlows[flowID] = &models.TCPHandshakeCorrelatedFlow{
+				FlowID:  flowID,
+				SrcIP:   synFlow.SrcIP,
+				SrcPort: synFlow.SrcPort,
+				DstIP:   synFlow.DstIP,
+				DstPort: synFlow.DstPort,
+				Events:  []models.TCPHandshakeEvent{},
+				Status:  "Pending",
+			}
+		}
+		correlatedFlows[flowID].Events = append(correlatedFlows[flowID].Events, models.TCPHandshakeEvent{
+			Type:      "SYN",
+			Timestamp: synFlow.Timestamp,
+		})
+	}
+
+	// Add SYN-ACK events (note: SYN-ACK comes from the opposite direction)
+	for _, synAckFlow := range report.TCPHandshakes.SYNACKFlows {
+		// SYN-ACK is sent from DstIP:DstPort back to SrcIP:SrcPort
+		// So we need to find the original flow in the opposite direction
+		flowID := fmt.Sprintf("%s:%d->%s:%d", synAckFlow.DstIP, synAckFlow.DstPort, synAckFlow.SrcIP, synAckFlow.SrcPort)
+		if flow, exists := correlatedFlows[flowID]; exists {
+			flow.Events = append(flow.Events, models.TCPHandshakeEvent{
+				Type:      "SYN-ACK",
+				Timestamp: synAckFlow.Timestamp,
+			})
+		}
+	}
+
+	// Add Handshake Complete events and set status
+	for _, successFlow := range report.TCPHandshakes.SuccessfulHandshakes {
+		flowID := fmt.Sprintf("%s:%d->%s:%d", successFlow.SrcIP, successFlow.SrcPort, successFlow.DstIP, successFlow.DstPort)
+		if flow, exists := correlatedFlows[flowID]; exists {
+			flow.Events = append(flow.Events, models.TCPHandshakeEvent{
+				Type:      "Handshake Complete",
+				Timestamp: successFlow.Timestamp,
+			})
+			flow.Status = "Complete"
+		}
+	}
+
+	// Mark failed flows
+	for _, failedFlow := range report.TCPHandshakes.FailedHandshakeAttempts {
+		flowID := fmt.Sprintf("%s:%d->%s:%d", failedFlow.SrcIP, failedFlow.SrcPort, failedFlow.DstIP, failedFlow.DstPort)
+		if flow, exists := correlatedFlows[flowID]; exists {
+			if flow.Status != "Complete" {
+				flow.Status = "Failed"
+			}
+		}
+	}
+
+	// Convert map to slice and sort events by timestamp within each flow
+	for _, flow := range correlatedFlows {
+		// Sort events by timestamp
+		sort.Slice(flow.Events, func(i, j int) bool {
+			return flow.Events[i].Timestamp < flow.Events[j].Timestamp
+		})
+		report.TCPHandshakeCorrelatedFlows = append(report.TCPHandshakeCorrelatedFlows, *flow)
+	}
+
+	// Sort correlated flows by first event timestamp
+	sort.Slice(report.TCPHandshakeCorrelatedFlows, func(i, j int) bool {
+		if len(report.TCPHandshakeCorrelatedFlows[i].Events) > 0 && len(report.TCPHandshakeCorrelatedFlows[j].Events) > 0 {
+			return report.TCPHandshakeCorrelatedFlows[i].Events[0].Timestamp < report.TCPHandshakeCorrelatedFlows[j].Events[0].Timestamp
+		}
+		return false
+	})
 }

@@ -1980,6 +1980,49 @@ func getTemplateContent() string {
                     </details>
                     {{end}}
 
+                    {{if .TCPHandshakeCorrelatedFlows}}
+                    <details>
+                        <summary><i class="fas fa-exchange-alt"></i> TCP Handshake Analysis ({{len .TCPHandshakeCorrelatedFlows}} flows)</summary>
+                        <div>
+                            <p style="color: #6c757d; margin-bottom: 15px;">TCP handshake events grouped by flow for correlation analysis.</p>
+                            {{range .TCPHandshakeCorrelatedFlows}}
+                            <div class="handshake-flow">
+                                <div class="handshake-flow-header">
+                                    <span class="flow-id"><i class="fas fa-stream"></i> {{.SrcIP}}:{{.SrcPort}} &rarr; {{.DstIP}}:{{.DstPort}}</span>
+                                    {{if eq .Status "Complete"}}
+                                    <span class="flow-status status-complete"><i class="fas fa-check-circle"></i> Complete</span>
+                                    {{else if eq .Status "Failed"}}
+                                    <span class="flow-status status-failed"><i class="fas fa-times-circle"></i> Failed</span>
+                                    {{else}}
+                                    <span class="flow-status status-pending"><i class="fas fa-hourglass-half"></i> Pending</span>
+                                    {{end}}
+                                </div>
+                                <div class="handshake-events">
+                                {{range .Events}}
+                                    {{if eq .Type "SYN"}}
+                                    <div class="event event-syn">
+                                        <span class="event-type">SYN</span>
+                                        <span class="event-time">{{.TimestampFmt}}</span>
+                                    </div>
+                                    {{else if eq .Type "SYN-ACK"}}
+                                    <div class="event event-synack">
+                                        <span class="event-type">SYN-ACK</span>
+                                        <span class="event-time">{{.TimestampFmt}}</span>
+                                    </div>
+                                    {{else if eq .Type "Handshake Complete"}}
+                                    <div class="event event-complete">
+                                        <span class="event-type">HANDSHAKE COMPLETE</span>
+                                        <span class="event-time">{{.TimestampFmt}}</span>
+                                    </div>
+                                    {{end}}
+                                {{end}}
+                                </div>
+                            </div>
+                            {{end}}
+                        </div>
+                    </details>
+                    {{end}}
+
                     {{if .FailedHandshakes}}
                     <details>
                         <summary><i class="fas fa-handshake-slash"></i> Failed TCP Handshakes ({{len .FailedHandshakes}})</summary>
