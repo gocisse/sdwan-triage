@@ -1,0 +1,16 @@
+{
+  "report": {
+    "template": "security",
+    "sections": [
+      "executive",
+      "security",
+      "protocols"
+    ],
+    "exclude_sections": [],
+    "branding": {
+      "company_name": "",
+      "logo_path": "",
+      "footer": "Security-focused network analysis report"
+    }
+  }
+}

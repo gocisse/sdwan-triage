@@ -31,6 +31,8 @@ OPTIONS:
     -json              Output in JSON format
     -csv <file>        Export findings to CSV file
     -html <file>       Export findings to HTML report with D3.js visualizations
+    -pdf <file>        Export findings to PDF report (requires wkhtmltopdf)
+    -config <path>     Use custom report configuration (default, performance, security, or path)
     -src-ip <ip>       Filter by source IP address
     -dst-ip <ip>       Filter by destination IP address
     -service <port>    Filter by service port or name (e.g., 443, https, ssh)
@@ -65,6 +67,8 @@ VERSION:
 	jsonOutput := flag.Bool("json", false, "Output in JSON format")
 	csvOutput := flag.String("csv", "", "Export findings to CSV file")
 	htmlOutput := flag.String("html", "", "Export findings to HTML report")
+	pdfOutput := flag.String("pdf", "", "Export findings to PDF report")
+	configPath := flag.String("config", "", "Report configuration (default, performance, security, or path)")
 	srcIP := flag.String("src-ip", "", "Filter by source IP address")
 	dstIP := flag.String("dst-ip", "", "Filter by destination IP address")
 	service := flag.String("service", "", "Filter by service port or name")
@@ -199,4 +203,22 @@ VERSION:
 			color.Green("✓ HTML report exported to %s", *htmlOutput)
 		}
 	}
+
+	// Export to PDF if requested
+	if *pdfOutput != "" {
+		pdfGen := output.NewPDFGenerator()
+		if !pdfGen.IsAvailable() {
+			color.Yellow("⚠ PDF generation requires wkhtmltopdf")
+			color.Yellow("  %s", pdfGen.GetInstallInstructions())
+		} else {
+			if err := pdfGen.GeneratePDF(report, *pdfOutput, filepath.Base(absPath)); err != nil {
+				fmt.Fprintf(os.Stderr, "Error exporting to PDF: %v\n", err)
+			} else {
+				color.Green("✓ PDF report exported to %s", *pdfOutput)
+			}
+		}
+	}
+
+	// Note: configPath is reserved for future template customization
+	_ = configPath
 }

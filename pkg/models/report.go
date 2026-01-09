@@ -27,6 +27,15 @@ type TriageReport struct {
 	AppIdentification           []IdentifiedApp              `json:"app_identification,omitempty"`
 	TotalBytes                  uint64                       `json:"total_bytes"`
 
+	// Risk Assessment
+	RiskScore int    `json:"risk_score"`
+	RiskLevel string `json:"risk_level"` // "Low", "Medium", "High", "Critical"
+
+	// Top Issues for Executive Summary
+	TopIssue           string   `json:"top_issue,omitempty"`
+	TopIssueCount      int      `json:"top_issue_count,omitempty"`
+	RecommendedActions []string `json:"recommended_actions,omitempty"`
+
 	// Security Analysis
 	Security SecurityAnalysis `json:"security"`
 

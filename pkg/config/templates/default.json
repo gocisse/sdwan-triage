@@ -1,0 +1,20 @@
+{
+  "report": {
+    "template": "default",
+    "sections": [
+      "executive",
+      "security",
+      "performance",
+      "traffic",
+      "protocols",
+      "network",
+      "visualizations"
+    ],
+    "exclude_sections": [],
+    "branding": {
+      "company_name": "",
+      "logo_path": "",
+      "footer": ""
+    }
+  }
+}

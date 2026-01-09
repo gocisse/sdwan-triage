@@ -69,8 +69,13 @@ type ReportData struct {
 	// Health status
 	HealthStatus  string // "good", "warning", "critical"
 	RiskScore     int
-	RiskLevel     string // "low", "medium", "high"
+	RiskLevel     string // "low", "medium", "high", "critical"
 	TotalFindings int
+
+	// Top Issue for Executive Dashboard
+	TopIssue           string
+	TopIssueCount      int
+	RecommendedActions []string
 
 	// Statistics
 	Stats struct {
@@ -514,6 +519,7 @@ func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string
 	funcMap := template.FuncMap{
 		"formatUnixTime":      formatUnixTime,
 		"formatUnixTimeShort": formatUnixTimeShort,
+		"hasPrefix":           strings.HasPrefix,
 	}
 
 	// Parse template with functions
@@ -548,33 +554,37 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 		JS:          template.JS(jsContent),
 	}
 
-	// Calculate health status and risk score
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.DDoSFindings) + len(r.Security.IOCFindings)
-	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
-	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings)
+	// Use risk score from model (calculated in processor)
+	data.RiskScore = r.RiskScore
+	data.RiskLevel = strings.ToLower(r.RiskLevel)
+	data.TopIssue = r.TopIssue
+	data.TopIssueCount = r.TopIssueCount
+	data.RecommendedActions = r.RecommendedActions
 
-	// Count ICMP anomalies
+	// Count ICMP anomalies for stats
 	icmpAnomalies := 0
 	for _, f := range r.ICMPAnalysis {
 		if f.IsAnomaly {
 			icmpAnomalies++
 		}
 	}
-	securityConcerns += icmpAnomalies
 
+	// Calculate total findings for display
+	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.DDoSFindings) + len(r.Security.IOCFindings)
+	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
+	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings) + icmpAnomalies
 	data.TotalFindings = criticalIssues + performanceIssues + securityConcerns
 
-	// Calculate risk score (0-100)
-	data.RiskScore = calculateRiskScore(criticalIssues, performanceIssues, securityConcerns)
-	if data.RiskScore < 30 {
-		data.RiskLevel = "low"
+	// Set health status based on risk level
+	switch data.RiskLevel {
+	case "low":
 		data.HealthStatus = "good"
-	} else if data.RiskScore < 70 {
-		data.RiskLevel = "medium"
+	case "medium":
 		data.HealthStatus = "warning"
-	} else {
-		data.RiskLevel = "high"
+	case "high", "critical":
 		data.HealthStatus = "critical"
+	default:
+		data.HealthStatus = "good"
 	}
 
 	// Statistics - comprehensive
@@ -1637,12 +1647,41 @@ func getTemplateContent() string {
                     </div>
                     {{end}}
 
-                    <div style="display: flex; align-items: center; gap: 30px; margin: 20px 0;">
-                        <div class="risk-score risk-{{.RiskLevel}}">{{.RiskScore}}</div>
-                        <div>
-                            <strong>Risk Score</strong><br/>
-                            <span style="color: #6c757d;">Based on {{.TotalFindings}} findings</span>
+                    <div class="executive-dashboard">
+                        <div class="dashboard-cards">
+                            <div class="dashboard-card risk-card risk-{{.RiskLevel}}">
+                                <div class="risk-score-display">{{.RiskScore}}</div>
+                                <div class="risk-label">Risk Score</div>
+                                <div class="risk-level-badge">{{.RiskLevel}}</div>
+                            </div>
+                            {{if .TopIssue}}
+                            <div class="dashboard-card top-issue-card">
+                                <div class="top-issue-icon"><i class="fas fa-exclamation-circle"></i></div>
+                                <div class="top-issue-content">
+                                    <div class="top-issue-label">Primary Concern</div>
+                                    <div class="top-issue-value">{{.TopIssueCount}} {{.TopIssue}}</div>
+                                </div>
+                            </div>
+                            {{end}}
+                            <div class="dashboard-card findings-card">
+                                <div class="findings-count">{{.TotalFindings}}</div>
+                                <div class="findings-label">Total Findings</div>
+                            </div>
                         </div>
+
+                        {{if .RecommendedActions}}
+                        <div class="recommended-actions">
+                            <h3><i class="fas fa-clipboard-list"></i> Recommended Actions</h3>
+                            <div class="actions-list">
+                                {{range .RecommendedActions}}
+                                <div class="action-item {{if hasPrefix . "CRITICAL"}}action-critical{{else if hasPrefix . "HIGH"}}action-high{{else if hasPrefix . "MEDIUM"}}action-medium{{else}}action-low{{end}}">
+                                    <i class="fas fa-chevron-right"></i>
+                                    <span>{{.}}</span>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                        {{end}}
                     </div>
 
                     <div class="stats-grid">

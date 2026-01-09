@@ -336,6 +336,150 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	sort.Slice(report.Timeline, func(i, j int) bool {
 		return report.Timeline[i].Timestamp < report.Timeline[j].Timestamp
 	})
+
+	// Calculate risk score and generate recommendations
+	p.calculateRiskScore(report)
+}
+
+// calculateRiskScore calculates the overall risk score and generates recommendations
+func (p *Processor) calculateRiskScore(report *models.TriageReport) {
+	score := 0
+	issues := make(map[string]int)
+
+	// Critical findings (+10 points each)
+	if len(report.ARPConflicts) > 0 {
+		score += len(report.ARPConflicts) * 10
+		issues["ARP Conflicts"] = len(report.ARPConflicts)
+	}
+	if len(report.DNSAnomalies) > 0 {
+		score += len(report.DNSAnomalies) * 10
+		issues["DNS Anomalies"] = len(report.DNSAnomalies)
+	}
+	if len(report.Security.DDoSFindings) > 0 {
+		score += len(report.Security.DDoSFindings) * 10
+		issues["DDoS Indicators"] = len(report.Security.DDoSFindings)
+	}
+	if len(report.Security.TLSSecurityFindings) > 0 {
+		score += len(report.Security.TLSSecurityFindings) * 10
+		issues["TLS Security Issues"] = len(report.Security.TLSSecurityFindings)
+	}
+	if len(report.Security.IOCFindings) > 0 {
+		score += len(report.Security.IOCFindings) * 10
+		issues["IOC Matches"] = len(report.Security.IOCFindings)
+	}
+
+	// Warning findings (+5 points each, capped)
+	if len(report.TCPRetransmissions) > 0 {
+		retransScore := len(report.TCPRetransmissions)
+		if retransScore > 20 {
+			retransScore = 20 // Cap at 100 points
+		}
+		score += retransScore * 5
+		issues["TCP Retransmissions"] = len(report.TCPRetransmissions)
+	}
+	if len(report.FailedHandshakes) > 0 {
+		score += len(report.FailedHandshakes) * 5
+		issues["Failed Handshakes"] = len(report.FailedHandshakes)
+	}
+	if len(report.SuspiciousTraffic) > 0 {
+		score += len(report.SuspiciousTraffic) * 5
+		issues["Suspicious Traffic"] = len(report.SuspiciousTraffic)
+	}
+	if len(report.Security.PortScanFindings) > 0 {
+		score += len(report.Security.PortScanFindings) * 5
+		issues["Port Scan Indicators"] = len(report.Security.PortScanFindings)
+	}
+	if len(report.RTTAnalysis) > 0 {
+		score += len(report.RTTAnalysis) * 2
+		issues["High RTT Flows"] = len(report.RTTAnalysis)
+	}
+	if len(report.HTTPErrors) > 0 {
+		score += len(report.HTTPErrors) * 2
+		issues["HTTP Errors"] = len(report.HTTPErrors)
+	}
+
+	// Set risk level based on score
+	report.RiskScore = score
+	switch {
+	case score == 0:
+		report.RiskLevel = "Low"
+	case score <= 10:
+		report.RiskLevel = "Low"
+	case score <= 20:
+		report.RiskLevel = "Medium"
+	case score <= 50:
+		report.RiskLevel = "High"
+	default:
+		report.RiskLevel = "Critical"
+	}
+
+	// Find top issue
+	maxCount := 0
+	topIssue := ""
+	for issue, count := range issues {
+		if count > maxCount {
+			maxCount = count
+			topIssue = issue
+		}
+	}
+	report.TopIssue = topIssue
+	report.TopIssueCount = maxCount
+
+	// Generate recommended actions
+	report.RecommendedActions = p.generateRecommendations(report, issues)
+}
+
+// generateRecommendations creates actionable recommendations based on findings
+func (p *Processor) generateRecommendations(report *models.TriageReport, issues map[string]int) []string {
+	var actions []string
+
+	// Critical actions first
+	if issues["ARP Conflicts"] > 0 {
+		actions = append(actions, "CRITICAL: Investigate ARP spoofing immediately. Locate the device causing the conflict and verify network security.")
+	}
+	if issues["DNS Anomalies"] > 0 {
+		actions = append(actions, "CRITICAL: Review DNS anomalies for potential DNS hijacking or poisoning attacks.")
+	}
+	if issues["DDoS Indicators"] > 0 {
+		actions = append(actions, "CRITICAL: Potential DDoS attack detected. Enable rate limiting and contact your ISP if needed.")
+	}
+	if issues["IOC Matches"] > 0 {
+		actions = append(actions, "CRITICAL: Indicators of Compromise detected. Isolate affected systems and perform forensic analysis.")
+	}
+	if issues["TLS Security Issues"] > 0 {
+		actions = append(actions, "HIGH: TLS security vulnerabilities found. Update certificates and disable weak cipher suites.")
+	}
+
+	// Warning actions
+	if issues["TCP Retransmissions"] > 50 {
+		actions = append(actions, "HIGH: Excessive TCP retransmissions indicate network congestion or hardware issues. Check links between affected hosts.")
+	} else if issues["TCP Retransmissions"] > 10 {
+		actions = append(actions, "MEDIUM: TCP retransmissions detected. Monitor network links for potential issues.")
+	}
+	if issues["Failed Handshakes"] > 0 {
+		actions = append(actions, "MEDIUM: Failed TCP handshakes may indicate firewall blocks, service unavailability, or network issues.")
+	}
+	if issues["Suspicious Traffic"] > 0 {
+		actions = append(actions, "MEDIUM: Suspicious traffic patterns detected. Review for potential malware or unauthorized access.")
+	}
+	if issues["Port Scan Indicators"] > 0 {
+		actions = append(actions, "MEDIUM: Port scanning activity detected. Review source IPs and consider blocking if malicious.")
+	}
+	if issues["High RTT Flows"] > 0 {
+		actions = append(actions, "LOW: High latency flows detected. Check for network congestion or routing issues.")
+	}
+
+	// Limit to top 5 actions
+	if len(actions) > 5 {
+		actions = actions[:5]
+	}
+
+	// If no issues, add positive message
+	if len(actions) == 0 {
+		actions = append(actions, "No critical issues detected. Continue monitoring network health.")
+	}
+
+	return actions
 }
 
 // buildTrafficSummary creates traffic flow summary from collected data

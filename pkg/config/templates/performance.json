@@ -1,0 +1,17 @@
+{
+  "report": {
+    "template": "performance",
+    "sections": [
+      "executive",
+      "performance",
+      "traffic",
+      "protocols"
+    ],
+    "exclude_sections": [],
+    "branding": {
+      "company_name": "",
+      "logo_path": "",
+      "footer": "Performance-focused network analysis report"
+    }
+  }
+}
