@@ -652,11 +652,10 @@ function toggleAction(btn) {
     const row = btn.closest('tr');
     const actionRow = row.nextElementSibling;
     if (actionRow && actionRow.classList.contains('action-row')) {
-        const isVisible = actionRow.classList.contains('visible');
-        actionRow.classList.toggle('visible');
+        const isVisible = actionRow.classList.contains('show');
+        actionRow.classList.toggle('show');
+        actionRow.style.display = isVisible ? 'none' : 'table-row';
         btn.textContent = isVisible ? 'Show Action' : 'Hide Action';
-        btn.classList.toggle('btn-secondary', isVisible);
-        btn.classList.toggle('btn-success', !isVisible);
     }
 }
 
