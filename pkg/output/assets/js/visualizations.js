@@ -1,4 +1,27 @@
 // SD-WAN Triage Report Visualizations
+// Modern Dashboard with Theme Support
+
+// Theme-aware color utilities
+function getThemeColors() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        primary: '#3b82f6',
+        primaryLight: '#60a5fa',
+        success: '#10b981',
+        warning: '#f59e0b',
+        danger: '#ef4444',
+        info: '#06b6d4',
+        text: isDark ? '#f1f5f9' : '#1e293b',
+        textSecondary: isDark ? '#94a3b8' : '#64748b',
+        textMuted: isDark ? '#64748b' : '#94a3b8',
+        background: isDark ? '#1e293b' : '#ffffff',
+        border: isDark ? '#334155' : '#e2e8f0',
+        nodeInternal: '#10b981',
+        nodeRouter: '#3b82f6',
+        nodeExternal: '#f59e0b',
+        nodeAnomaly: '#ef4444'
+    };
+}
 
 // Utility: Safe D3 initialization wrapper
 function safeD3Init(containerId, initFn, data) {
@@ -47,10 +70,11 @@ function createNetworkDiagram(container, data) {
         .attr("class", "d3-tooltip")
         .style("opacity", 0);
     
-    // Color scale
+    // Color scale - theme aware
+    const colors = getThemeColors();
     const colorScale = d3.scaleOrdinal()
         .domain(["internal", "router", "external", "anomaly"])
-        .range(["#66cc66", "#6699ff", "#ff9933", "#dc3545"]);
+        .range([colors.nodeInternal, colors.nodeRouter, colors.nodeExternal, colors.nodeAnomaly]);
     
     // Force simulation
     const simulation = d3.forceSimulation(data.nodes)
@@ -144,18 +168,18 @@ function createNetworkDiagram(container, data) {
             });
     }
     
-    // Legend
+    // Legend - theme aware
     const legend = svg.append("g").attr("transform", `translate(20, 20)`);
     const legendData = [
-        { label: "Internal", color: "#66cc66" },
-        { label: "Router/Gateway", color: "#6699ff" },
-        { label: "External", color: "#ff9933" },
-        { label: "Anomaly", color: "#dc3545" }
+        { label: "Internal", color: colors.nodeInternal },
+        { label: "Router/Gateway", color: colors.nodeRouter },
+        { label: "External", color: colors.nodeExternal },
+        { label: "Anomaly", color: colors.nodeAnomaly }
     ];
     legendData.forEach((item, i) => {
         const lg = legend.append("g").attr("transform", `translate(0, ${i * 22})`);
         lg.append("circle").attr("r", 6).attr("fill", item.color);
-        lg.append("text").attr("x", 12).attr("y", 4).attr("font-size", "11px").text(item.label);
+        lg.append("text").attr("x", 12).attr("y", 4).attr("font-size", "11px").attr("fill", colors.text).text(item.label);
     });
 }
 
@@ -164,6 +188,7 @@ function createTimeline(container, data) {
     const width = container.clientWidth || 800;
     const height = 300;
     const margin = { top: 30, right: 30, bottom: 50, left: 60 };
+    const colors = getThemeColors();
     
     d3.select(container).selectAll("*").remove();
     
@@ -244,6 +269,7 @@ function createTimeline(container, data) {
         .attr("text-anchor", "middle")
         .attr("font-size", "14px")
         .attr("font-weight", "bold")
+        .attr("fill", colors.text)
         .text("Event Timeline");
 }
 
@@ -252,6 +278,7 @@ function createSankeyDiagram(container, data) {
     const width = container.clientWidth || 800;
     const height = 400;
     const margin = { top: 20, right: 120, bottom: 20, left: 120 };
+    const colors = getThemeColors();
     
     d3.select(container).selectAll("*").remove();
     
@@ -340,6 +367,7 @@ function createSankeyDiagram(container, data) {
         .attr("dy", "0.35em")
         .attr("text-anchor", d => d.x0 < innerWidth / 2 ? "start" : "end")
         .attr("font-size", "12px")
+        .attr("fill", colors.text)
         .text(d => d.name);
 }
 
@@ -357,6 +385,7 @@ function createProtocolChart(container, data) {
     const width = container.clientWidth || 400;
     const height = 350;
     const radius = Math.min(width, height) / 2 - 40;
+    const colors = getThemeColors();
     
     d3.select(container).selectAll("*").remove();
     
@@ -415,13 +444,14 @@ function createProtocolChart(container, data) {
         .attr("dy", "-0.5em")
         .attr("font-size", "14px")
         .attr("font-weight", "bold")
+        .attr("fill", colors.text)
         .text("Protocol");
     
     g.append("text")
         .attr("text-anchor", "middle")
         .attr("dy", "1em")
         .attr("font-size", "12px")
-        .attr("fill", "#6c757d")
+        .attr("fill", colors.textSecondary)
         .text("Distribution");
     
     // Legend
@@ -434,11 +464,12 @@ function createProtocolChart(container, data) {
         lg.append("rect")
             .attr("width", 18)
             .attr("height", 18)
-            .attr("fill", d.Color || "#667eea");
+            .attr("fill", d.Color || colors.primary);
         lg.append("text")
             .attr("x", 24)
             .attr("y", 14)
             .attr("font-size", "12px")
+            .attr("fill", colors.text)
             .text(`${d.Protocol} (${d.Percent.toFixed(1)}%)`);
     });
 }
@@ -448,6 +479,7 @@ function createTopTalkersChart(container, data) {
     const width = container.clientWidth || 600;
     const height = 350;
     const margin = { top: 30, right: 30, bottom: 60, left: 150 };
+    const colors = getThemeColors();
     
     d3.select(container).selectAll("*").remove();
     
@@ -482,10 +514,10 @@ function createTopTalkersChart(container, data) {
         .range([0, innerHeight])
         .padding(0.2);
     
-    // Color scale
+    // Color scale - theme aware
     const colorScale = d3.scaleOrdinal()
         .domain(["internal", "external"])
-        .range(["#28a745", "#667eea"]);
+        .range([colors.success, colors.primary]);
     
     // Bars
     g.selectAll("rect")
@@ -521,7 +553,7 @@ function createTopTalkersChart(container, data) {
         .attr("y", d => y(d.IP) + y.bandwidth() / 2)
         .attr("dy", "0.35em")
         .attr("font-size", "11px")
-        .attr("fill", "#333")
+        .attr("fill", colors.text)
         .text(d => formatBytes(d.Bytes));
     
     // Y axis (IPs)
@@ -542,13 +574,14 @@ function createTopTalkersChart(container, data) {
         .attr("text-anchor", "middle")
         .attr("font-size", "14px")
         .attr("font-weight", "bold")
+        .attr("fill", colors.text)
         .text("Top Talkers by Traffic Volume");
     
     // Legend
     const legend = svg.append("g")
         .attr("transform", `translate(${width - 150}, ${height - 30})`);
     
-    [{ label: "Internal", color: "#28a745" }, { label: "External", color: "#667eea" }].forEach((item, i) => {
+    [{ label: "Internal", color: colors.success }, { label: "External", color: colors.primary }].forEach((item, i) => {
         const lg = legend.append("g")
             .attr("transform", `translate(${i * 80}, 0)`);
         lg.append("rect")
@@ -559,6 +592,7 @@ function createTopTalkersChart(container, data) {
             .attr("x", 18)
             .attr("y", 11)
             .attr("font-size", "11px")
+            .attr("fill", colors.text)
             .text(item.label);
     });
 }
