@@ -1,8 +1,0 @@
-Query Timestamp (UTC),Query Name,Query Type,Source IP,Destination IP,Response Timestamp (UTC),Response Code,Answer IPs,Answer Names,Is Anomalous,Detail
-2026-01-07 16:53:56,easylist-downloads.adblockplus.org,Unknown,192.168.100.203,8.8.8.8,2026-01-07 16:53:56,0,,production-filterlist-delivery.easylist-downloads.adblockplus.org.edgesuite.net;a1446.dscr.akamai.net,No,
-2026-01-07 16:53:56,easylist-downloads.adblockplus.org,A,192.168.100.203,8.8.8.8,2026-01-07 16:53:56,0,2.21.74.74;2.21.74.59,production-filterlist-delivery.easylist-downloads.adblockplus.org.edgesuite.net;a1446.dscr.akamai.net,No,
-2026-01-07 16:53:56,onatel.bf,A,192.168.100.203,8.8.8.8,2026-01-07 16:53:56,0,196.28.243.151,,No,
-2026-01-07 16:54:08,yahoo.com,A,192.168.100.203,8.8.8.8,2026-01-07 16:54:08,0,74.6.231.20;74.6.143.26;98.137.11.164;74.6.143.25;98.137.11.163;74.6.231.21,,No,
-2026-01-07 16:54:21,stream-production.avcdn.net,A,192.168.100.203,8.8.8.8,2026-01-07 16:54:21,0,2a02:26f0:4700::210:27b;2a02:26f0:4700::210:262;2a02:26f0:4700::172c:d73b;2a02:26f0:4700::172c:d731;2a02:26f0:4700::172c:d732,stream-production.avcdn.net.akamaized.net;a6143.dscd.akamai.net,No,
-2026-01-07 16:54:21,stream-production.avcdn.net,AAAA,192.168.100.203,8.8.8.8,2026-01-07 16:54:21,0,23.44.215.200;23.44.215.203;23.44.215.178;23.44.215.192;23.44.215.209;23.44.215.195;23.44.215.184;23.44.215.187;23.44.215.179,stream-production.avcdn.net.akamaized.net;a6143.dscd.akamai.net,No,
-2026-01-07 16:54:21,cisco.com,A,192.168.100.203,8.8.8.8,2026-01-07 16:54:21,0,72.163.4.185,,No,

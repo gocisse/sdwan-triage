@@ -1604,73 +1604,174 @@ func getTemplateContent() string {
     <style>{{.CSS}}</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1><i class="fas fa-network-wired"></i> SD-WAN Network Triage Report</h1>
-            <p class="subtitle">Comprehensive Network Analysis</p>
-            <p class="meta">Generated: {{.GeneratedAt}} | File: {{.FileName}} | Packets: {{.PacketCount}}</p>
-        </div>
-
-        <div class="content">
-            <div class="card">
-                <div class="card-header">
-                    <i class="fas fa-chart-line"></i>
-                    <h2>Executive Summary</h2>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-network-wired"></i></div>
+                <div>
+                    <div class="sidebar-title">SD-WAN Triage</div>
+                    <div class="sidebar-subtitle">Network Analysis</div>
                 </div>
-                <div class="card-body">
-                    {{if eq .HealthStatus "good"}}
-                    <div class="health-badge health-good">
-                        <i class="fas fa-check-circle"></i>&nbsp; Network Health: GOOD
-                    </div>
-                    {{else if eq .HealthStatus "warning"}}
-                    <div class="health-badge health-warning">
-                        <i class="fas fa-exclamation-triangle"></i>&nbsp; Network Health: WARNING
-                    </div>
-                    {{else}}
-                    <div class="health-badge health-critical">
-                        <i class="fas fa-times-circle"></i>&nbsp; Network Health: CRITICAL
-                    </div>
-                    {{end}}
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="#dashboard" class="nav-item active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                    <a href="#executive-summary" class="nav-item"><i class="fas fa-chart-line"></i> Executive Summary</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Security</div>
+                    <a href="#security-findings" class="nav-item"><i class="fas fa-shield-alt"></i> Security Findings {{if gt .Stats.SuspiciousTraffic 0}}<span class="nav-badge">{{.Stats.SuspiciousTraffic}}</span>{{end}}</a>
+                    <a href="#dns-analysis" class="nav-item"><i class="fas fa-globe"></i> DNS Analysis {{if gt .Stats.DNSAnomalies 0}}<span class="nav-badge">{{.Stats.DNSAnomalies}}</span>{{end}}</a>
+                    <a href="#arp-conflicts" class="nav-item"><i class="fas fa-project-diagram"></i> ARP Conflicts {{if gt .Stats.ARPConflicts 0}}<span class="nav-badge">{{.Stats.ARPConflicts}}</span>{{end}}</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Performance</div>
+                    <a href="#tcp-analysis" class="nav-item"><i class="fas fa-exchange-alt"></i> TCP Analysis {{if gt .Stats.TCPRetransmissions 10}}<span class="nav-badge">{{.Stats.TCPRetransmissions}}</span>{{end}}</a>
+                    <a href="#latency" class="nav-item"><i class="fas fa-clock"></i> Latency (RTT) {{if gt .Stats.HighRTTFlows 0}}<span class="nav-badge">{{.Stats.HighRTTFlows}}</span>{{end}}</a>
+                    <a href="#qos-analysis" class="nav-item"><i class="fas fa-sliders-h"></i> QoS Analysis</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Traffic</div>
+                    <a href="#traffic-flows" class="nav-item"><i class="fas fa-stream"></i> Traffic Flows</a>
+                    <a href="#protocols" class="nav-item"><i class="fas fa-layer-group"></i> Protocols</a>
+                    <a href="#devices" class="nav-item"><i class="fas fa-laptop"></i> Devices</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Visualizations</div>
+                    <a href="#network-diagram" class="nav-item"><i class="fas fa-project-diagram"></i> Network Map</a>
+                    <a href="#timeline" class="nav-item"><i class="fas fa-history"></i> Timeline</a>
+                </div>
+            </nav>
+            <div class="theme-toggle">
+                <span class="theme-toggle-label"><i class="fas fa-moon"></i> Dark Mode</span>
+                <div class="theme-switch" onclick="toggleTheme()"></div>
+            </div>
+        </aside>
 
-                    <div class="executive-dashboard">
-                        <div class="dashboard-cards">
-                            <div class="dashboard-card risk-card risk-{{.RiskLevel}}">
-                                <div class="risk-score-display">{{.RiskScore}}</div>
-                                <div class="risk-label">Risk Score</div>
-                                <div class="risk-level-badge">{{.RiskLevel}}</div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                    <div class="breadcrumb">
+                        <a href="#dashboard">Dashboard</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">Overview</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-meta">
+                        <div><strong>{{.FileName}}</strong></div>
+                        <div>{{.GeneratedAt}} • {{.PacketCount}} packets</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <!-- KPI Dashboard Section -->
+                <section id="dashboard">
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-icon {{if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}danger{{end}}">
+                                {{if eq .HealthStatus "good"}}<i class="fas fa-check-circle"></i>{{else if eq .HealthStatus "warning"}}<i class="fas fa-exclamation-triangle"></i>{{else}}<i class="fas fa-times-circle"></i>{{end}}
                             </div>
-                            {{if .TopIssue}}
-                            <div class="dashboard-card top-issue-card">
-                                <div class="top-issue-icon"><i class="fas fa-exclamation-circle"></i></div>
-                                <div class="top-issue-content">
-                                    <div class="top-issue-label">Primary Concern</div>
-                                    <div class="top-issue-value">{{.TopIssueCount}} {{.TopIssue}}</div>
-                                </div>
-                            </div>
-                            {{end}}
-                            <div class="dashboard-card findings-card">
-                                <div class="findings-count">{{.TotalFindings}}</div>
-                                <div class="findings-label">Total Findings</div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Network Health</div>
+                                <div class="kpi-value">{{if eq .HealthStatus "good"}}Good{{else if eq .HealthStatus "warning"}}Warning{{else}}Critical{{end}}</div>
                             </div>
                         </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon {{if gt .Stats.SuspiciousTraffic 0}}danger{{else}}success{{end}}">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Security Issues</div>
+                                <div class="kpi-value">{{.Stats.SuspiciousTraffic}}</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon {{if gt .Stats.TCPRetransmissions 10}}warning{{else}}info{{end}}">
+                                <i class="fas fa-redo"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">TCP Retransmissions</div>
+                                <div class="kpi-value">{{.Stats.TCPRetransmissions}}</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon primary">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Total Traffic</div>
+                                <div class="kpi-value">{{.Stats.TotalTraffic}}</div>
+                            </div>
+                        </div>
+                    </div>
 
-                        {{if .RecommendedActions}}
-                        <div class="recommended-actions">
-                            <h3><i class="fas fa-clipboard-list"></i> Recommended Actions</h3>
-                            <div class="actions-list">
-                                {{range .RecommendedActions}}
-                                <div class="action-item {{if hasPrefix . "CRITICAL"}}action-critical{{else if hasPrefix . "HIGH"}}action-high{{else if hasPrefix . "MEDIUM"}}action-medium{{else}}action-low{{end}}">
-                                    <i class="fas fa-chevron-right"></i>
-                                    <span>{{.}}</span>
-                                </div>
-                                {{end}}
+                    <!-- Risk Score Widget -->
+                    <div class="dashboard-cards">
+                        <div class="dashboard-card risk-card risk-{{.RiskLevel}}">
+                            <div class="risk-score-display">{{.RiskScore}}</div>
+                            <div class="risk-label">Risk Score</div>
+                            <div class="risk-level-badge {{.RiskLevel}}">{{.RiskLevel}}</div>
+                        </div>
+                        {{if .TopIssue}}
+                        <div class="dashboard-card top-issue-card">
+                            <div class="top-issue-icon"><i class="fas fa-exclamation-circle"></i></div>
+                            <div class="top-issue-content">
+                                <div class="top-issue-label">Primary Concern</div>
+                                <div class="top-issue-value">{{.TopIssueCount}} {{.TopIssue}}</div>
                             </div>
                         </div>
                         {{end}}
+                        <div class="dashboard-card findings-card">
+                            <div class="findings-count">{{.TotalFindings}}</div>
+                            <div class="findings-label">Total Findings</div>
+                        </div>
                     </div>
 
-                    <div class="stats-grid">
-                        <div class="stat-card">
+                    {{if .RecommendedActions}}
+                    <div class="recommended-actions">
+                        <h3><i class="fas fa-clipboard-list"></i> Recommended Actions</h3>
+                        <div class="actions-list">
+                            {{range .RecommendedActions}}
+                            <div class="action-item {{if hasPrefix . "CRITICAL"}}action-critical{{else if hasPrefix . "HIGH"}}action-high{{else if hasPrefix . "MEDIUM"}}action-medium{{else}}action-low{{end}}">
+                                <i class="fas fa-chevron-right"></i>
+                                <span>{{.}}</span>
+                            </div>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}}
+                </section>
+
+                <!-- Executive Summary Section -->
+                <section id="executive-summary">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-chart-line"></i>
+                            <h2>Executive Summary</h2>
+                        </div>
+                        <div class="card-body">
+                            {{if eq .HealthStatus "good"}}
+                            <div class="health-badge health-good">
+                                <i class="fas fa-check-circle"></i> Network Health: GOOD
+                            </div>
+                            {{else if eq .HealthStatus "warning"}}
+                            <div class="health-badge health-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Network Health: WARNING
+                            </div>
+                            {{else}}
+                            <div class="health-badge health-critical">
+                                <i class="fas fa-times-circle"></i> Network Health: CRITICAL
+                            </div>
+                            {{end}}
+
+                            <div class="stats-grid">
+                                <div class="stat-card">
                             <span class="stat-value">{{.Stats.TotalTraffic}}</span>
                             <span class="stat-label"><i class="fas fa-database"></i> Total Traffic</span>
                         </div>
@@ -2689,11 +2790,11 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-users"></i> Top Talkers</summary>
                         <div><div id="top-talkers-chart" class="viz-container" style="height: 350px;"></div></div>
                     </details>
-                    <details>
+                    <details id="network-diagram">
                         <summary><i class="fas fa-project-diagram"></i> Network Topology</summary>
-                        <div><div id="network-diagram" class="viz-container" style="height: 500px;"></div></div>
+                        <div><div id="network-diagram-viz" class="viz-container" style="height: 500px;"></div></div>
                     </details>
-                    <details>
+                    <details id="timeline">
                         <summary><i class="fas fa-clock"></i> Event Timeline</summary>
                         <div><div id="timeline-diagram" class="viz-container" style="height: 300px;"></div></div>
                     </details>
@@ -2705,9 +2806,11 @@ func getTemplateContent() string {
             </div>
         </div>
 
-        <div class="footer">
-            <p>Generated by SD-WAN Triage Tool v{{.Version}} | &copy; {{.Year}}</p>
-        </div>
+                <footer class="footer">
+                    <p>Generated by SD-WAN Triage Tool v{{.Version}} | &copy; {{.Year}}</p>
+                </footer>
+            </div>
+        </main>
     </div>
 
     <script>
@@ -2716,6 +2819,63 @@ func getTemplateContent() string {
         var sankeyData = {{.SankeyDataJSON}};
         var protocolStats = {{.ProtocolStatsJSON}};
         var topTalkers = {{.TopTalkersJSON}};
+
+        // Theme toggle functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Mobile sidebar toggle
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // Initialize theme from localStorage
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+
+        // Scrollspy for navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const navItems = document.querySelectorAll('.nav-item');
+            const sections = document.querySelectorAll('section[id], details[id]');
+            
+            // Click handler for nav items
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    navItems.forEach(n => n.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Close mobile sidebar
+                    if (window.innerWidth <= 1024) {
+                        document.getElementById('sidebar').classList.remove('open');
+                    }
+                });
+            });
+
+            // Scroll spy
+            window.addEventListener('scroll', function() {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 100) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navItems.forEach(item => {
+                    item.classList.remove('active');
+                    if (item.getAttribute('href') === '#' + current) {
+                        item.classList.add('active');
+                    }
+                });
+            });
+        });
     </script>
     <script>{{.JS}}</script>
 </body>

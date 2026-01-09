@@ -1,2 +1,0 @@
-Timestamp (UTC),Source IP,Target IP,Scan Type,Ports Scanned,Sample Ports,Severity,Description,Recommended Action
-2026-01-07 16:54:24,192.168.100.203,,Vertical,15,443,Low,Vertical port scan from 192.168.100.203 targeting 15 ports,Block source IP; review firewall rules; enable IDS/IPS
