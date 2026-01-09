@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/gocisse/sdwan-triage/pkg/analyzer"
@@ -96,6 +98,41 @@ VERSION:
 	}
 
 	pcapFile := flag.Arg(0)
+
+	// Create output directory for this analysis run
+	var outputDir string
+	if *csvOutput != "" || *htmlOutput != "" || *pdfOutput != "" {
+		// Generate output folder name based on input file and timestamp
+		inputBaseName := filepath.Base(pcapFile)
+		inputBaseName = strings.TrimSuffix(inputBaseName, filepath.Ext(inputBaseName))
+		// Sanitize filename for directory name
+		inputBaseName = strings.ReplaceAll(inputBaseName, ".", "_")
+		inputBaseName = strings.ReplaceAll(inputBaseName, " ", "_")
+
+		// Create timestamped output directory
+		timestamp := time.Now().Format("20060102_150405")
+		outputDir = fmt.Sprintf("sdwan_report_%s_%s", inputBaseName, timestamp)
+
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating output directory '%s': %v\n", outputDir, err)
+			os.Exit(1)
+		}
+
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Created output directory: %s\n", outputDir)
+		}
+
+		// Update output file paths to include directory
+		if *csvOutput != "" {
+			*csvOutput = filepath.Join(outputDir, *csvOutput)
+		}
+		if *htmlOutput != "" {
+			*htmlOutput = filepath.Join(outputDir, *htmlOutput)
+		}
+		if *pdfOutput != "" {
+			*pdfOutput = filepath.Join(outputDir, *pdfOutput)
+		}
+	}
 
 	// Validate PCAP file path
 	absPath, err := filepath.Abs(pcapFile)
@@ -188,7 +225,7 @@ VERSION:
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to CSV: %v\n", err)
 		} else {
-			color.Green("✓ CSV reports exported:")
+			color.Green("✓ CSV reports exported to %s:", outputDir)
 			for _, f := range result.Files {
 				color.Green("  - %s", filepath.Base(f))
 			}
@@ -200,7 +237,11 @@ VERSION:
 		if err := output.GenerateHTMLReport(report, *htmlOutput, filepath.Base(absPath)); err != nil {
 			fmt.Fprintf(os.Stderr, "Error exporting to HTML: %v\n", err)
 		} else {
-			color.Green("✓ HTML report exported to %s", *htmlOutput)
+			if outputDir != "" {
+				color.Green("✓ HTML report exported to %s/%s", outputDir, filepath.Base(*htmlOutput))
+			} else {
+				color.Green("✓ HTML report exported to %s", *htmlOutput)
+			}
 		}
 	}
 
@@ -214,7 +255,11 @@ VERSION:
 			if err := pdfGen.GeneratePDF(report, *pdfOutput, filepath.Base(absPath)); err != nil {
 				fmt.Fprintf(os.Stderr, "Error exporting to PDF: %v\n", err)
 			} else {
-				color.Green("✓ PDF report exported to %s", *pdfOutput)
+				if outputDir != "" {
+					color.Green("✓ PDF report exported to %s/%s", outputDir, filepath.Base(*pdfOutput))
+				} else {
+					color.Green("✓ PDF report exported to %s", *pdfOutput)
+				}
 			}
 		}
 	}
