@@ -1671,15 +1671,15 @@ func getTemplateContent() string {
 
             <div class="card">
                 <div class="tabs">
-                    <button class="tab active" data-tab="tab-security"><i class="fas fa-shield-alt"></i> Security</button>
-                    <button class="tab" data-tab="tab-performance"><i class="fas fa-tachometer-alt"></i> Performance</button>
+                    <button class="tab" data-tab="tab-security"><i class="fas fa-shield-alt"></i> Security</button>
+                    <button class="tab active" data-tab="tab-performance"><i class="fas fa-tachometer-alt"></i> Performance</button>
                     <button class="tab" data-tab="tab-protocols"><i class="fas fa-layer-group"></i> Protocols</button>
                     <button class="tab" data-tab="tab-network"><i class="fas fa-sitemap"></i> Network</button>
                     <button class="tab" data-tab="tab-traffic"><i class="fas fa-exchange-alt"></i> Traffic</button>
                     <button class="tab" data-tab="tab-visualizations"><i class="fas fa-project-diagram"></i> Visualizations</button>
                 </div>
 
-                <div id="tab-security" class="tab-content active">
+                <div id="tab-security" class="tab-content">
                     {{if .DNSAnomalies}}
                     <details open>
                         <summary><i class="fas fa-dns"></i> DNS Anomalies ({{len .DNSAnomalies}})</summary>
@@ -1932,7 +1932,7 @@ func getTemplateContent() string {
                     {{end}}
                 </div>
 
-                <div id="tab-performance" class="tab-content">
+                <div id="tab-performance" class="tab-content active">
                     {{if .TCPRetransmissions}}
                     <details open>
                         <summary><i class="fas fa-redo"></i> TCP Retransmissions ({{len .TCPRetransmissions}})</summary>
@@ -1981,7 +1981,7 @@ func getTemplateContent() string {
                     {{end}}
 
                     {{if .TCPHandshakeCorrelatedFlows}}
-                    <details>
+                    <details open>
                         <summary><i class="fas fa-exchange-alt"></i> TCP Handshake Analysis ({{len .TCPHandshakeCorrelatedFlows}} flows)</summary>
                         <div>
                             <p style="color: #6c757d; margin-bottom: 15px;">TCP handshake events grouped by flow for correlation analysis.</p>
