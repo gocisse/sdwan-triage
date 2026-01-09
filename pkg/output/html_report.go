@@ -268,14 +268,20 @@ type BGPIndicatorView struct {
 }
 
 type DNSDetailView struct {
-	QueryName     string
-	QueryType     string
-	SourceIP      string
-	DestinationIP string
-	AnswerIPs     string
-	ResponseCode  string
-	IsAnomalous   bool
-	Detail        string
+	QueryName        string
+	QueryType        string
+	SourceIP         string
+	DestinationIP    string
+	AnswerIPs        string
+	AnswerNames      string
+	ResponseCode     string
+	ResponseCodeName string
+	IsAnomalous      bool
+	Detail           string
+	QueryTimeFmt     string
+	ResponseTimeFmt  string
+	ResponseTimeMs   string
+	HasResponse      bool
 }
 
 type HTTP2FlowView struct {
@@ -1115,22 +1121,81 @@ func convertDNSDetails(records []models.DNSRecord) []DNSDetailView {
 		if len(r.AnswerIPs) > 0 {
 			answerIPs = strings.Join(r.AnswerIPs, ", ")
 		}
+		answerNames := ""
+		if len(r.AnswerNames) > 0 {
+			answerNames = strings.Join(r.AnswerNames, ", ")
+		}
 		respCode := ""
+		respCodeName := ""
 		if r.ResponseCode != nil {
 			respCode = fmt.Sprintf("%d", *r.ResponseCode)
+			respCodeName = getDNSResponseCodeName(*r.ResponseCode)
 		}
+
+		// Format timestamps
+		queryTimeFmt := formatUnixTimeMs(r.QueryTimestamp)
+		responseTimeFmt := "-"
+		responseTimeMs := "-"
+		hasResponse := false
+
+		if r.ResponseTimestamp != nil && *r.ResponseTimestamp > 0 {
+			hasResponse = true
+			responseTimeFmt = formatUnixTimeMs(*r.ResponseTimestamp)
+			// Calculate response time in milliseconds
+			responseTime := (*r.ResponseTimestamp - r.QueryTimestamp) * 1000
+			if responseTime >= 0 {
+				responseTimeMs = fmt.Sprintf("%.2f ms", responseTime)
+			}
+		}
+
 		result[i] = DNSDetailView{
-			QueryName:     html.EscapeString(r.QueryName),
-			QueryType:     html.EscapeString(r.QueryType),
-			SourceIP:      html.EscapeString(r.SourceIP),
-			DestinationIP: html.EscapeString(r.DestinationIP),
-			AnswerIPs:     html.EscapeString(answerIPs),
-			ResponseCode:  respCode,
-			IsAnomalous:   r.IsAnomalous,
-			Detail:        html.EscapeString(r.Detail),
+			QueryName:        html.EscapeString(r.QueryName),
+			QueryType:        html.EscapeString(r.QueryType),
+			SourceIP:         html.EscapeString(r.SourceIP),
+			DestinationIP:    html.EscapeString(r.DestinationIP),
+			AnswerIPs:        html.EscapeString(answerIPs),
+			AnswerNames:      html.EscapeString(answerNames),
+			ResponseCode:     respCode,
+			ResponseCodeName: respCodeName,
+			IsAnomalous:      r.IsAnomalous,
+			Detail:           html.EscapeString(r.Detail),
+			QueryTimeFmt:     queryTimeFmt,
+			ResponseTimeFmt:  responseTimeFmt,
+			ResponseTimeMs:   responseTimeMs,
+			HasResponse:      hasResponse,
 		}
 	}
 	return result
+}
+
+// getDNSResponseCodeName returns the human-readable name for a DNS response code
+func getDNSResponseCodeName(code uint16) string {
+	switch code {
+	case 0:
+		return "NOERROR"
+	case 1:
+		return "FORMERR"
+	case 2:
+		return "SERVFAIL"
+	case 3:
+		return "NXDOMAIN"
+	case 4:
+		return "NOTIMP"
+	case 5:
+		return "REFUSED"
+	case 6:
+		return "YXDOMAIN"
+	case 7:
+		return "YXRRSET"
+	case 8:
+		return "NXRRSET"
+	case 9:
+		return "NOTAUTH"
+	case 10:
+		return "NOTZONE"
+	default:
+		return fmt.Sprintf("CODE_%d", code)
+	}
 }
 
 func convertHTTP2Flows(flows []models.TCPFlow) []HTTP2FlowView {
@@ -2182,23 +2247,102 @@ func getTemplateContent() string {
 
                     {{if .DNSDetails}}
                     <details open>
-                        <summary><i class="fas fa-globe"></i> DNS Query Details ({{len .DNSDetails}})</summary>
-                        <div>
-                            <table class="data-table">
-                                <thead><tr><th>Query Name</th><th>Type</th><th>Source</th><th>DNS Server</th><th>Answer IPs</th><th>Status</th></tr></thead>
-                                <tbody>
-                                    {{range .DNSDetails}}
-                                    <tr class="{{if .IsAnomalous}}severity-row-high{{end}}">
-                                        <td><code>{{.QueryName}}</code></td>
-                                        <td>{{.QueryType}}</td>
-                                        <td><code>{{.SourceIP}}</code></td>
-                                        <td><code>{{.DestinationIP}}</code></td>
-                                        <td><code>{{.AnswerIPs}}</code></td>
-                                        <td>{{if .IsAnomalous}}<span class="badge badge-danger">Anomaly</span>{{else}}<span class="badge badge-success">OK</span>{{end}}</td>
-                                    </tr>
+                        <summary><i class="fas fa-globe"></i> DNS Request/Response Analysis ({{len .DNSDetails}})</summary>
+                        <div class="dns-analysis-container">
+                            <div class="dns-intro">
+                                <p>DNS queries and responses correlated with response times. Click on each query to expand details.</p>
+                                <div class="dns-legend">
+                                    <span class="legend-item"><span class="legend-color legend-dns-query"></span> Query (Request)</span>
+                                    <span class="legend-item"><span class="legend-color legend-dns-response"></span> Response</span>
+                                    <span class="legend-item"><span class="legend-color legend-dns-error"></span> Error/No Response</span>
+                                </div>
+                            </div>
+                            {{range .DNSDetails}}
+                            <details class="dns-flow-details {{if .IsAnomalous}}dns-anomalous{{end}}">
+                                <summary class="dns-flow-summary">
+                                    <span class="dns-query-name"><i class="fas fa-search"></i> {{.QueryName}}</span>
+                                    <span class="dns-meta">
+                                        <span class="dns-type badge">{{.QueryType}}</span>
+                                        {{if .HasResponse}}
+                                            {{if eq .ResponseCodeName "NOERROR"}}
+                                            <span class="dns-status badge badge-success"><i class="fas fa-check-circle"></i> {{.ResponseCodeName}}</span>
+                                            {{else if eq .ResponseCodeName "NXDOMAIN"}}
+                                            <span class="dns-status badge badge-warning"><i class="fas fa-question-circle"></i> {{.ResponseCodeName}}</span>
+                                            {{else}}
+                                            <span class="dns-status badge badge-danger"><i class="fas fa-exclamation-circle"></i> {{.ResponseCodeName}}</span>
+                                            {{end}}
+                                        {{else}}
+                                        <span class="dns-status badge badge-secondary"><i class="fas fa-clock"></i> No Response</span>
+                                        {{end}}
+                                        <span class="dns-response-time">{{.ResponseTimeMs}}</span>
+                                    </span>
+                                </summary>
+                                <div class="dns-flow-content">
+                                    <div class="dns-events">
+                                        <div class="dns-event dns-event-query">
+                                            <span class="dns-event-icon"><i class="fas fa-arrow-right"></i></span>
+                                            <span class="dns-event-type">QUERY</span>
+                                            <span class="dns-event-time">{{.QueryTimeFmt}}</span>
+                                            <span class="dns-event-detail">{{.SourceIP}} → {{.DestinationIP}}</span>
+                                        </div>
+                                        {{if .HasResponse}}
+                                        <div class="dns-event dns-event-response {{if ne .ResponseCodeName "NOERROR"}}dns-event-error{{end}}">
+                                            <span class="dns-event-icon"><i class="fas fa-arrow-left"></i></span>
+                                            <span class="dns-event-type">RESPONSE</span>
+                                            <span class="dns-event-time">{{.ResponseTimeFmt}}</span>
+                                            <span class="dns-event-detail">Code: {{.ResponseCode}} ({{.ResponseCodeName}})</span>
+                                        </div>
+                                        {{else}}
+                                        <div class="dns-event dns-event-timeout">
+                                            <span class="dns-event-icon"><i class="fas fa-times"></i></span>
+                                            <span class="dns-event-type">NO RESPONSE</span>
+                                            <span class="dns-event-time">-</span>
+                                            <span class="dns-event-detail">Query may have timed out or been dropped</span>
+                                        </div>
+                                        {{end}}
+                                    </div>
+                                    {{if or .AnswerIPs .AnswerNames}}
+                                    <div class="dns-answers">
+                                        <h4><i class="fas fa-reply"></i> DNS Answers</h4>
+                                        {{if .AnswerIPs}}
+                                        <div class="dns-answer-row">
+                                            <span class="dns-answer-label">IP Addresses:</span>
+                                            <span class="dns-answer-value"><code>{{.AnswerIPs}}</code></span>
+                                        </div>
+                                        {{end}}
+                                        {{if .AnswerNames}}
+                                        <div class="dns-answer-row">
+                                            <span class="dns-answer-label">CNAME/Aliases:</span>
+                                            <span class="dns-answer-value"><code>{{.AnswerNames}}</code></span>
+                                        </div>
+                                        {{end}}
+                                    </div>
                                     {{end}}
-                                </tbody>
-                            </table>
+                                    <div class="dns-explanation">
+                                        <h4><i class="fas fa-info-circle"></i> DNS Resolution Details</h4>
+                                        <p><strong>Client:</strong> {{.SourceIP}} queried DNS server {{.DestinationIP}}</p>
+                                        <p><strong>Query Type:</strong> {{.QueryType}} - 
+                                            {{if eq .QueryType "A"}}IPv4 address lookup
+                                            {{else if eq .QueryType "AAAA"}}IPv6 address lookup
+                                            {{else if eq .QueryType "CNAME"}}Canonical name lookup
+                                            {{else if eq .QueryType "MX"}}Mail exchange lookup
+                                            {{else if eq .QueryType "TXT"}}Text record lookup
+                                            {{else if eq .QueryType "PTR"}}Reverse DNS lookup
+                                            {{else if eq .QueryType "NS"}}Name server lookup
+                                            {{else if eq .QueryType "SOA"}}Start of authority lookup
+                                            {{else}}Standard DNS lookup
+                                            {{end}}
+                                        </p>
+                                        {{if .HasResponse}}
+                                        <p><strong>Response Time:</strong> {{.ResponseTimeMs}}</p>
+                                        {{end}}
+                                        {{if .IsAnomalous}}
+                                        <p class="dns-anomaly-note"><i class="fas fa-exclamation-triangle"></i> <strong>Anomaly Detected:</strong> {{.Detail}}</p>
+                                        {{end}}
+                                    </div>
+                                </div>
+                            </details>
+                            {{end}}
                         </div>
                     </details>
                     {{else}}
