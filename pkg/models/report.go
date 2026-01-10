@@ -18,6 +18,7 @@ type TriageReport struct {
 	ApplicationBreakdown        map[string]AppCategory       `json:"application_breakdown"`
 	SuspiciousTraffic           []SuspiciousFlow             `json:"suspicious_traffic"`
 	RTTAnalysis                 []RTTFlow                    `json:"rtt_analysis"`
+	RTTHistogram                map[string]int               `json:"rtt_histogram"`
 	DeviceFingerprinting        []DeviceFingerprint          `json:"device_fingerprinting"`
 	BandwidthReport             BandwidthReport              `json:"bandwidth_report"`
 	Timeline                    []TimelineEvent              `json:"timeline"`

@@ -677,6 +677,125 @@ function initTableSorting() {
     });
 }
 
+// RTT Distribution Histogram
+function createRTTHistogram(container, data) {
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 350;
+    
+    if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('No RTT data available');
+    }
+    
+    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+    const colors = getThemeColors();
+    
+    d3.select(container).selectAll("*").remove();
+    
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    // X scale - categorical (buckets)
+    const x = d3.scaleBand()
+        .domain(data.map(d => d.bucket))
+        .range([0, chartWidth])
+        .padding(0.2);
+    
+    // Y scale - linear (counts)
+    const maxCount = d3.max(data, d => d.count) || 0;
+    const y = d3.scaleLinear()
+        .domain([0, maxCount * 1.1])
+        .range([chartHeight, 0]);
+    
+    // Color scale based on RTT ranges
+    const colorScale = d3.scaleOrdinal()
+        .domain(["0-10ms", "10-50ms", "50-100ms", "100-200ms", "200-500ms", "500-1000ms", "1000ms+"])
+        .range(["#10b981", "#34d399", "#fbbf24", "#fb923c", "#f87171", "#ef4444", "#dc2626"]);
+    
+    // Add bars
+    g.selectAll(".bar")
+        .data(data)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.bucket))
+        .attr("y", d => y(d.count))
+        .attr("width", x.bandwidth())
+        .attr("height", d => chartHeight - y(d.count))
+        .attr("fill", d => colorScale(d.bucket))
+        .attr("opacity", 0.8)
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("opacity", 1);
+            
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "d3-tooltip")
+                .style("position", "absolute")
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 10) + "px")
+                .html(`<strong>${d.bucket}</strong><br/>Count: ${d.count.toLocaleString()}`);
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("opacity", 0.8);
+            d3.selectAll(".d3-tooltip").remove();
+        });
+    
+    // Add value labels on top of bars
+    g.selectAll(".label")
+        .data(data)
+        .enter()
+        .append("text")
+        .attr("class", "label")
+        .attr("x", d => x(d.bucket) + x.bandwidth() / 2)
+        .attr("y", d => y(d.count) - 5)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "11px")
+        .attr("fill", colors.text)
+        .text(d => d.count > 0 ? d.count : "");
+    
+    // X axis
+    g.append("g")
+        .attr("class", "timeline-axis")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end")
+        .attr("dx", "-0.8em")
+        .attr("dy", "0.15em");
+    
+    // Y axis
+    g.append("g")
+        .attr("class", "timeline-axis")
+        .call(d3.axisLeft(y).ticks(5));
+    
+    // Y axis label
+    g.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -chartHeight / 2)
+        .attr("y", -45)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("fill", colors.text)
+        .text("Number of Samples");
+    
+    // Title
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "14px")
+        .attr("font-weight", "bold")
+        .attr("fill", colors.text)
+        .text("Round-Trip Time (RTT) Distribution");
+}
+
 // Toggle action visibility
 function toggleAction(btn) {
     const row = btn.closest('tr');
@@ -712,6 +831,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof sankeyData !== 'undefined' && sankeyData) {
             safeD3Init('sankey-diagram', createSankeyDiagram, sankeyData);
         }
+        if (typeof rttHistogramData !== 'undefined' && rttHistogramData) {
+            safeD3Init('rtt-histogram', createRTTHistogram, rttHistogramData);
+        }
     }, 100);
     
     // Re-render visualizations on window resize
@@ -733,6 +855,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (typeof sankeyData !== 'undefined' && sankeyData) {
                 safeD3Init('sankey-diagram', createSankeyDiagram, sankeyData);
+            }
+            if (typeof rttHistogramData !== 'undefined' && rttHistogramData) {
+                safeD3Init('rtt-histogram', createRTTHistogram, rttHistogramData);
             }
         }, 250);
     });

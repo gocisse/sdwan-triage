@@ -165,6 +165,7 @@ type ReportData struct {
 	SankeyDataJSON    template.JS
 	ProtocolStatsJSON template.JS
 	TopTalkersJSON    template.JS
+	RTTHistogramJSON  template.JS
 }
 
 // View structs for template rendering (with escaped/formatted data)
@@ -674,6 +675,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.SankeyDataJSON = template.JS(generateSankeyJSON(r))
 	data.ProtocolStatsJSON = template.JS(generateProtocolStatsJSON(data.ProtocolStats))
 	data.TopTalkersJSON = template.JS(generateTopTalkersJSON(data.TopTalkers))
+	data.RTTHistogramJSON = template.JS(generateRTTHistogramJSON(r.RTTHistogram))
 
 	return data
 }
@@ -1088,6 +1090,29 @@ func generateProtocolStatsJSON(stats []ProtocolStatView) string {
 
 func generateTopTalkersJSON(talkers []TopTalkerView) string {
 	jsonBytes, _ := json.Marshal(talkers)
+	return string(jsonBytes)
+}
+
+func generateRTTHistogramJSON(histogram map[string]int) string {
+	if len(histogram) == 0 {
+		return "[]"
+	}
+
+	// Convert map to array of objects for D3.js
+	// Maintain bucket order
+	bucketOrder := []string{"0-10ms", "10-50ms", "50-100ms", "100-200ms", "200-500ms", "500-1000ms", "1000ms+"}
+	data := []map[string]interface{}{}
+
+	for _, bucket := range bucketOrder {
+		if count, exists := histogram[bucket]; exists {
+			data = append(data, map[string]interface{}{
+				"bucket": bucket,
+				"count":  count,
+			})
+		}
+	}
+
+	jsonBytes, _ := json.Marshal(data)
 	return string(jsonBytes)
 }
 
@@ -2818,6 +2843,10 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-stream"></i> Traffic Flow (Sankey)</summary>
                         <div><div id="sankey-diagram" class="viz-container" style="height: 400px;"></div></div>
                     </details>
+                    <details open>
+                        <summary><i class="fas fa-chart-bar"></i> RTT Distribution</summary>
+                        <div><div id="rtt-histogram" class="viz-container" style="height: 350px;"></div></div>
+                    </details>
                 </div>
             </div>
         </div>
@@ -2835,6 +2864,7 @@ func getTemplateContent() string {
         var sankeyData = {{.SankeyDataJSON}};
         var protocolStats = {{.ProtocolStatsJSON}};
         var topTalkers = {{.TopTalkersJSON}};
+        var rttHistogramData = {{.RTTHistogramJSON}};
 
         // Theme toggle functionality
         function toggleTheme() {

@@ -12,6 +12,7 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/detector"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 )
 
@@ -107,6 +108,15 @@ func (p *Processor) Process(reader *pcapgo.Reader, state *models.AnalysisState, 
 			continue
 		}
 
+		// Early filter check: Apply filter before packet creation for performance
+		// This avoids expensive packet parsing for filtered packets
+		if filter != nil && !filter.IsEmpty() {
+			// Quick pre-filter check on raw data if possible
+			if !p.quickFilterCheck(data, reader.LinkType(), filter) {
+				continue
+			}
+		}
+
 		// Safely create packet with error handling
 		packet := gopacket.NewPacket(data, reader.LinkType(), gopacket.Default)
 		if packet == nil {
@@ -122,7 +132,7 @@ func (p *Processor) Process(reader *pcapgo.Reader, state *models.AnalysisState, 
 			packet.Metadata().Length = ci.Length
 		}
 
-		// Apply filter if set
+		// Final filter check with full packet (if quick check passed)
 		if filter != nil && !filter.IsEmpty() && !p.matchesFilter(packet, filter) {
 			continue
 		}
@@ -211,6 +221,19 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	p.tunnelAnalyzer.Analyze(packet, state, report)
 }
 
+// quickFilterCheck performs a fast pre-filter check on raw packet data
+// This avoids expensive packet parsing for packets that won't match the filter
+func (p *Processor) quickFilterCheck(data []byte, linkType layers.LinkType, filter *models.Filter) bool {
+	// For now, we'll parse the packet minimally
+	// In the future, this could be optimized with raw byte inspection
+	// For IP filters, we could check IP headers directly without full parsing
+	packet := gopacket.NewPacket(data, linkType, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	if packet == nil {
+		return false
+	}
+	return p.matchesFilter(packet, filter)
+}
+
 // matchesFilter checks if a packet matches the configured filter
 func (p *Processor) matchesFilter(packet gopacket.Packet, filter *models.Filter) bool {
 	// Get IP addresses
@@ -262,6 +285,9 @@ func (p *Processor) matchesFilter(packet gopacket.Packet, filter *models.Filter)
 
 // finalizeReport processes collected state into final report data
 func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.TriageReport) {
+	// Build RTT histogram from collected samples
+	p.buildRTTHistogram(state, report)
+
 	// Build correlated TCP handshake flows for visualization
 	p.buildTCPHandshakeCorrelatedFlows(report)
 
@@ -659,6 +685,50 @@ func (p *Processor) finalizeSDWANAnalysis(report *models.TriageReport) {
 			LastSeen:    float64(vendor.LastSeen.UnixNano()) / 1e9,
 		})
 	}
+}
+
+// buildRTTHistogram creates histogram buckets from RTT samples
+func (p *Processor) buildRTTHistogram(state *models.AnalysisState, report *models.TriageReport) {
+	histogram := make(map[string]int)
+
+	// Initialize buckets
+	buckets := []string{
+		"0-10ms",
+		"10-50ms",
+		"50-100ms",
+		"100-200ms",
+		"200-500ms",
+		"500-1000ms",
+		"1000ms+",
+	}
+	for _, bucket := range buckets {
+		histogram[bucket] = 0
+	}
+
+	// Collect all RTT samples from TCP flows
+	for _, flowState := range state.TCPFlows {
+		for _, rtt := range flowState.RTTSamples {
+			// Categorize RTT into buckets
+			switch {
+			case rtt < 10:
+				histogram["0-10ms"]++
+			case rtt < 50:
+				histogram["10-50ms"]++
+			case rtt < 100:
+				histogram["50-100ms"]++
+			case rtt < 200:
+				histogram["100-200ms"]++
+			case rtt < 500:
+				histogram["200-500ms"]++
+			case rtt < 1000:
+				histogram["500-1000ms"]++
+			default:
+				histogram["1000ms+"]++
+			}
+		}
+	}
+
+	report.RTTHistogram = histogram
 }
 
 // buildTCPHandshakeCorrelatedFlows creates correlated TCP handshake flows for visualization
