@@ -832,42 +832,121 @@ func convertDeviceFingerprints(fps []models.DeviceFingerprint) []DeviceFingerpri
 func generateNetworkJSON(r *models.TriageReport) string {
 	nodes := []map[string]interface{}{}
 	links := []map[string]interface{}{}
-	nodeMap := make(map[string]bool)
+	nodeMap := make(map[string]int) // Map IP to node index
+	nodeStats := make(map[string]map[string]interface{})
+	linkMap := make(map[string]int) // Map "src->dst" to link index
 
-	// Add nodes from traffic flows
+	// Initialize node statistics
 	for _, flow := range r.TrafficAnalysis {
-		if !nodeMap[flow.SrcIP] {
-			nodeMap[flow.SrcIP] = true
-			nodes = append(nodes, map[string]interface{}{
-				"id":    flow.SrcIP,
-				"label": flow.SrcIP,
-				"group": categorizeIPForVisualization(flow.SrcIP),
-			})
+		if _, exists := nodeStats[flow.SrcIP]; !exists {
+			nodeStats[flow.SrcIP] = map[string]interface{}{
+				"bytes":       uint64(0),
+				"connections": 0,
+			}
 		}
-		if !nodeMap[flow.DstIP] {
-			nodeMap[flow.DstIP] = true
-			nodes = append(nodes, map[string]interface{}{
-				"id":    flow.DstIP,
-				"label": flow.DstIP,
-				"group": categorizeIPForVisualization(flow.DstIP),
-			})
+		if _, exists := nodeStats[flow.DstIP]; !exists {
+			nodeStats[flow.DstIP] = map[string]interface{}{
+				"bytes":       uint64(0),
+				"connections": 0,
+			}
 		}
-		links = append(links, map[string]interface{}{
-			"source":   flow.SrcIP,
-			"target":   flow.DstIP,
-			"value":    5,
-			"hasIssue": false,
-		})
+
+		// Accumulate statistics
+		srcStats := nodeStats[flow.SrcIP]
+		srcStats["bytes"] = srcStats["bytes"].(uint64) + flow.TotalBytes
+		srcStats["connections"] = srcStats["connections"].(int) + 1
+
+		dstStats := nodeStats[flow.DstIP]
+		dstStats["bytes"] = dstStats["bytes"].(uint64) + flow.TotalBytes
+		dstStats["connections"] = dstStats["connections"].(int) + 1
 	}
 
-	// Mark anomaly nodes
+	// Create nodes with enhanced information
+	nodeIndex := 0
+	for ip, stats := range nodeStats {
+		nodeMap[ip] = nodeIndex
+		nodes = append(nodes, map[string]interface{}{
+			"id":          ip,
+			"label":       ip,
+			"group":       categorizeIPForVisualization(ip),
+			"bytes":       stats["bytes"],
+			"connections": stats["connections"],
+		})
+		nodeIndex++
+	}
+
+	// Create links with traffic volume
+	for _, flow := range r.TrafficAnalysis {
+		linkKey := flow.SrcIP + "->" + flow.DstIP
+		if idx, exists := linkMap[linkKey]; exists {
+			// Update existing link
+			links[idx]["value"] = links[idx]["value"].(uint64) + flow.TotalBytes
+		} else {
+			// Create new link
+			linkMap[linkKey] = len(links)
+			links = append(links, map[string]interface{}{
+				"source":   flow.SrcIP,
+				"target":   flow.DstIP,
+				"value":    flow.TotalBytes,
+				"hasIssue": false,
+			})
+		}
+	}
+
+	// Mark nodes with security issues
+	anomalyIPs := make(map[string]bool)
+
+	// DNS anomalies
 	for _, anomaly := range r.DNSAnomalies {
-		if nodeMap[anomaly.AnswerIP] {
-			for i := range nodes {
-				if nodes[i]["id"] == anomaly.AnswerIP {
-					nodes[i]["group"] = "anomaly"
-				}
-			}
+		if anomaly.AnswerIP != "" {
+			anomalyIPs[anomaly.AnswerIP] = true
+		}
+		if anomaly.ServerIP != "" {
+			anomalyIPs[anomaly.ServerIP] = true
+		}
+	}
+
+	// DDoS sources
+	for _, ddos := range r.Security.DDoSFindings {
+		anomalyIPs[ddos.SourceIP] = true
+	}
+
+	// Port scan sources
+	for _, scan := range r.Security.PortScanFindings {
+		anomalyIPs[scan.SourceIP] = true
+	}
+
+	// IOC matches
+	for _, ioc := range r.Security.IOCFindings {
+		anomalyIPs[ioc.SourceIP] = true
+		if ioc.DestIP != "" {
+			anomalyIPs[ioc.DestIP] = true
+		}
+	}
+
+	// Update node groups for anomalies
+	for i := range nodes {
+		if anomalyIPs[nodes[i]["id"].(string)] {
+			nodes[i]["group"] = "anomaly"
+			nodes[i]["hasIssue"] = true
+		}
+	}
+
+	// Mark links with issues (retransmissions, failed handshakes)
+	issueLinks := make(map[string]bool)
+	for _, retrans := range r.TCPRetransmissions {
+		linkKey := retrans.SrcIP + "->" + retrans.DstIP
+		issueLinks[linkKey] = true
+	}
+	for _, failed := range r.FailedHandshakes {
+		linkKey := failed.SrcIP + "->" + failed.DstIP
+		issueLinks[linkKey] = true
+	}
+
+	for i := range links {
+		linkKey := links[i]["source"].(string) + "->" + links[i]["target"].(string)
+		if issueLinks[linkKey] {
+			links[i]["hasIssue"] = true
 		}
 	}
 

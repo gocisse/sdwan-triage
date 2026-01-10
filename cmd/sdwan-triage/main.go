@@ -24,43 +24,168 @@ var verbose *bool
 func main() {
 	// Define custom usage function
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stdout, `SD-WAN Network Triage: Analyze PCAP files for network issues, security threats, and traffic patterns.
+		fmt.Fprintf(os.Stdout, `SD-WAN Network Triage v%s
+Comprehensive PCAP analysis tool for SD-WAN networks with advanced security detection,
+performance monitoring, and interactive D3.js visualizations.
 
 USAGE:
     sdwan-triage [OPTIONS] <pcap_file>
 
 OPTIONS:
-    -json              Output in JSON format
-    -csv <file>        Export findings to CSV file
-    -html <file>       Export findings to HTML report with D3.js visualizations
-    -pdf <file>        Export findings to PDF report (requires wkhtmltopdf)
-    -config <path>     Use custom report configuration (default, performance, security, or path)
-    -src-ip <ip>       Filter by source IP address
-    -dst-ip <ip>       Filter by destination IP address
-    -service <port>    Filter by service port or name (e.g., 443, https, ssh)
-    -protocol <proto>  Filter by protocol (tcp or udp)
-    -qos-analysis      Enable QoS/DSCP traffic class analysis
-    -verbose           Enable verbose/debug output
+  Output Formats:
+    -json              Output results in JSON format (for automation/scripting)
+    -csv <file>        Export findings to CSV files (separate files per category)
+    -html <file>       Generate interactive HTML report with D3.js visualizations
+    -pdf <file>        Export to PDF report (requires wkhtmltopdf installed)
+    -config <path>     Use report configuration: default, performance, security, or file path
+
+  Filtering:
+    -src-ip <ip>       Filter packets by source IP address
+    -dst-ip <ip>       Filter packets by destination IP address
+    -service <port>    Filter by service port or name (e.g., 443, https, ssh, dns)
+    -protocol <proto>  Filter by protocol: tcp or udp
+
+  Analysis Options:
+    -qos-analysis      Enable QoS/DSCP traffic class analysis and prioritization checks
+    -verbose           Enable verbose/debug output for troubleshooting
     -help              Show this help message
 
+FEATURES:
+  Security Analysis:
+    • DDoS Detection (SYN flood, UDP flood, ICMP flood)
+    • Port Scanning Detection (horizontal, vertical, block scans)
+    • Malware Indicators (IOC checking with custom databases)
+    • TLS Security Analysis (weak ciphers, outdated protocols)
+    • BGP Hijack Heuristics
+    • GeoIP Analysis with country-based traffic distribution
+
+  Performance Monitoring:
+    • TCP Retransmission Analysis
+    • RTT Distribution with histogram visualization
+    • Failed Handshake Detection
+    • Bandwidth Tracking (per-flow and aggregate)
+    • Jitter & Packet Loss metrics for VoIP/RTP
+
+  Protocol Analysis:
+    • DNS Anomaly Detection (NXDOMAIN, timeouts, DGA detection)
+    • HTTP/HTTPS Analysis with status codes and errors
+    • HTTP/2 & QUIC Detection
+    • VoIP/SIP Call Tracking with codec identification
+    • RTP/RTCP Media Stream Quality Analysis
+
+  Tunnel & Encapsulation:
+    • VXLAN (VNI extraction, overlay detection)
+    • GRE/NVGRE/ERSPAN Tunnels
+    • MPLS Label Analysis
+    • IPsec (ESP/AH) Detection
+    • GTP-U/GTP-C for mobile networks
+    • L2TP, OpenVPN, WireGuard VPN detection
+
+  SD-WAN Specific:
+    • Vendor Detection: Cisco (Viptela), VMware (VeloCloud), Fortinet,
+      Palo Alto Prisma, Silver Peak, Citrix, Versa Networks
+    • Application Identification (SNI-based and port-based)
+    • Device Fingerprinting (OS and device type)
+    • ARP Conflict Detection
+
+  Visualizations (HTML Report):
+    • Interactive Timeline with event filtering
+    • Sankey Diagram (source → destination flows)
+    • RTT Histogram (latency distribution)
+    • Protocol Breakdown charts
+    • Bandwidth utilization graphs
+
 EXAMPLES:
-    # Basic analysis with human-readable output
+  Basic Usage:
+    # Console output with summary
     sdwan-triage capture.pcap
 
-    # Generate HTML report with visualizations
+    # Generate interactive HTML report (recommended)
     sdwan-triage -html report.html capture.pcap
 
     # Export to JSON for automation
     sdwan-triage -json capture.pcap > results.json
 
-    # Filter by source IP
+    # Export to CSV for spreadsheet analysis
+    sdwan-triage -csv findings.csv capture.pcap
+
+    # Generate PDF report
+    sdwan-triage -pdf report.pdf capture.pcap
+
+  Filtering Examples:
+    # Analyze traffic from specific source IP
     sdwan-triage -src-ip 192.168.1.100 capture.pcap
 
-    # Filter by service
-    sdwan-triage -service https capture.pcap
+    # Analyze traffic to specific destination
+    sdwan-triage -dst-ip 10.0.0.50 capture.pcap
 
-VERSION:
-    SD-WAN Triage v%s
+    # Filter by service (port name or number)
+    sdwan-triage -service https capture.pcap
+    sdwan-triage -service 443 capture.pcap
+    sdwan-triage -service dns capture.pcap
+
+    # Filter by protocol
+    sdwan-triage -protocol tcp capture.pcap
+    sdwan-triage -protocol udp capture.pcap
+
+    # Combine multiple filters
+    sdwan-triage -src-ip 192.168.1.100 -service https -html report.html capture.pcap
+
+  Security Analysis:
+    # Detect DDoS attacks and port scans
+    sdwan-triage -config security -html security-report.html capture.pcap
+
+    # Analyze suspicious traffic from specific IP
+    sdwan-triage -src-ip 203.0.113.50 -html scan-report.html suspicious.pcap
+
+    # Check for malware IOCs and TLS weaknesses
+    sdwan-triage -html threat-analysis.html malware-capture.pcap
+
+  Performance Troubleshooting:
+    # Analyze network performance with QoS
+    sdwan-triage -qos-analysis -html performance.html slow-network.pcap
+
+    # Investigate TCP retransmissions
+    sdwan-triage -protocol tcp -html tcp-issues.html capture.pcap
+
+    # Troubleshoot VoIP quality issues
+    sdwan-triage -service sip -html voip-quality.html call-problems.pcap
+
+  SD-WAN Analysis:
+    # Detect SD-WAN vendor and analyze tunnels
+    sdwan-triage -html sdwan-report.html overlay-traffic.pcap
+
+    # Analyze VXLAN overlay network
+    sdwan-triage -service 4789 -html vxlan-analysis.html capture.pcap
+
+    # Check IPsec tunnel traffic
+    sdwan-triage -protocol esp -html ipsec-report.html capture.pcap
+
+  Advanced Usage:
+    # Multiple output formats simultaneously
+    sdwan-triage -html report.html -json -csv findings.csv capture.pcap
+
+    # Verbose output for debugging
+    sdwan-triage -verbose -html report.html capture.pcap
+
+    # Custom configuration with filtering
+    sdwan-triage -config performance -dst-ip 10.0.0.1 -html report.html capture.pcap
+
+OUTPUT FILES:
+  HTML Report:  Interactive single-file report with D3.js visualizations
+  JSON Output:  Structured data for automation and scripting
+  CSV Files:    Separate CSV files for each finding category
+  PDF Report:   Professional formatted document (requires wkhtmltopdf)
+
+SUPPORTED PROTOCOLS:
+  Network:   IPv4, IPv6, ARP, ICMP, ICMPv6
+  Transport: TCP, UDP, SCTP
+  Tunnels:   VXLAN, GRE, NVGRE, ERSPAN, MPLS, IPsec (ESP/AH), GTP, L2TP
+  VPN:       OpenVPN, WireGuard
+  App Layer: HTTP, HTTPS, HTTP/2, QUIC, DNS, TLS/SSL, SIP, RTP/RTCP
+
+For more information and documentation:
+  https://github.com/gocisse/sdwan-triage
 
 `, version)
 	}
