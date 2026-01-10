@@ -177,9 +177,25 @@ details > div { padding: 20px; background: var(--bg-card); }
 .badge-warning { background: var(--warning-bg); color: var(--warning); }
 .badge-danger { background: var(--danger-bg); color: var(--danger); }
 
-.viz-container { background: var(--bg-card); border-radius: var(--border-radius); overflow: hidden; border: 1px solid var(--border-color); min-height: 300px; position: relative; }
-.viz-container::before { content: 'Loading visualization...'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-muted); font-size: 0.875rem; }
-.d3-tooltip { position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 12px 16px; font-size: 0.8125rem; box-shadow: var(--shadow-lg); pointer-events: none; z-index: 1000; }
+.viz-container { background: var(--bg-card); border-radius: var(--border-radius); overflow: hidden; border: 1px solid var(--border-color); min-height: 300px; position: relative; display: flex; align-items: center; justify-content: center; }
+.viz-container svg { display: block; }
+.viz-container::before { content: 'Loading visualization...'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-muted); font-size: 0.875rem; z-index: 1; }
+.d3-tooltip { position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 12px 16px; font-size: 0.8125rem; box-shadow: var(--shadow-lg); pointer-events: none; z-index: 1000; max-width: 300px; }
+.d3-tooltip strong { color: var(--text-primary); display: block; margin-bottom: 4px; }
+
+/* Visualization-specific styles */
+.node-label { font-size: 11px; fill: var(--text-primary); pointer-events: none; }
+.timeline-axis text { fill: var(--text-secondary); font-size: 11px; }
+.timeline-axis path, .timeline-axis line { stroke: var(--border-color); }
+.sankey-link { fill: none; stroke-opacity: 0.4; }
+.sankey-link:hover { stroke-opacity: 0.7; }
+
+/* Loading animation */
+@keyframes vizPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+.viz-container::before { animation: vizPulse 1.5s ease-in-out infinite; }
 
 /* TCP Handshake Analysis Styles */
 .handshake-analysis-container { padding: 0; }

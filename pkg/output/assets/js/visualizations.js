@@ -31,24 +31,35 @@ function safeD3Init(containerId, initFn, data) {
         return;
     }
     
+    // Remove loading message
+    container.style.position = 'relative';
+    const loadingMsg = container.querySelector('::before');
+    
     if (!data || (Array.isArray(data) && data.length === 0) || 
         (data.nodes && data.nodes.length === 0)) {
-        container.innerHTML = '<div class="viz-error"><i class="fas fa-info-circle"></i>&nbsp;No data available for visualization</div>';
+        container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 0.875rem;"><i class="fas fa-info-circle" style="margin-right: 8px;"></i>No data available for visualization</div>';
         return;
     }
     
     try {
         initFn(container, data);
+        // Remove loading indicator after successful init
+        container.style.minHeight = 'auto';
     } catch (error) {
         console.error(`Error initializing ${containerId}:`, error);
-        container.innerHTML = `<div class="viz-error"><i class="fas fa-exclamation-triangle"></i>&nbsp;Error rendering visualization: ${error.message}</div>`;
+        container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--danger); font-size: 0.875rem;"><i class="fas fa-exclamation-triangle" style="margin-right: 8px;"></i>Error rendering visualization: ${error.message}</div>`;
     }
 }
 
 // Network Diagram (Force-Directed Graph)
 function createNetworkDiagram(container, data) {
     const width = container.clientWidth || 800;
-    const height = 500;
+    const height = container.clientHeight || 500;
+    
+    // Validate data structure
+    if (!data.nodes || !data.links) {
+        throw new Error('Invalid network data structure');
+    }
     
     // Clear existing content
     d3.select(container).selectAll("*").remove();
@@ -186,7 +197,11 @@ function createNetworkDiagram(container, data) {
 // Timeline Visualization
 function createTimeline(container, data) {
     const width = container.clientWidth || 800;
-    const height = 300;
+    const height = container.clientHeight || 300;
+    
+    if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('No timeline data available');
+    }
     const margin = { top: 30, right: 30, bottom: 50, left: 60 };
     const colors = getThemeColors();
     
@@ -276,7 +291,11 @@ function createTimeline(container, data) {
 // Sankey Diagram
 function createSankeyDiagram(container, data) {
     const width = container.clientWidth || 800;
-    const height = 400;
+    const height = container.clientHeight || 400;
+    
+    if (!data.nodes || !data.links) {
+        throw new Error('Invalid sankey data structure');
+    }
     const margin = { top: 20, right: 120, bottom: 20, left: 120 };
     const colors = getThemeColors();
     
@@ -383,7 +402,11 @@ function formatBytes(bytes) {
 // Protocol Distribution Pie Chart
 function createProtocolChart(container, data) {
     const width = container.clientWidth || 400;
-    const height = 350;
+    const height = container.clientHeight || 350;
+    
+    if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('No protocol data available');
+    }
     const radius = Math.min(width, height) / 2 - 40;
     const colors = getThemeColors();
     
@@ -477,7 +500,14 @@ function createProtocolChart(container, data) {
 // Top Talkers Bar Chart
 function createTopTalkersChart(container, data) {
     const width = container.clientWidth || 600;
-    const height = 350;
+    const height = container.clientHeight || 350;
+    
+    if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('No traffic data available');
+    }
+    
+    // Limit to top 10 for better visualization
+    data = data.slice(0, 10);
     const margin = { top: 30, right: 30, bottom: 60, left: 150 };
     const colors = getThemeColors();
     
@@ -664,20 +694,46 @@ document.addEventListener('DOMContentLoaded', function() {
     initTabs();
     initTableSorting();
     
-    // Initialize visualizations if data exists
-    if (typeof protocolStats !== 'undefined') {
-        safeD3Init('protocol-chart', createProtocolChart, protocolStats);
-    }
-    if (typeof topTalkers !== 'undefined') {
-        safeD3Init('top-talkers-chart', createTopTalkersChart, topTalkers);
-    }
-    if (typeof networkData !== 'undefined') {
-        safeD3Init('network-diagram', createNetworkDiagram, networkData);
-    }
-    if (typeof timelineData !== 'undefined') {
-        safeD3Init('timeline-diagram', createTimeline, timelineData);
-    }
-    if (typeof sankeyData !== 'undefined') {
-        safeD3Init('sankey-diagram', createSankeyDiagram, sankeyData);
-    }
+    // Add small delay to ensure DOM is fully ready
+    setTimeout(function() {
+        // Initialize visualizations if data exists
+        if (typeof protocolStats !== 'undefined' && protocolStats) {
+            safeD3Init('protocol-chart', createProtocolChart, protocolStats);
+        }
+        if (typeof topTalkers !== 'undefined' && topTalkers) {
+            safeD3Init('top-talkers-chart', createTopTalkersChart, topTalkers);
+        }
+        if (typeof networkData !== 'undefined' && networkData) {
+            safeD3Init('network-diagram-viz', createNetworkDiagram, networkData);
+        }
+        if (typeof timelineData !== 'undefined' && timelineData) {
+            safeD3Init('timeline-diagram', createTimeline, timelineData);
+        }
+        if (typeof sankeyData !== 'undefined' && sankeyData) {
+            safeD3Init('sankey-diagram', createSankeyDiagram, sankeyData);
+        }
+    }, 100);
+    
+    // Re-render visualizations on window resize
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            if (typeof protocolStats !== 'undefined' && protocolStats) {
+                safeD3Init('protocol-chart', createProtocolChart, protocolStats);
+            }
+            if (typeof topTalkers !== 'undefined' && topTalkers) {
+                safeD3Init('top-talkers-chart', createTopTalkersChart, topTalkers);
+            }
+            if (typeof networkData !== 'undefined' && networkData) {
+                safeD3Init('network-diagram-viz', createNetworkDiagram, networkData);
+            }
+            if (typeof timelineData !== 'undefined' && timelineData) {
+                safeD3Init('timeline-diagram', createTimeline, timelineData);
+            }
+            if (typeof sankeyData !== 'undefined' && sankeyData) {
+                safeD3Init('sankey-diagram', createSankeyDiagram, sankeyData);
+            }
+        }, 250);
+    });
 });
