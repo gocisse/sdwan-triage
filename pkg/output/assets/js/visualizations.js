@@ -167,19 +167,26 @@ function createNetworkDiagram(container, data) {
         "anomaly": width * 0.5      // Center (will be colored red)
     };
     
-    // Enhanced force simulation with hierarchical constraints
+    // Enhanced force simulation with hierarchical constraints - optimized for clarity
+    const nodeCount = data.nodes.length;
+    const linkStrength = nodeCount > 50 ? 0.2 : 0.4;  // Weaker links for large graphs
+    const chargeStrength = nodeCount > 50 ? -800 : -600;  // Stronger repulsion for large graphs
+    
     const simulation = d3.forceSimulation(data.nodes)
         .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => {
             // Longer distances for clearer paths
             const traffic = d.value || 0;
-            if (traffic > 5000000) return 120;  // High traffic: closer
-            if (traffic > 1000000) return 150;  // Medium traffic
-            return 180;  // Low traffic: further apart
-        }))
-        .force("charge", d3.forceManyBody().strength(-500))  // Stronger repulsion
-        .force("collision", d3.forceCollide().radius(50))    // Prevent overlap
-        .force("x", d3.forceX(d => hierarchyX[d.group] || width / 2).strength(0.3))  // Hierarchical X positioning
-        .force("y", d3.forceY(height / 2).strength(0.1));    // Vertical centering
+            if (traffic > 5000000) return 140;  // High traffic: closer
+            if (traffic > 1000000) return 180;  // Medium traffic
+            return 220;  // Low traffic: further apart
+        }).strength(linkStrength))
+        .force("charge", d3.forceManyBody().strength(chargeStrength).distanceMax(400))  // Stronger repulsion with max distance
+        .force("collision", d3.forceCollide().radius(60).strength(0.8))    // Prevent overlap
+        .force("x", d3.forceX(d => hierarchyX[d.group] || width / 2).strength(0.25))  // Hierarchical X positioning
+        .force("y", d3.forceY(height / 2).strength(0.08))    // Vertical centering
+        .alpha(1)
+        .alphaDecay(0.02)  // Slower decay for better layout
+        .velocityDecay(0.4);  // Smoother movement
     
     // Enhanced links with traffic-based thickness and labels
     const linkGroup = g.append("g").attr("class", "links");
@@ -379,23 +386,24 @@ function createNetworkDiagram(container, data) {
             }
         });
     
-    // Clear, simple labels - just IP addresses
+    // Clear, simple labels - just IP addresses with enhanced visibility
     const labels = g.append("g")
         .selectAll("text")
         .data(data.nodes)
         .join("text")
         .attr("class", "node-label")
-        .attr("dx", 22)
+        .attr("dx", 24)
         .attr("dy", 5)
-        .attr("font-size", "12px")
-        .attr("font-weight", "600")
+        .attr("font-size", "13px")
+        .attr("font-weight", "700")
         .attr("fill", "#1e293b")
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 4)
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", 5)
         .attr("paint-order", "stroke")
         .text(d => d.id)  // Just show IP address
         .style("pointer-events", "none")
-        .style("user-select", "none");
+        .style("user-select", "none")
+        .style("text-shadow", "0 1px 2px rgba(0,0,0,0.1)");
     
     // Highlight connections
     function highlightConnections(d, highlight) {

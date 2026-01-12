@@ -729,76 +729,93 @@
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-handshake card-title-icon"></i>
-                        TCP Connection Analysis
+                        TCP Connection Analysis - Per-Flow Breakdown
                     </h3>
                     <div class="card-actions">
                         <span class="status-badge {{if gt .TCPHandshakeStats.FailedCount 0}}critical{{else}}healthy{{end}}">
                             <span class="status-dot"></span>
-                            {{if gt .TCPHandshakeStats.FailedCount 0}}{{.TCPHandshakeStats.FailedCount}} Failed{{else}}All Successful{{end}}
+                            {{.TCPHandshakeStats.SuccessfulCount}} Success / {{.TCPHandshakeStats.FailedCount}} Failed
                         </span>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-xl);">
-                        <!-- SYN Packets -->
-                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
-                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-info); margin-bottom: var(--space-sm);">
-                                {{.TCPHandshakeStats.TotalSYN}}
-                            </div>
-                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
-                                SYN Packets Sent
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-                                <i class="fas fa-arrow-right"></i> Connection attempts
-                            </div>
+                    <!-- Summary Stats Row -->
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(4, 1fr); gap: var(--space-md); margin-bottom: var(--space-xl);">
+                        <div style="text-align: center; padding: var(--space-md); background: var(--color-surface); border-radius: var(--radius-md); border-left: 4px solid var(--color-info);">
+                            <div style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-info);">{{.TCPHandshakeStats.TotalSYN}}</div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Total SYN</div>
                         </div>
-                        
-                        <!-- SYN-ACK Packets -->
-                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
-                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-success); margin-bottom: var(--space-sm);">
-                                {{.TCPHandshakeStats.TotalSYNACK}}
-                            </div>
-                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
-                                SYN-ACK Received
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-                                <i class="fas fa-reply"></i> Server responses
-                            </div>
+                        <div style="text-align: center; padding: var(--space-md); background: var(--color-surface); border-radius: var(--radius-md); border-left: 4px solid var(--color-success);">
+                            <div style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-success);">{{.TCPHandshakeStats.TotalSYNACK}}</div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Total SYN-ACK</div>
                         </div>
-                        
-                        <!-- Successful Handshakes -->
-                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
-                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-success); margin-bottom: var(--space-sm);">
-                                {{.TCPHandshakeStats.SuccessfulCount}}
-                            </div>
-                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
-                                Successful Handshakes
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
-                                <i class="fas fa-check-circle"></i> Connections established
-                            </div>
+                        <div style="text-align: center; padding: var(--space-md); background: var(--color-surface); border-radius: var(--radius-md); border-left: 4px solid var(--color-success);">
+                            <div style="font-size: var(--font-size-2xl); font-weight: 700; color: var(--color-success);">{{.TCPHandshakeStats.SuccessfulCount}}</div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Successful</div>
                         </div>
-                        
-                        <!-- Failed Handshakes (CRITICAL) -->
-                        <div style="text-align: center; padding: var(--space-lg); background: {{if gt .TCPHandshakeStats.FailedCount 0}}rgba(225, 112, 85, 0.1){{else}}var(--color-surface){{end}}; border-radius: var(--radius-lg); border: {{if gt .TCPHandshakeStats.FailedCount 0}}2px solid var(--color-critical){{else}}1px solid var(--color-border){{end}};">
-                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: {{if gt .TCPHandshakeStats.FailedCount 0}}var(--color-critical){{else}}var(--color-success){{end}}; margin-bottom: var(--space-sm);">
-                                {{.TCPHandshakeStats.FailedCount}}
-                            </div>
-                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
-                                <strong>Failed Handshakes</strong>
-                            </div>
-                            <div style="font-size: var(--font-size-xs); color: {{if gt .TCPHandshakeStats.FailedCount 0}}var(--color-critical){{else}}var(--color-text-muted){{end}};">
-                                {{if gt .TCPHandshakeStats.FailedCount 0}}
-                                <i class="fas fa-exclamation-triangle"></i> Unreachable/Blocked
-                                {{else}}
-                                <i class="fas fa-check"></i> No failures
-                                {{end}}
-                            </div>
+                        <div style="text-align: center; padding: var(--space-md); background: {{if gt .TCPHandshakeStats.FailedCount 0}}rgba(225, 112, 85, 0.1){{else}}var(--color-surface){{end}}; border-radius: var(--radius-md); border-left: 4px solid {{if gt .TCPHandshakeStats.FailedCount 0}}var(--color-critical){{else}}var(--color-success){{end}};">
+                            <div style="font-size: var(--font-size-2xl); font-weight: 700; color: {{if gt .TCPHandshakeStats.FailedCount 0}}var(--color-critical){{else}}var(--color-success){{end}};">{{.TCPHandshakeStats.FailedCount}}</div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Failed</div>
                         </div>
                     </div>
                     
+                    <!-- Per-Flow Detailed Table -->
+                    {{if .TCPHandshakeCorrelatedFlows}}
+                    <div class="mb-md">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+                            <h4 style="margin: 0;"><i class="fas fa-list"></i> Per-Flow Details ({{len .TCPHandshakeCorrelatedFlows}} flows)</h4>
+                            <input type="text" id="tcp-flow-search" placeholder="Filter by IP address..." 
+                                   style="padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm); width: 250px;"
+                                   onkeyup="filterTCPFlows(this.value)">
+                        </div>
+                        <div class="data-table-container" style="max-height: 500px; overflow-y: auto;">
+                            <table class="data-table" id="tcp-flow-table">
+                                <thead style="position: sticky; top: 0; background: var(--color-background); z-index: 10;">
+                                    <tr>
+                                        <th style="cursor: pointer;" onclick="sortTCPTable(0)">Source IP:Port <i class="fas fa-sort"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortTCPTable(1)">Destination IP:Port <i class="fas fa-sort"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortTCPTable(2)">Status <i class="fas fa-sort"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortTCPTable(3)">SYN Sent <i class="fas fa-sort"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortTCPTable(4)">SYN-ACK Recv <i class="fas fa-sort"></i></th>
+                                        <th>Wireshark Filter</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range $index, $flow := .TCPHandshakeCorrelatedFlows}}
+                                    <tr class="tcp-flow-row {{if eq $flow.Status "Complete"}}status-row-success{{else if eq $flow.Status "Failed"}}status-row-failed{{else}}status-row-partial{{end}}">
+                                        <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
+                                        <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
+                                        <td>
+                                            <span class="tcp-status-badge {{if eq $flow.Status "Complete"}}tcp-status-success{{else if eq $flow.Status "Failed"}}tcp-status-failed{{else}}tcp-status-partial{{end}}">
+                                                {{if eq $flow.Status "Complete"}}<i class="fas fa-check-circle"></i>{{else if eq $flow.Status "Failed"}}<i class="fas fa-times-circle"></i>{{else}}<i class="fas fa-clock"></i>{{end}}
+                                                {{$flow.Status}}
+                                            </span>
+                                        </td>
+                                        <td style="text-align: center;">{{$flow.SynCount}}</td>
+                                        <td style="text-align: center;">{{$flow.SynAckCount}}</td>
+                                        <td>
+                                            <div style="display: flex; align-items: center; gap: var(--space-xs);">
+                                                <code class="wireshark-filter" style="font-size: var(--font-size-xs); flex: 1; overflow: hidden; text-overflow: ellipsis;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}</code>
+                                                <button class="copy-filter-btn" onclick="copyToClipboard('ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}', this)" title="Copy filter">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {{else}}
+                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
+                        <i class="fas fa-info-circle" style="font-size: var(--font-size-2xl); margin-bottom: var(--space-md);"></i>
+                        <p>No TCP handshake flows recorded in this capture.</p>
+                    </div>
+                    {{end}}
+                    
                     {{if gt .TCPHandshakeStats.FailedCount 0}}
-                    <div style="background: rgba(225, 112, 85, 0.1); border-left: 4px solid var(--color-critical); padding: var(--space-lg); border-radius: var(--radius-md); margin-bottom: var(--space-lg);">
+                    <div style="background: rgba(225, 112, 85, 0.1); border-left: 4px solid var(--color-critical); padding: var(--space-lg); border-radius: var(--radius-md); margin-top: var(--space-lg);">
                         <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--color-critical);">
                             <i class="fas fa-exclamation-circle"></i> Failed Handshake Analysis
                         </h4>
@@ -1911,6 +1928,93 @@
                 container.innerHTML = '';
                 createNetworkDiagram(container, networkData);
             }
+        }
+        
+        // TCP Flow Table - Filter by IP address
+        function filterTCPFlows(searchText) {
+            const table = document.getElementById('tcp-flow-table');
+            if (!table) return;
+            
+            const rows = table.querySelectorAll('tbody tr.tcp-flow-row');
+            const search = searchText.toLowerCase().trim();
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        }
+        
+        // TCP Flow Table - Sort by column
+        let tcpSortDirection = {};
+        function sortTCPTable(columnIndex) {
+            const table = document.getElementById('tcp-flow-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr.tcp-flow-row'));
+            
+            // Toggle sort direction
+            tcpSortDirection[columnIndex] = !tcpSortDirection[columnIndex];
+            const ascending = tcpSortDirection[columnIndex];
+            
+            rows.sort((a, b) => {
+                let aVal = a.cells[columnIndex].textContent.trim();
+                let bVal = b.cells[columnIndex].textContent.trim();
+                
+                // Numeric sort for SYN/SYN-ACK columns
+                if (columnIndex === 3 || columnIndex === 4) {
+                    aVal = parseInt(aVal) || 0;
+                    bVal = parseInt(bVal) || 0;
+                    return ascending ? aVal - bVal : bVal - aVal;
+                }
+                
+                // String sort for other columns
+                return ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+            
+            // Update sort indicators
+            const headers = table.querySelectorAll('thead th');
+            headers.forEach((th, i) => {
+                const icon = th.querySelector('i.fa-sort, i.fa-sort-up, i.fa-sort-down');
+                if (icon) {
+                    if (i === columnIndex) {
+                        icon.className = ascending ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                    } else {
+                        icon.className = 'fas fa-sort';
+                    }
+                }
+            });
+        }
+        
+        // Copy to clipboard with visual feedback
+        function copyToClipboard(text, button) {
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = button.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                button.style.background = '#00B894';
+                button.style.color = 'white';
+                button.style.borderColor = '#00B894';
+                
+                setTimeout(() => {
+                    icon.className = originalClass;
+                    button.style.background = '';
+                    button.style.color = '';
+                    button.style.borderColor = '';
+                }, 1500);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            });
         }
         
         // Initialize visualizations when section is shown

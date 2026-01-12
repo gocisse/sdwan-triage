@@ -993,7 +993,100 @@ code, pre {
 .gap-lg { gap: var(--space-lg); }
 
 /* ============================================================================
-   16. PRINT STYLES
+   16. TCP CONNECTION ANALYSIS STYLES
+   ============================================================================ */
+
+/* TCP Status Badges */
+.tcp-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tcp-status-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.tcp-status-failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.tcp-status-partial {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Row highlighting based on status */
+.status-row-success {
+    background-color: rgba(0, 184, 148, 0.05);
+}
+
+.status-row-success:hover {
+    background-color: rgba(0, 184, 148, 0.1);
+}
+
+.status-row-failed {
+    background-color: rgba(225, 112, 85, 0.08);
+}
+
+.status-row-failed:hover {
+    background-color: rgba(225, 112, 85, 0.15);
+}
+
+.status-row-partial {
+    background-color: rgba(253, 203, 110, 0.08);
+}
+
+.status-row-partial:hover {
+    background-color: rgba(253, 203, 110, 0.15);
+}
+
+/* Copy Filter Button */
+.copy-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-background);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.copy-filter-btn:hover {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.copy-filter-btn:active {
+    transform: scale(0.95);
+}
+
+/* Wireshark Filter Code */
+.wireshark-filter {
+    background: var(--color-surface);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+    white-space: nowrap;
+}
+
+/* ============================================================================
+   17. PRINT STYLES
    ============================================================================ */
 @media print {
     .dashboard-header,

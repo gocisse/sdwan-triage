@@ -347,13 +347,15 @@ type TCPHandshakeEventView struct {
 
 // TCPHandshakeCorrelatedFlowView represents a correlated TCP handshake flow for display
 type TCPHandshakeCorrelatedFlowView struct {
-	FlowID  string
-	SrcIP   string
-	SrcPort uint16
-	DstIP   string
-	DstPort uint16
-	Events  []TCPHandshakeEventView
-	Status  string // "Complete", "Failed", "Pending"
+	FlowID      string
+	SrcIP       string
+	SrcPort     uint16
+	DstIP       string
+	DstPort     uint16
+	Events      []TCPHandshakeEventView
+	Status      string // "Complete", "Failed", "Pending"
+	SynCount    int    // Number of SYN packets in this flow
+	SynAckCount int    // Number of SYN-ACK packets in this flow
 }
 
 type AppIdentificationView struct {
@@ -1450,21 +1452,31 @@ func convertTCPHandshakeCorrelatedFlows(flows []models.TCPHandshakeCorrelatedFlo
 	result := make([]TCPHandshakeCorrelatedFlowView, len(flows))
 	for i, f := range flows {
 		events := make([]TCPHandshakeEventView, len(f.Events))
+		synCount := 0
+		synAckCount := 0
 		for j, e := range f.Events {
 			events[j] = TCPHandshakeEventView{
 				Type:         html.EscapeString(e.Type),
 				Timestamp:    e.Timestamp,
 				TimestampFmt: formatUnixTimeMs(e.Timestamp),
 			}
+			// Count SYN and SYN-ACK events
+			if e.Type == "SYN" {
+				synCount++
+			} else if e.Type == "SYN-ACK" {
+				synAckCount++
+			}
 		}
 		result[i] = TCPHandshakeCorrelatedFlowView{
-			FlowID:  html.EscapeString(f.FlowID),
-			SrcIP:   html.EscapeString(f.SrcIP),
-			SrcPort: f.SrcPort,
-			DstIP:   html.EscapeString(f.DstIP),
-			DstPort: f.DstPort,
-			Events:  events,
-			Status:  html.EscapeString(f.Status),
+			FlowID:      html.EscapeString(f.FlowID),
+			SrcIP:       html.EscapeString(f.SrcIP),
+			SrcPort:     f.SrcPort,
+			DstIP:       html.EscapeString(f.DstIP),
+			DstPort:     f.DstPort,
+			Events:      events,
+			Status:      html.EscapeString(f.Status),
+			SynCount:    synCount,
+			SynAckCount: synAckCount,
 		}
 	}
 	return result
