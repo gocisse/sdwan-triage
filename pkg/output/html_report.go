@@ -109,6 +109,7 @@ type ReportData struct {
 	// Educational content
 	ExecutiveSummaryExplanation template.HTML
 	ProtocolGuide               template.HTML
+	WiresharkFilterGuide        template.HTML
 
 	// Security Findings
 	DNSAnomalies        []DNSAnomalyView
@@ -696,6 +697,10 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	// Add educational content
 	data.ExecutiveSummaryExplanation = template.HTML(GetExecutiveSummaryExplanation())
 	data.ProtocolGuide = GetProtocolAnalysisGuide()
+
+	// Add Wireshark filter guide
+	wfg := NewWiresharkFilterGenerator()
+	data.WiresharkFilterGuide = template.HTML(wfg.GetFilterGuideHTML())
 
 	return data
 }
@@ -2507,6 +2512,8 @@ func getTemplateContent() string {
                     <div id="protocols"></div>
                     
                     {{.ProtocolGuide}}
+                    
+                    {{.WiresharkFilterGuide}}
                     
                     <div class="protocol-summary">
                         <h3><i class="fas fa-handshake"></i> TCP Handshake Analysis</h3>
