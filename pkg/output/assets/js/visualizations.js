@@ -116,11 +116,16 @@ function createNetworkDiagram(container, data) {
         .style("opacity", 0)
         .style("max-width", "300px");
     
-    // Color scale - theme aware with better colors
+    // Color scale - solid colors for better visibility
     const colors = getThemeColors();
     const colorScale = d3.scaleOrdinal()
         .domain(["internal", "router", "external", "anomaly"])
-        .range([colors.nodeInternal, colors.nodeRouter, colors.nodeExternal, colors.nodeAnomaly]);
+        .range([
+            colors.nodeInternal,    // Internal: Green
+            "#2563eb",              // Router: Solid Blue
+            colors.nodeExternal,    // External: Orange
+            "#dc2626"               // Anomaly: Solid Red
+        ]);
     
     // Enhanced force simulation with better spacing
     const simulation = d3.forceSimulation(data.nodes)
@@ -178,7 +183,7 @@ function createNetworkDiagram(container, data) {
         .append("circle")
         .attr("r", 18)
         .attr("fill", "none")
-        .attr("stroke", colors.nodeAnomaly)
+        .attr("stroke", "#dc2626")  // Solid Red
         .attr("stroke-width", 2)
         .attr("stroke-opacity", 0.3)
         .attr("class", "node-glow");
@@ -390,9 +395,9 @@ function createNetworkDiagram(container, data) {
     
     const legendData = [
         { label: "Internal Device", color: colors.nodeInternal, icon: "\uf109" },
-        { label: "Gateway/Router", color: colors.nodeRouter, icon: "\uf233" },
+        { label: "Gateway/Router", color: "#2563eb", icon: "\uf233" },  // Solid Blue
         { label: "External Server", color: colors.nodeExternal, icon: "\uf0ac" },
-        { label: "Security Alert", color: colors.nodeAnomaly, icon: "\uf071" }
+        { label: "Security Alert", color: "#dc2626", icon: "\uf071" }   // Solid Red
     ];
     
     legendData.forEach((item, i) => {
