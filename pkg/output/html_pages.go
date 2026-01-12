@@ -571,14 +571,14 @@ func generateNetworkPage(data *ReportData, outputPath string) error {
                         </div>
                         <div class="card-body">
                             <table class="data-table">
-                                <thead><tr><th>Vendor</th><th>Device IP</th><th>Confidence</th><th>Indicators</th></tr></thead>
+                                <thead><tr><th>Vendor</th><th>Confidence</th><th>Detected By</th><th>Packets</th></tr></thead>
                                 <tbody>
                                     {{range .SDWANVendors}}
                                     <tr>
-                                        <td><strong>{{.Vendor}}</strong></td>
-                                        <td><code>{{.DeviceIP}}</code></td>
+                                        <td><strong>{{.Name}}</strong></td>
                                         <td>{{.Confidence}}</td>
-                                        <td>{{.Indicators}}</td>
+                                        <td>{{.DetectedBy}}</td>
+                                        <td>{{.PacketCount}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -620,15 +620,12 @@ func generateNetworkPage(data *ReportData, outputPath string) error {
                         </div>
                         <div class="card-body">
                             <table class="data-table">
-                                <thead><tr><th>IP Address</th><th>Country</th><th>City</th><th>ASN</th><th>Connections</th></tr></thead>
+                                <thead><tr><th>Country</th><th>Connections</th></tr></thead>
                                 <tbody>
                                     {{range .GeoLocations}}
                                     <tr>
-                                        <td><code>{{.IP}}</code></td>
                                         <td>{{.Country}}</td>
-                                        <td>{{.City}}</td>
-                                        <td>{{.ASN}}</td>
-                                        <td>{{.ConnectionCount}}</td>
+                                        <td>{{.Count}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>

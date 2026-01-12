@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SD-WAN Network Triage Report</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/report.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-network-wired"></i></div>
+                <div>
+                    <div class="sidebar-title">SD-WAN Triage</div>
+                    <div class="sidebar-subtitle">Network Analysis</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="index.html" class="nav-item active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                    <a href="executive-summary.html" class="nav-item "><i class="fas fa-chart-line"></i> Executive Summary</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Security</div>
+                    <a href="security.html" class="nav-item "><i class="fas fa-shield-alt"></i> Security Findings </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Performance</div>
+                    <a href="performance.html" class="nav-item "><i class="fas fa-exchange-alt"></i> Performance <span class="nav-badge">210</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Traffic</div>
+                    <a href="traffic.html" class="nav-item "><i class="fas fa-stream"></i> Traffic Flows</a>
+                    <a href="protocols.html" class="nav-item "><i class="fas fa-layer-group"></i> Protocols</a>
+                    <a href="network.html" class="nav-item "><i class="fas fa-laptop"></i> Network & Devices</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Visualizations</div>
+                    <a href="visualizations.html" class="nav-item "><i class="fas fa-project-diagram"></i> Charts & Maps</a>
+                </div>
+            </nav>
+            <div class="theme-toggle">
+                <span class="theme-toggle-label"><i class="fas fa-moon"></i> Dark Mode</span>
+                <div class="theme-switch" onclick="toggleTheme()"></div>
+            </div>
+        </aside>
+
+        
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                    <div class="breadcrumb">
+                        <a href="index.html">Dashboard</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">Dashboard</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-meta">
+                        <div><strong>TestFile.pcap</strong></div>
+                        <div>2026-01-12 15:23:36 • 0 packets</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                
+                
+                <section id="dashboard">
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-icon danger">
+                                <i class="fas fa-times-circle"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Network Health</div>
+                                <div class="kpi-value">Critical</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon success">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Security Issues</div>
+                                <div class="kpi-value">0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon warning">
+                                <i class="fas fa-redo"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">TCP Retransmissions</div>
+                                <div class="kpi-value">210</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon info">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-label">Total Traffic</div>
+                                <div class="kpi-value">14.9 MB</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <h2>Primary Concern</h2>
+                        </div>
+                        <div class="card-body">
+                            
+                            <div class="alert alert-warning">
+                                <strong>TCP Retransmissions</strong> (210 instances detected)
+                            </div>
+                            
+
+                            
+                            <h4>Recommended Actions:</h4>
+                            <ul>
+                                
+                                <li>HIGH: Excessive TCP retransmissions indicate network congestion or hardware issues. Check links between affected hosts.</li>
+                                
+                                <li>MEDIUM: Port scanning activity detected. Review source IPs and consider blocking if malicious.</li>
+                                
+                                <li>LOW: High latency flows detected. Check for network congestion or routing issues.</li>
+                                
+                            </ul>
+                            
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-list-check"></i>
+                            <h2>Quick Links</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="quick-links-grid">
+                                <a href="security.html" class="quick-link-card">
+                                    <i class="fas fa-shield-alt"></i>
+                                    <h3>Security Analysis</h3>
+                                    <p>0 DDoS • 1 Port Scans • 0 IOCs</p>
+                                </a>
+                                <a href="performance.html" class="quick-link-card">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    <h3>Performance</h3>
+                                    <p>210 Retrans • 16 High RTT</p>
+                                </a>
+                                <a href="traffic.html" class="quick-link-card">
+                                    <i class="fas fa-stream"></i>
+                                    <h3>Traffic Analysis</h3>
+                                    <p>Top flows and conversations</p>
+                                </a>
+                                <a href="visualizations.html" class="quick-link-card">
+                                    <i class="fas fa-chart-pie"></i>
+                                    <h3>Visualizations</h3>
+                                    <p>Network maps and charts</p>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+    <script src="assets/visualizations.js"></script>
+</body>
+</html>

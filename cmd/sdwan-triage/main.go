@@ -36,6 +36,7 @@ OPTIONS:
     -json              Output results in JSON format (for automation/scripting)
     -csv <file>        Export findings to CSV files (separate files per category)
     -html <file>       Generate interactive HTML report with D3.js visualizations
+    -multi-page-html <dir>  Generate multi-page HTML report in specified directory
     -pdf <file>        Export to PDF report (requires wkhtmltopdf installed)
     -config <path>     Use report configuration: default, performance, security, or file path
 
@@ -194,6 +195,7 @@ For more information and documentation:
 	jsonOutput := flag.Bool("json", false, "Output in JSON format")
 	csvOutput := flag.String("csv", "", "Export findings to CSV file")
 	htmlOutput := flag.String("html", "", "Export findings to HTML report")
+	multiPageHTML := flag.String("multi-page-html", "", "Export findings to multi-page HTML report (specify output directory)")
 	pdfOutput := flag.String("pdf", "", "Export findings to PDF report")
 	configPath := flag.String("config", "", "Report configuration (default, performance, security, or path)")
 	srcIP := flag.String("src-ip", "", "Filter by source IP address")
@@ -354,6 +356,20 @@ For more information and documentation:
 			for _, f := range result.Files {
 				color.Green("  - %s", filepath.Base(f))
 			}
+		}
+	}
+
+	// Export to multi-page HTML if requested
+	if *multiPageHTML != "" {
+		mpOutputDir := *multiPageHTML
+		if mpOutputDir == "" {
+			mpOutputDir = "sdwan_report"
+		}
+		if err := output.GenerateMultiPageHTMLReport(report, mpOutputDir, filepath.Base(absPath)); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating multi-page HTML report: %v\n", err)
+		} else {
+			color.Green("✓ Multi-page HTML report generated in directory: %s", mpOutputDir)
+			color.Cyan("  Open %s/index.html in your browser to view the report", mpOutputDir)
 		}
 	}
 

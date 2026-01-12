@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protocol Analysis - SD-WAN Network Triage Report</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/report.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-network-wired"></i></div>
+                <div>
+                    <div class="sidebar-title">SD-WAN Triage</div>
+                    <div class="sidebar-subtitle">Network Analysis</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="index.html" class="nav-item "><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                    <a href="executive-summary.html" class="nav-item "><i class="fas fa-chart-line"></i> Executive Summary</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Security</div>
+                    <a href="security.html" class="nav-item "><i class="fas fa-shield-alt"></i> Security Findings </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Performance</div>
+                    <a href="performance.html" class="nav-item "><i class="fas fa-exchange-alt"></i> Performance <span class="nav-badge">210</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Traffic</div>
+                    <a href="traffic.html" class="nav-item "><i class="fas fa-stream"></i> Traffic Flows</a>
+                    <a href="protocols.html" class="nav-item active"><i class="fas fa-layer-group"></i> Protocols</a>
+                    <a href="network.html" class="nav-item "><i class="fas fa-laptop"></i> Network & Devices</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Visualizations</div>
+                    <a href="visualizations.html" class="nav-item "><i class="fas fa-project-diagram"></i> Charts & Maps</a>
+                </div>
+            </nav>
+            <div class="theme-toggle">
+                <span class="theme-toggle-label"><i class="fas fa-moon"></i> Dark Mode</span>
+                <div class="theme-switch" onclick="toggleTheme()"></div>
+            </div>
+        </aside>
+
+        
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                    <div class="breadcrumb">
+                        <a href="index.html">Dashboard</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">Protocol Analysis</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-meta">
+                        <div><strong>TestFile.pcap</strong></div>
+                        <div>2026-01-12 15:23:36 • 0 packets</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                
+                <section id="protocols">
+                    
+		<div class="protocol-guide">
+			<details class="guide-section">
+				<summary><i class="fas fa-book-open"></i> Protocol Analysis Guide</summary>
+				<div class="guide-content">
+					<h4>Understanding Network Protocols</h4>
+					
+					<div class="protocol-explanation">
+						<h5><i class="fas fa-exchange-alt"></i> TCP Handshakes</h5>
+						<p><strong>Normal Behavior:</strong> TCP uses a three-way handshake to establish connections:</p>
+						<ol>
+							<li><strong>SYN:</strong> Client sends SYN packet to server</li>
+							<li><strong>SYN-ACK:</strong> Server responds with SYN-ACK</li>
+							<li><strong>ACK:</strong> Client sends final ACK to complete handshake</li>
+						</ol>
+						<p><strong>Abnormal Behavior:</strong> Failed handshakes occur when SYN packets receive no response (server down/firewalled) or receive RST (connection refused).</p>
+						<p><strong>Wireshark Filters:</strong></p>
+						<ul>
+							<li><code>tcp.flags.syn == 1 and tcp.flags.ack == 0</code> - See SYN packets (connection attempts)</li>
+							<li><code>tcp.flags.syn == 1 and tcp.flags.ack == 1</code> - See SYN-ACK packets (server responses)</li>
+							<li><code>tcp.flags.reset == 1</code> - See RST packets (connection refused/aborted)</li>
+							<li><code>tcp.analysis.flags</code> - See TCP analysis flags (retransmissions, out-of-order, etc.)</li>
+						</ul>
+					</div>
+					
+					<div class="protocol-explanation">
+						<h5><i class="fas fa-globe"></i> HTTP/HTTPS</h5>
+						<p><strong>Normal Behavior:</strong> HTTP requests receive 2xx (success) or 3xx (redirect) responses.</p>
+						<p><strong>Abnormal Behavior:</strong> 4xx errors indicate client-side issues (404 Not Found, 403 Forbidden). 5xx errors indicate server-side failures (500 Internal Server Error, 503 Service Unavailable).</p>
+						<p><strong>Wireshark Filters:</strong></p>
+						<ul>
+							<li><code>http.response.code >= 400</code> - See all HTTP errors</li>
+							<li><code>http.response.code >= 500</code> - See server errors only</li>
+							<li><code>http.request.method == "GET"</code> - See GET requests</li>
+							<li><code>http.request.method == "POST"</code> - See POST requests</li>
+							<li><code>ssl.handshake.type == 1</code> - See HTTPS ClientHello packets</li>
+						</ul>
+					</div>
+					
+					<div class="protocol-explanation">
+						<h5><i class="fas fa-search"></i> DNS</h5>
+						<p><strong>Normal Behavior:</strong> DNS queries receive responses with answer records. Response time is typically under 100ms.</p>
+						<p><strong>Abnormal Behavior:</strong> NXDOMAIN (domain doesn't exist), timeouts (no response), excessive queries to random domains (DGA malware), or queries to suspicious domains.</p>
+						<p><strong>Wireshark Filters:</strong></p>
+						<ul>
+							<li><code>dns.flags.response == 0</code> - See DNS queries</li>
+							<li><code>dns.flags.response == 1</code> - See DNS responses</li>
+							<li><code>dns.flags.rcode == 3</code> - See NXDOMAIN responses</li>
+							<li><code>dns.time > 1</code> - See slow DNS responses (>1 second)</li>
+							<li><code>dns.qry.name contains "suspicious"</code> - Search for specific domains</li>
+						</ul>
+					</div>
+					
+					<div class="protocol-explanation">
+						<h5><i class="fas fa-network-wired"></i> ARP</h5>
+						<p><strong>Normal Behavior:</strong> ARP requests receive a single response mapping an IP to a MAC address.</p>
+						<p><strong>Abnormal Behavior:</strong> Multiple MAC addresses claiming the same IP (conflict), excessive ARP requests (scanning), or gratuitous ARP from unexpected sources (spoofing).</p>
+						<p><strong>Wireshark Filters:</strong></p>
+						<ul>
+							<li><code>arp.opcode == 1</code> - See ARP requests (who-has)</li>
+							<li><code>arp.opcode == 2</code> - See ARP replies (is-at)</li>
+							<li><code>arp.duplicate-address-detected</code> - See ARP conflicts</li>
+							<li><code>arp.src.proto_ipv4 == 192.168.1.1</code> - See ARP for specific IP</li>
+						</ul>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-handshake"></i>
+                            <h2>TCP Handshake Analysis</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                                <div class="stat-card">
+                                    <span class="stat-value">98</span>
+                                    <span class="stat-label">SYN Packets</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-value">98</span>
+                                    <span class="stat-label">SYN-ACK Packets</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-value">98</span>
+                                    <span class="stat-label">Successful Handshakes</span>
+                                </div>
+                                <div class="stat-card ">
+                                    <span class="stat-value">0</span>
+                                    <span class="stat-label">Failed Handshakes</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+
+                    
+                </section>
+
+            </div>
+        </main>
+    </div>
+    <script src="assets/visualizations.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network &amp; Devices - SD-WAN Network Triage Report</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/report.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-network-wired"></i></div>
+                <div>
+                    <div class="sidebar-title">SD-WAN Triage</div>
+                    <div class="sidebar-subtitle">Network Analysis</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="index.html" class="nav-item "><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                    <a href="executive-summary.html" class="nav-item "><i class="fas fa-chart-line"></i> Executive Summary</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Security</div>
+                    <a href="security.html" class="nav-item "><i class="fas fa-shield-alt"></i> Security Findings </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Performance</div>
+                    <a href="performance.html" class="nav-item "><i class="fas fa-exchange-alt"></i> Performance <span class="nav-badge">210</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Traffic</div>
+                    <a href="traffic.html" class="nav-item "><i class="fas fa-stream"></i> Traffic Flows</a>
+                    <a href="protocols.html" class="nav-item "><i class="fas fa-layer-group"></i> Protocols</a>
+                    <a href="network.html" class="nav-item active"><i class="fas fa-laptop"></i> Network & Devices</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Visualizations</div>
+                    <a href="visualizations.html" class="nav-item "><i class="fas fa-project-diagram"></i> Charts & Maps</a>
+                </div>
+            </nav>
+            <div class="theme-toggle">
+                <span class="theme-toggle-label"><i class="fas fa-moon"></i> Dark Mode</span>
+                <div class="theme-switch" onclick="toggleTheme()"></div>
+            </div>
+        </aside>
+
+        
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                    <div class="breadcrumb">
+                        <a href="index.html">Dashboard</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">Network &amp; Devices</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-meta">
+                        <div><strong>TestFile.pcap</strong></div>
+                        <div>2026-01-12 15:23:36 • 0 packets</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                
+                <section id="network">
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-building"></i>
+                            <h2>SD-WAN Vendors Detected (1)</h2>
+                        </div>
+                        <div class="card-body">
+                            <table class="data-table">
+                                <thead><tr><th>Vendor</th><th>Confidence</th><th>Detected By</th><th>Packets</th></tr></thead>
+                                <tbody>
+                                    
+                                    <tr>
+                                        <td><strong>VMware SD-WAN (VeloCloud)</strong></td>
+                                        <td>Medium</td>
+                                        <td>Port Match</td>
+                                        <td>17408</td>
+                                    </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+
+                    
+
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-globe-americas"></i>
+                            <h2>Geographic Distribution (4)</h2>
+                        </div>
+                        <div class="card-body">
+                            <table class="data-table">
+                                <thead><tr><th>Country</th><th>Connections</th></tr></thead>
+                                <tbody>
+                                    
+                                    <tr>
+                                        <td>Unknown (Class A)</td>
+                                        <td>27</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td>Unknown (Class B)</td>
+                                        <td>24</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td>Unknown</td>
+                                        <td>2</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td>Unknown (IPv6)</td>
+                                        <td>1</td>
+                                    </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-phone"></i>
+                            <h2>VoIP Analysis (

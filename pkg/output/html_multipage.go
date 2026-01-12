@@ -386,8 +386,17 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
 // renderPage renders a template to a file
 func renderPage(templateStr string, data interface{}, outputPath string) error {
 	tmpl, err := template.New("page").Funcs(template.FuncMap{
-		"formatUnixTimeShort": func(t int64) string {
-			return time.Unix(t, 0).Format("15:04:05")
+		"formatUnixTimeShort": func(t interface{}) string {
+			switch v := t.(type) {
+			case int64:
+				return time.Unix(v, 0).Format("15:04:05")
+			case float64:
+				return time.Unix(int64(v), 0).Format("15:04:05")
+			case int:
+				return time.Unix(int64(v), 0).Format("15:04:05")
+			default:
+				return fmt.Sprintf("%v", t)
+			}
 		},
 	}).Parse(templateStr)
 	if err != nil {
