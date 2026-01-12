@@ -51,7 +51,7 @@ function safeD3Init(containerId, initFn, data) {
     }
 }
 
-// Network Diagram (Force-Directed Graph) - Enhanced Human-Readable Version
+// Network Diagram - Host-to-Host Communication Paths with Hierarchical Layout
 function createNetworkDiagram(container, data) {
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 500;
@@ -64,64 +64,60 @@ function createNetworkDiagram(container, data) {
     // Clear existing content
     d3.select(container).selectAll("*").remove();
     
-    // Add comprehensive control panel
-    const controlPanel = d3.select(container)
+    // Filter nodes: Only show internal, router, external, and nodes with issues
+    const filteredNodes = data.nodes.filter(d => {
+        return d.group === 'internal' || 
+               d.group === 'router' || 
+               d.group === 'external' || 
+               d.group === 'anomaly' ||
+               d.hasIssue === true;
+    });
+    
+    // Create a set of valid node IDs for filtering edges
+    const validNodeIds = new Set(filteredNodes.map(d => d.id));
+    
+    // Filter edges: Only show connections between filtered nodes
+    const filteredLinks = data.links.filter(d => {
+        const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+        const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+        
+        // Include edge if both nodes are in our filtered set
+        return validNodeIds.has(sourceId) && validNodeIds.has(targetId);
+    });
+    
+    // Update data with filtered sets
+    data = {
+        nodes: filteredNodes,
+        links: filteredLinks
+    };
+    
+    // Add interactive guide
+    const guide = d3.select(container)
         .append("div")
-        .attr("class", "topology-controls")
+        .attr("class", "topology-guide")
         .style("position", "absolute")
         .style("top", "10px")
         .style("right", "10px")
         .style("background", "rgba(255, 255, 255, 0.98)")
-        .style("padding", "15px")
+        .style("padding", "12px 15px")
         .style("border-radius", "8px")
         .style("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
         .style("font-size", "12px")
         .style("z-index", "1000")
-        .style("max-width", "280px")
+        .style("max-width", "320px")
         .html(`
-            <div style="font-weight: 600; margin-bottom: 10px; color: #1e293b; font-size: 14px;">
-                <i class="fas fa-sliders-h" style="color: #3b82f6;"></i> Topology Controls
+            <div style="font-weight: 600; margin-bottom: 8px; color: #1e293b; font-size: 13px;">
+                <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Network Communication Paths
             </div>
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; margin-bottom: 6px; color: #475569; font-weight: 500;">
-                    <i class="fas fa-filter" style="width: 14px;"></i> Filters
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" id="filter-anomalies" style="margin-right: 6px;">
-                        <span style="color: #64748b;">Show Only Anomalies</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" id="filter-external" style="margin-right: 6px;">
-                        <span style="color: #64748b;">External Traffic Only</span>
-                    </label>
-                </div>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; margin-bottom: 6px; color: #475569; font-weight: 500;">
-                    <i class="fas fa-chart-bar" style="width: 14px;"></i> Min Traffic (KB)
-                </label>
-                <input type="range" id="traffic-slider" min="0" max="1000" value="0" step="10" 
-                    style="width: 100%; margin-bottom: 4px;">
-                <div style="display: flex; justify-content: space-between; color: #94a3b8; font-size: 10px;">
-                    <span>0</span>
-                    <span id="traffic-value">0 KB</span>
-                    <span>1 MB</span>
-                </div>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <button id="reset-layout" style="width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                    <i class="fas fa-sync-alt"></i> Reset Layout
-                </button>
-            </div>
-            <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 10px;">
-                <div style="color: #64748b; line-height: 1.6; font-size: 11px;">
-                    <strong>Tips:</strong><br/>
-                    • Hover for details<br/>
-                    • Drag to reposition<br/>
-                    • Scroll to zoom<br/>
-                    • Click to pin/unpin
-                </div>
+            <div style="color: #64748b; line-height: 1.7; font-size: 11px;">
+                This diagram shows host-to-host communication paths:<br/>
+                • <span style="color: #10b981; font-weight: 600;">Green circles</span> = Internal devices<br/>
+                • <span style="color: #2563eb; font-weight: 600;">Blue squares</span> = Gateways/Routers<br/>
+                • <span style="color: #f59e0b; font-weight: 600;">Orange circles</span> = External servers<br/>
+                • <span style="color: #dc2626; font-weight: 600;">Red dashed lines</span> = Security alerts<br/>
+                <br/>
+                <strong>Thicker lines</strong> indicate higher traffic volume.<br/>
+                <strong>Hover</strong> over nodes for details. <strong>Drag</strong> to reposition.
             </div>
         `);
     
@@ -157,24 +153,33 @@ function createNetworkDiagram(container, data) {
     const colorScale = d3.scaleOrdinal()
         .domain(["internal", "router", "external", "anomaly"])
         .range([
-            colors.nodeInternal,    // Internal: Green
+            "#10b981",              // Internal: Green
             "#2563eb",              // Router: Solid Blue
-            colors.nodeExternal,    // External: Orange
+            "#f59e0b",              // External: Orange
             "#dc2626"               // Anomaly: Solid Red
         ]);
     
-    // Enhanced force simulation with better spacing
+    // Hierarchical positioning: Internal (left), Router (center), External (right)
+    const hierarchyX = {
+        "internal": width * 0.2,   // Left side
+        "router": width * 0.5,      // Center
+        "external": width * 0.8,    // Right side
+        "anomaly": width * 0.5      // Center (will be colored red)
+    };
+    
+    // Enhanced force simulation with hierarchical constraints
     const simulation = d3.forceSimulation(data.nodes)
         .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => {
-            // Vary distance based on traffic volume
+            // Longer distances for clearer paths
             const traffic = d.value || 0;
-            return traffic > 1000000 ? 100 : 150; // Closer for high-traffic links
+            if (traffic > 5000000) return 120;  // High traffic: closer
+            if (traffic > 1000000) return 150;  // Medium traffic
+            return 180;  // Low traffic: further apart
         }))
-        .force("charge", d3.forceManyBody().strength(-400))
-        .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(45))
-        .force("x", d3.forceX(width / 2).strength(0.05))
-        .force("y", d3.forceY(height / 2).strength(0.05));
+        .force("charge", d3.forceManyBody().strength(-500))  // Stronger repulsion
+        .force("collision", d3.forceCollide().radius(50))    // Prevent overlap
+        .force("x", d3.forceX(d => hierarchyX[d.group] || width / 2).strength(0.3))  // Hierarchical X positioning
+        .force("y", d3.forceY(height / 2).strength(0.1));    // Vertical centering
     
     // Enhanced links with traffic-based thickness and labels
     const linkGroup = g.append("g").attr("class", "links");
@@ -251,7 +256,7 @@ function createNetworkDiagram(container, data) {
         return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
     }
     
-    // Enhanced nodes with glow effect for anomalies
+    // Enhanced nodes with shape differentiation
     const node = g.append("g")
         .selectAll("g")
         .data(data.nodes)
@@ -260,56 +265,73 @@ function createNetworkDiagram(container, data) {
         .call(drag(simulation));
     
     // Add outer glow for anomaly nodes
-    node.filter(d => d.group === "anomaly")
+    node.filter(d => d.group === "anomaly" || d.hasIssue)
         .append("circle")
-        .attr("r", 18)
+        .attr("r", 22)
         .attr("fill", "none")
-        .attr("stroke", "#dc2626")  // Solid Red
-        .attr("stroke-width", 2)
-        .attr("stroke-opacity", 0.3)
+        .attr("stroke", "#dc2626")
+        .attr("stroke-width", 2.5)
+        .attr("stroke-opacity", 0.4)
         .attr("class", "node-glow");
     
-    // Main node circles with size based on traffic
-    node.append("circle")
+    // Router nodes: Use squares (rectangles)
+    node.filter(d => d.group === "router")
+        .append("rect")
+        .attr("x", -16)
+        .attr("y", -16)
+        .attr("width", 32)
+        .attr("height", 32)
+        .attr("rx", 4)
+        .attr("fill", colorScale("router"))
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 3)
+        .attr("class", "node-shape");
+    
+    // Device nodes: Use circles (internal, external, anomaly)
+    node.filter(d => d.group !== "router")
+        .append("circle")
         .attr("r", d => {
-            if (d.group === "router") return 14;
-            if (d.group === "anomaly") return 12;
-            // Size based on traffic volume
+            if (d.group === "anomaly" || d.hasIssue) return 16;
+            // Larger, more visible nodes
             const bytes = d.bytes || 0;
-            if (bytes > 10000000) return 12; // > 10MB
-            if (bytes > 1000000) return 10;  // > 1MB
-            return 8;
+            if (bytes > 10000000) return 16; // > 10MB
+            if (bytes > 1000000) return 14;  // > 1MB
+            return 12;  // Default size
         })
         .attr("fill", d => colorScale(d.group))
         .attr("stroke", "#fff")
-        .attr("stroke-width", 2.5)
-        .attr("class", "node-circle")
-        .style("filter", d => d.group === "anomaly" ? "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))" : "none");
+        .attr("stroke-width", 3)
+        .attr("class", "node-shape")
+        .style("filter", d => (d.group === "anomaly" || d.hasIssue) ? "drop-shadow(0 0 8px rgba(220, 38, 38, 0.7))" : "none");
     
     // Add icon overlay for routers and anomalies
-    node.filter(d => d.group === "router" || d.group === "anomaly")
+    node.filter(d => d.group === "router")
         .append("text")
         .attr("text-anchor", "middle")
         .attr("dy", "0.35em")
-        .attr("font-size", "10px")
+        .attr("font-size", "14px")
         .attr("fill", "#fff")
         .attr("font-family", "Font Awesome 5 Free")
         .attr("font-weight", "900")
-        .text(d => d.group === "router" ? "\uf233" : "\uf071"); // router or warning icon
+        .text("\uf233"); // router icon
+    
+    node.filter(d => d.group === "anomaly" || d.hasIssue)
+        .append("text")
+        .attr("text-anchor", "middle")
+        .attr("dy", "0.35em")
+        .attr("font-size", "12px")
+        .attr("fill", "#fff")
+        .attr("font-family", "Font Awesome 5 Free")
+        .attr("font-weight", "900")
+        .text("\uf071"); // warning icon
     
     // Enhanced interaction
     node.on("mouseover", function(event, d) {
-            d3.select(this).select(".node-circle")
+            // Scale up the node shape
+            d3.select(this).select(".node-shape")
                 .transition().duration(200)
-                .attr("r", d => {
-                    if (d.group === "router") return 18;
-                    if (d.group === "anomaly") return 16;
-                    const bytes = d.bytes || 0;
-                    if (bytes > 10000000) return 16;
-                    if (bytes > 1000000) return 14;
-                    return 12;
-                })
-                .attr("stroke-width", 3);
+                .attr("transform", "scale(1.2)")
+                .attr("stroke-width", 4);
             
             highlightConnections(d, true);
             
@@ -317,7 +339,8 @@ function createNetworkDiagram(container, data) {
             const connections = d.connections || 0;
             const trafficInfo = formatTrafficVolume(d.bytes);
             const nodeType = getNodeTypeLabel(d.group);
-            const issueWarning = d.hasIssue ? '<div style="color: #dc3545; font-weight: 600; margin-top: 8px;"><i class="fas fa-exclamation-triangle"></i> Security issues detected</div>' : '';
+            const issueWarning = (d.hasIssue || d.group === "anomaly") ? 
+                '<div style="color: #dc2626; font-weight: 600; margin-top: 8px;"><i class="fas fa-exclamation-triangle"></i> Security issues detected</div>' : '';
             
             tooltip.transition().duration(200).style("opacity", 0.95);
             tooltip.html(`
@@ -335,17 +358,10 @@ function createNetworkDiagram(container, data) {
                 .style("top", (event.pageY - 28) + "px");
         })
         .on("mouseout", function(event, d) {
-            d3.select(this).select(".node-circle")
+            d3.select(this).select(".node-shape")
                 .transition().duration(200)
-                .attr("r", d => {
-                    if (d.group === "router") return 14;
-                    if (d.group === "anomaly") return 12;
-                    const bytes = d.bytes || 0;
-                    if (bytes > 10000000) return 12;
-                    if (bytes > 1000000) return 10;
-                    return 8;
-                })
-                .attr("stroke-width", 2.5);
+                .attr("transform", "scale(1)")
+                .attr("stroke-width", 3);
             
             highlightConnections(d, false);
             tooltip.transition().duration(500).style("opacity", 0);
@@ -355,34 +371,29 @@ function createNetworkDiagram(container, data) {
             if (d.fx === null) {
                 d.fx = d.x;
                 d.fy = d.y;
-                d3.select(this).select(".node-circle").attr("stroke", "#fbbf24").attr("stroke-width", 4);
+                d3.select(this).select(".node-shape").attr("stroke", "#fbbf24").attr("stroke-width", 5);
             } else {
                 d.fx = null;
                 d.fy = null;
-                d3.select(this).select(".node-circle").attr("stroke", "#fff").attr("stroke-width", 2.5);
+                d3.select(this).select(".node-shape").attr("stroke", "#fff").attr("stroke-width", 3);
             }
         });
     
-    // Enhanced labels with better positioning and styling
+    // Clear, simple labels - just IP addresses
     const labels = g.append("g")
         .selectAll("text")
         .data(data.nodes)
         .join("text")
         .attr("class", "node-label")
-        .attr("dx", 18)
-        .attr("dy", 4)
-        .attr("font-size", "11px")
-        .attr("font-weight", "500")
-        .attr("fill", colors.text)
-        .attr("stroke", colors.background)
-        .attr("stroke-width", 3)
+        .attr("dx", 22)
+        .attr("dy", 5)
+        .attr("font-size", "12px")
+        .attr("font-weight", "600")
+        .attr("fill", "#1e293b")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 4)
         .attr("paint-order", "stroke")
-        .text(d => {
-            // Shorten long IP addresses for readability
-            const label = d.label || d.id;
-            if (label.length > 20) return label.substring(0, 17) + "...";
-            return label;
-        })
+        .text(d => d.id)  // Just show IP address
         .style("pointer-events", "none")
         .style("user-select", "none");
     
@@ -453,174 +464,101 @@ function createNetworkDiagram(container, data) {
             });
     }
     
-    // Enhanced Legend with better styling
+    // Enhanced Legend with shape differentiation
     const legend = svg.append("g")
         .attr("class", "topology-legend")
-        .attr("transform", `translate(20, 20)`);
+        .attr("transform", `translate(20, ${height - 140})`);
     
     // Legend background
-    const legendBg = legend.append("rect")
+    legend.append("rect")
         .attr("x", -10)
         .attr("y", -10)
-        .attr("width", 180)
-        .attr("height", 120)
-        .attr("fill", "rgba(255, 255, 255, 0.95)")
+        .attr("width", 190)
+        .attr("height", 130)
+        .attr("fill", "rgba(255, 255, 255, 0.98)")
         .attr("stroke", "#e2e8f0")
-        .attr("stroke-width", 1)
+        .attr("stroke-width", 1.5)
         .attr("rx", 6);
     
     // Legend title
     legend.append("text")
         .attr("x", 0)
         .attr("y", 0)
-        .attr("font-size", "12px")
-        .attr("font-weight", "600")
+        .attr("font-size", "13px")
+        .attr("font-weight", "700")
         .attr("fill", "#1e293b")
-        .text("Node Types");
+        .text("Network Nodes");
     
     const legendData = [
-        { label: "Internal Device", color: colors.nodeInternal, icon: "\uf109" },
-        { label: "Gateway/Router", color: "#2563eb", icon: "\uf233" },  // Solid Blue
-        { label: "External Server", color: colors.nodeExternal, icon: "\uf0ac" },
-        { label: "Security Alert", color: "#dc2626", icon: "\uf071" }   // Solid Red
+        { label: "Internal Device", color: "#10b981", shape: "circle" },
+        { label: "Gateway/Router", color: "#2563eb", shape: "square" },
+        { label: "External Server", color: "#f59e0b", shape: "circle" },
+        { label: "Security Alert", color: "#dc2626", shape: "circle", dashed: true }
     ];
     
     legendData.forEach((item, i) => {
         const lg = legend.append("g")
-            .attr("transform", `translate(0, ${i * 24 + 20})`);
+            .attr("transform", `translate(0, ${i * 26 + 20})`);
         
-        // Circle
-        lg.append("circle")
-            .attr("r", 7)
-            .attr("fill", item.color)
-            .attr("stroke", "#fff")
-            .attr("stroke-width", 2);
-        
-        // Icon (for router and anomaly)
-        if (item.icon && (i === 1 || i === 3)) {
+        if (item.shape === "square") {
+            // Square for router
+            lg.append("rect")
+                .attr("x", -8)
+                .attr("y", -8)
+                .attr("width", 16)
+                .attr("height", 16)
+                .attr("rx", 2)
+                .attr("fill", item.color)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 2);
+            
+            // Router icon
             lg.append("text")
                 .attr("text-anchor", "middle")
                 .attr("dy", "0.35em")
-                .attr("font-size", "8px")
+                .attr("font-size", "9px")
                 .attr("fill", "#fff")
                 .attr("font-family", "Font Awesome 5 Free")
                 .attr("font-weight", "900")
-                .text(item.icon);
+                .text("\uf233");
+        } else {
+            // Circle for devices
+            lg.append("circle")
+                .attr("r", 8)
+                .attr("fill", item.color)
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 2);
+            
+            // Warning icon for security alerts
+            if (item.dashed) {
+                lg.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "0.35em")
+                    .attr("font-size", "8px")
+                    .attr("fill", "#fff")
+                    .attr("font-family", "Font Awesome 5 Free")
+                    .attr("font-weight", "900")
+                    .text("\uf071");
+            }
         }
         
         // Label
         lg.append("text")
-            .attr("x", 16)
+            .attr("x", 18)
             .attr("y", 4)
-            .attr("font-size", "11px")
-            .attr("fill", colors.text)
+            .attr("font-size", "12px")
+            .attr("font-weight", "500")
+            .attr("fill", "#1e293b")
             .text(item.label);
     });
     
-    // Add traffic indicator legend
+    // Add layout hint
     legend.append("text")
         .attr("x", 0)
         .attr("y", 120)
         .attr("font-size", "10px")
-        .attr("fill", colors.textMuted)
-        .text("💡 Tip: Click node to pin/unpin");
-    
-    // Filter functionality
-    let minTrafficKB = 0;
-    let showOnlyAnomalies = false;
-    let showOnlyExternal = false;
-    
-    function applyFilters() {
-        const minBytes = minTrafficKB * 1024;
-        
-        // Filter nodes
-        node.style("display", d => {
-            if (showOnlyAnomalies && d.group !== "anomaly") return "none";
-            if (showOnlyExternal && d.group === "internal") return "none";
-            return "block";
-        });
-        
-        // Filter links
-        link.style("display", d => {
-            const bytes = d.value || 0;
-            if (bytes < minBytes) return "none";
-            
-            // Check if connected nodes are visible
-            const sourceVisible = showOnlyAnomalies ? d.source.group === "anomaly" : 
-                                 (showOnlyExternal ? d.source.group !== "internal" : true);
-            const targetVisible = showOnlyAnomalies ? d.target.group === "anomaly" : 
-                                 (showOnlyExternal ? d.target.group !== "internal" : true);
-            
-            return (sourceVisible && targetVisible) ? "block" : "none";
-        });
-        
-        // Filter link labels
-        linkLabels.style("display", d => {
-            const bytes = d.value || 0;
-            if (bytes < minBytes) return "none";
-            
-            const sourceVisible = showOnlyAnomalies ? d.source.group === "anomaly" : 
-                                 (showOnlyExternal ? d.source.group !== "internal" : true);
-            const targetVisible = showOnlyAnomalies ? d.target.group === "anomaly" : 
-                                 (showOnlyExternal ? d.target.group !== "internal" : true);
-            
-            return (sourceVisible && targetVisible) ? "block" : "none";
-        });
-        
-        // Filter labels
-        labels.style("display", d => {
-            if (showOnlyAnomalies && d.group !== "anomaly") return "none";
-            if (showOnlyExternal && d.group === "internal") return "none";
-            return "block";
-        });
-    }
-    
-    // Event handlers for filters
-    d3.select("#filter-anomalies").on("change", function() {
-        showOnlyAnomalies = this.checked;
-        if (showOnlyAnomalies) {
-            showOnlyExternal = false;
-            d3.select("#filter-external").property("checked", false);
-        }
-        applyFilters();
-    });
-    
-    d3.select("#filter-external").on("change", function() {
-        showOnlyExternal = this.checked;
-        if (showOnlyExternal) {
-            showOnlyAnomalies = false;
-            d3.select("#filter-anomalies").property("checked", false);
-        }
-        applyFilters();
-    });
-    
-    d3.select("#traffic-slider").on("input", function() {
-        minTrafficKB = +this.value;
-        d3.select("#traffic-value").text(minTrafficKB + " KB");
-        applyFilters();
-    });
-    
-    d3.select("#reset-layout").on("click", function() {
-        // Reset all filters
-        showOnlyAnomalies = false;
-        showOnlyExternal = false;
-        minTrafficKB = 0;
-        d3.select("#filter-anomalies").property("checked", false);
-        d3.select("#filter-external").property("checked", false);
-        d3.select("#traffic-slider").property("value", 0);
-        d3.select("#traffic-value").text("0 KB");
-        applyFilters();
-        
-        // Unpin all nodes
-        data.nodes.forEach(d => {
-            d.fx = null;
-            d.fy = null;
-        });
-        node.selectAll(".node-circle").attr("stroke", "#fff").attr("stroke-width", 2.5);
-        
-        // Restart simulation
-        simulation.alpha(0.5).restart();
-    });
+        .attr("fill", "#64748b")
+        .text("Layout: Internal ← Gateway → External");
 }
 
 // Timeline Visualization
