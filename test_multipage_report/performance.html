@@ -65,7 +65,7 @@
                 <div class="header-right">
                     <div class="header-meta">
                         <div><strong>TestFile.pcap</strong></div>
-                        <div>2026-01-12 15:23:36 • 0 packets</div>
+                        <div>2026-01-12 16:54:09 • 0 packets</div>
                     </div>
                 </div>
             </header>
@@ -9792,53 +9792,6 @@
                                 <tbody>
                                     
                                     <tr>
-                                        <td><code>192.168.100.203:60554</code></td>
-                                        <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">131.0</td>
-                                        <td>131.0</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="5">
-                                            <div class="action-content">
-                                                
-		<div class="finding-explanation">
-			<details class="explanation-details">
-				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
-				<div class="explanation-content">
-					<div class="explanation-section">
-						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 131.01 ms, which is considered high.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (131.01 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-search"></i> How was it detected?</h4>
-						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
-						<p>Use this filter in Wireshark to examine the specific traffic:</p>
-						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
-						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
-							<i class="fas fa-copy"></i> Copy
-						</button>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
-						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
-					</div>
-				</div>
-			</details>
-		</div>
-	
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
                                         <td><code>192.168.100.203:49644</code></td>
                                         <td><code>35.223.238.178:443</code></td>
                                         <td class="severity-medium">127.2</td>
@@ -9933,10 +9886,10 @@
                                     </tr>
                                     
                                     <tr>
-                                        <td><code>192.168.100.203:50211</code></td>
+                                        <td><code>192.168.100.203:50078</code></td>
                                         <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">127.0</td>
-                                        <td>128.0</td>
+                                        <td class="severity-medium">128.7</td>
+                                        <td>129.0</td>
                                         <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
@@ -9949,199 +9902,11 @@
 				<div class="explanation-content">
 					<div class="explanation-section">
 						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 126.98 ms, which is considered high.</p>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 128.69 ms, which is considered high.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (126.98 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-search"></i> How was it detected?</h4>
-						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
-						<p>Use this filter in Wireshark to examine the specific traffic:</p>
-						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
-						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
-							<i class="fas fa-copy"></i> Copy
-						</button>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
-						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
-					</div>
-				</div>
-			</details>
-		</div>
-	
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
-                                        <td><code>192.168.100.203:54309</code></td>
-                                        <td><code>17.57.155.39:993</code></td>
-                                        <td class="severity-medium">103.1</td>
-                                        <td>105.3</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="5">
-                                            <div class="action-content">
-                                                
-		<div class="finding-explanation">
-			<details class="explanation-details">
-				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
-				<div class="explanation-content">
-					<div class="explanation-section">
-						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 17.57.155.39 has an average RTT of 103.05 ms, which is considered high.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (103.05 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-search"></i> How was it detected?</h4>
-						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 17.57.155.39.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
-						<p>Use this filter in Wireshark to examine the specific traffic:</p>
-						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 17.57.155.39</code>
-						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 17.57.155.39')" title="Copy filter to clipboard">
-							<i class="fas fa-copy"></i> Copy
-						</button>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
-						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 17.57.155.39'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 17.57.155.39' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
-					</div>
-				</div>
-			</details>
-		</div>
-	
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
-                                        <td><code>192.168.100.203:49968</code></td>
-                                        <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">125.6</td>
-                                        <td>125.6</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="5">
-                                            <div class="action-content">
-                                                
-		<div class="finding-explanation">
-			<details class="explanation-details">
-				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
-				<div class="explanation-content">
-					<div class="explanation-section">
-						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 125.59 ms, which is considered high.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (125.59 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-search"></i> How was it detected?</h4>
-						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
-						<p>Use this filter in Wireshark to examine the specific traffic:</p>
-						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
-						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
-							<i class="fas fa-copy"></i> Copy
-						</button>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
-						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
-					</div>
-				</div>
-			</details>
-		</div>
-	
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
-                                        <td><code>192.168.100.203:50055</code></td>
-                                        <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">125.1</td>
-                                        <td>125.2</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="5">
-                                            <div class="action-content">
-                                                
-		<div class="finding-explanation">
-			<details class="explanation-details">
-				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
-				<div class="explanation-content">
-					<div class="explanation-section">
-						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 125.12 ms, which is considered high.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (125.12 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-search"></i> How was it detected?</h4>
-						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
-						<p>Use this filter in Wireshark to examine the specific traffic:</p>
-						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
-						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
-							<i class="fas fa-copy"></i> Copy
-						</button>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
-						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
-					</div>
-				</div>
-			</details>
-		</div>
-	
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
-                                        <td><code>192.168.100.203:49932</code></td>
-                                        <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">127.2</td>
-                                        <td>129.1</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="5">
-                                            <div class="action-content">
-                                                
-		<div class="finding-explanation">
-			<details class="explanation-details">
-				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
-				<div class="explanation-content">
-					<div class="explanation-section">
-						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 127.16 ms, which is considered high.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (127.16 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+						<p>High RTT (128.69 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-search"></i> How was it detected?</h4>
@@ -10215,10 +9980,10 @@
                                     </tr>
                                     
                                     <tr>
-                                        <td><code>192.168.100.203:59632</code></td>
-                                        <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">129.5</td>
-                                        <td>129.5</td>
+                                        <td><code>192.168.100.203:64480</code></td>
+                                        <td><code>18.97.36.73:443</code></td>
+                                        <td class="severity-medium">107.5</td>
+                                        <td>107.5</td>
                                         <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
@@ -10231,11 +9996,58 @@
 				<div class="explanation-content">
 					<div class="explanation-section">
 						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 129.53 ms, which is considered high.</p>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 18.97.36.73 has an average RTT of 107.48 ms, which is considered high.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (129.53 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+						<p>High RTT (107.48 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-search"></i> How was it detected?</h4>
+						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 18.97.36.73.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
+						<p>Use this filter in Wireshark to examine the specific traffic:</p>
+						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 18.97.36.73</code>
+						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 18.97.36.73')" title="Copy filter to clipboard">
+							<i class="fas fa-copy"></i> Copy
+						</button>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
+						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 18.97.36.73'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 18.97.36.73' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td><code>192.168.100.203:60554</code></td>
+                                        <td><code>35.223.238.178:443</code></td>
+                                        <td class="severity-medium">131.0</td>
+                                        <td>131.0</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                
+		<div class="finding-explanation">
+			<details class="explanation-details">
+				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
+				<div class="explanation-content">
+					<div class="explanation-section">
+						<h4><i class="fas fa-book"></i> Definition</h4>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 131.01 ms, which is considered high.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
+						<p>High RTT (131.01 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-search"></i> How was it detected?</h4>
@@ -10252,6 +10064,100 @@
 					<div class="explanation-section">
 						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
 						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td><code>192.168.100.203:50055</code></td>
+                                        <td><code>35.223.238.178:443</code></td>
+                                        <td class="severity-medium">125.1</td>
+                                        <td>125.2</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                
+		<div class="finding-explanation">
+			<details class="explanation-details">
+				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
+				<div class="explanation-content">
+					<div class="explanation-section">
+						<h4><i class="fas fa-book"></i> Definition</h4>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 125.12 ms, which is considered high.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
+						<p>High RTT (125.12 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-search"></i> How was it detected?</h4>
+						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
+						<p>Use this filter in Wireshark to examine the specific traffic:</p>
+						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
+						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
+							<i class="fas fa-copy"></i> Copy
+						</button>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
+						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td><code>192.168.100.203:54309</code></td>
+                                        <td><code>17.57.155.39:993</code></td>
+                                        <td class="severity-medium">103.1</td>
+                                        <td>105.3</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                
+		<div class="finding-explanation">
+			<details class="explanation-details">
+				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
+				<div class="explanation-content">
+					<div class="explanation-section">
+						<h4><i class="fas fa-book"></i> Definition</h4>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 17.57.155.39 has an average RTT of 103.05 ms, which is considered high.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
+						<p>High RTT (103.05 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-search"></i> How was it detected?</h4>
+						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 17.57.155.39.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
+						<p>Use this filter in Wireshark to examine the specific traffic:</p>
+						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 17.57.155.39</code>
+						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 17.57.155.39')" title="Copy filter to clipboard">
+							<i class="fas fa-copy"></i> Copy
+						</button>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
+						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 17.57.155.39'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 17.57.155.39' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
 					</div>
 				</div>
 			</details>
@@ -10309,10 +10215,10 @@
                                     </tr>
                                     
                                     <tr>
-                                        <td><code>192.168.100.203:50078</code></td>
+                                        <td><code>192.168.100.203:50165</code></td>
                                         <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">128.7</td>
-                                        <td>129.0</td>
+                                        <td class="severity-medium">127.6</td>
+                                        <td>130.1</td>
                                         <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
@@ -10325,11 +10231,11 @@
 				<div class="explanation-content">
 					<div class="explanation-section">
 						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 128.69 ms, which is considered high.</p>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 127.60 ms, which is considered high.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (128.69 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+						<p>High RTT (127.60 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-search"></i> How was it detected?</h4>
@@ -10403,10 +10309,10 @@
                                     </tr>
                                     
                                     <tr>
-                                        <td><code>192.168.100.203:50165</code></td>
+                                        <td><code>192.168.100.203:50211</code></td>
                                         <td><code>35.223.238.178:443</code></td>
-                                        <td class="severity-medium">127.6</td>
-                                        <td>130.1</td>
+                                        <td class="severity-medium">127.0</td>
+                                        <td>128.0</td>
                                         <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
@@ -10419,11 +10325,152 @@
 				<div class="explanation-content">
 					<div class="explanation-section">
 						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 127.60 ms, which is considered high.</p>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 126.98 ms, which is considered high.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (127.60 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+						<p>High RTT (126.98 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-search"></i> How was it detected?</h4>
+						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
+						<p>Use this filter in Wireshark to examine the specific traffic:</p>
+						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
+						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
+							<i class="fas fa-copy"></i> Copy
+						</button>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
+						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td><code>192.168.100.203:59632</code></td>
+                                        <td><code>35.223.238.178:443</code></td>
+                                        <td class="severity-medium">129.5</td>
+                                        <td>129.5</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                
+		<div class="finding-explanation">
+			<details class="explanation-details">
+				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
+				<div class="explanation-content">
+					<div class="explanation-section">
+						<h4><i class="fas fa-book"></i> Definition</h4>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 129.53 ms, which is considered high.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
+						<p>High RTT (129.53 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-search"></i> How was it detected?</h4>
+						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
+						<p>Use this filter in Wireshark to examine the specific traffic:</p>
+						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
+						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
+							<i class="fas fa-copy"></i> Copy
+						</button>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
+						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td><code>192.168.100.203:49932</code></td>
+                                        <td><code>35.223.238.178:443</code></td>
+                                        <td class="severity-medium">127.2</td>
+                                        <td>129.1</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                
+		<div class="finding-explanation">
+			<details class="explanation-details">
+				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
+				<div class="explanation-content">
+					<div class="explanation-section">
+						<h4><i class="fas fa-book"></i> Definition</h4>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 127.16 ms, which is considered high.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
+						<p>High RTT (127.16 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-search"></i> How was it detected?</h4>
+						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 35.223.238.178.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
+						<p>Use this filter in Wireshark to examine the specific traffic:</p>
+						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178</code>
+						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 35.223.238.178')" title="Copy filter to clipboard">
+							<i class="fas fa-copy"></i> Copy
+						</button>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
+						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 35.223.238.178'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 35.223.238.178' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
+					</div>
+				</div>
+			</details>
+		</div>
+	
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td><code>192.168.100.203:49968</code></td>
+                                        <td><code>35.223.238.178:443</code></td>
+                                        <td class="severity-medium">125.6</td>
+                                        <td>125.6</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                
+		<div class="finding-explanation">
+			<details class="explanation-details">
+				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
+				<div class="explanation-content">
+					<div class="explanation-section">
+						<h4><i class="fas fa-book"></i> Definition</h4>
+						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 35.223.238.178 has an average RTT of 125.59 ms, which is considered high.</p>
+					</div>
+					<div class="explanation-section">
+						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
+						<p>High RTT (125.59 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
 					</div>
 					<div class="explanation-section">
 						<h4><i class="fas fa-search"></i> How was it detected?</h4>
@@ -10487,53 +10534,6 @@
 					<div class="explanation-section">
 						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
 						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 173.255.232.120'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 173.255.232.120' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
-					</div>
-				</div>
-			</details>
-		</div>
-	
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    
-                                    <tr>
-                                        <td><code>192.168.100.203:64480</code></td>
-                                        <td><code>18.97.36.73:443</code></td>
-                                        <td class="severity-medium">107.5</td>
-                                        <td>107.5</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="5">
-                                            <div class="action-content">
-                                                
-		<div class="finding-explanation">
-			<details class="explanation-details">
-				<summary class="explanation-summary"><i class="fas fa-info-circle"></i> What is High Round-Trip Time (RTT)?</summary>
-				<div class="explanation-content">
-					<div class="explanation-section">
-						<h4><i class="fas fa-book"></i> Definition</h4>
-						<p>Round-Trip Time (RTT) is the time it takes for a packet to travel from source to destination and back. The flow between 192.168.100.203 and 18.97.36.73 has an average RTT of 107.48 ms, which is considered high.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-exclamation-triangle"></i> Why is this a problem?</h4>
-						<p>High RTT (107.48 ms) causes slow application response times, delayed page loads, and poor user experience. Real-time applications like VoIP, video conferencing, and online gaming are severely affected. Each request-response cycle is delayed, multiplying the impact.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-search"></i> How was it detected?</h4>
-						<p>The tool calculated RTT by measuring the time between TCP data packets and their corresponding ACK packets for the flow 192.168.100.203 ↔ 18.97.36.73.</p>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-filter"></i> Wireshark Filter</h4>
-						<p>Use this filter in Wireshark to examine the specific traffic:</p>
-						<code class="wireshark-filter">tcp and ip.addr == 192.168.100.203 and ip.addr == 18.97.36.73</code>
-						<button class="copy-filter-btn" onclick="copyToClipboard('tcp and ip.addr == 192.168.100.203 and ip.addr == 18.97.36.73')" title="Copy filter to clipboard">
-							<i class="fas fa-copy"></i> Copy
-						</button>
-					</div>
-					<div class="explanation-section">
-						<h4><i class="fas fa-wrench"></i> Recommended Actions</h4>
-						<p>1. Apply the filter to see the TCP conversation. 2. Use 'Statistics → TCP Stream Graphs → Round Trip Time' to visualize RTT over time. 3. Check for consistent high RTT (routing issue) vs. spikes (congestion). 4. Use traceroute to identify where latency is introduced: 'traceroute 18.97.36.73'. 5. Check for WAN link saturation or QoS misconfigurations. 6. Verify routing is optimal (no unnecessary hops). 7. Test with ping: 'ping -c 100 18.97.36.73' and analyze statistics. 8. Consider using CDN or edge caching for frequently accessed content.</p>
 					</div>
 				</div>
 			</details>

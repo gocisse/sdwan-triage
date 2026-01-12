@@ -285,6 +285,146 @@ func generateSecurityPage(data *ReportData, outputPath string) error {
                         </div>
                     </div>
                     {{end}}
+
+                    <!-- Comprehensive Wireshark Filter Guide -->
+                    <div class="card" id="wireshark-filter-guide">
+                        <div class="card-header">
+                            <i class="fas fa-graduation-cap"></i>
+                            <h2>Wireshark Filter Guide for Junior Technicians</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="explanation-content">
+                                <h3>📋 How to Use Filters from This Report</h3>
+                                <ol>
+                                    <li><strong>Copy the Filter:</strong> Click any "Copy" button next to Wireshark filters in this report</li>
+                                    <li><strong>Open Wireshark:</strong> Load your PCAP file</li>
+                                    <li><strong>Apply Filter:</strong> Paste into the display filter bar (top of Wireshark window)</li>
+                                    <li><strong>Press Enter:</strong> View only matching packets</li>
+                                </ol>
+
+                                <h3>🔍 Extracting Data from Report Source</h3>
+                                <p>This HTML report contains embedded network data in JavaScript variables. To extract additional filters:</p>
+                                <ol>
+                                    <li>Press <code>Ctrl+U</code> (Windows/Linux) or <code>Cmd+Option+U</code> (Mac) to view page source</li>
+                                    <li>Press <code>Ctrl+F</code> to search for these variables:
+                                        <ul>
+                                            <li><code>var timelineData</code> - Events with timestamps, IPs, ports</li>
+                                            <li><code>var networkData</code> - Flow data for issues like retransmissions</li>
+                                            <li><code>var sankeyData</code> - Aggregated traffic flows</li>
+                                        </ul>
+                                    </li>
+                                    <li>Find IP addresses and ports in the JSON data</li>
+                                    <li>Build custom filters using patterns below</li>
+                                </ol>
+
+                                <h3>📝 Filter Pattern Library</h3>
+                                
+                                <details open>
+                                    <summary><strong>Basic Flow Filters</strong></summary>
+                                    <div class="filter-examples">
+                                        <p><strong>Traffic between two IPs:</strong></p>
+                                        <code class="wireshark-filter">ip.addr == 192.168.1.100 and ip.addr == 8.8.8.8</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.addr == 192.168.1.100 and ip.addr == 8.8.8.8')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>Specific TCP port:</strong></p>
+                                        <code class="wireshark-filter">ip.addr == 192.168.1.100 and tcp.port == 443</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.addr == 192.168.1.100 and tcp.port == 443')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>Specific UDP port:</strong></p>
+                                        <code class="wireshark-filter">ip.addr == 192.168.1.100 and udp.port == 53</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.addr == 192.168.1.100 and udp.port == 53')"><i class="fas fa-copy"></i> Copy</button>
+                                    </div>
+                                </details>
+
+                                <details>
+                                    <summary><strong>Security Analysis Filters</strong></summary>
+                                    <div class="filter-examples">
+                                        <p><strong>Port scan detection (SYN packets from scanner):</strong></p>
+                                        <code class="wireshark-filter">ip.src == 203.0.113.50 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.src == 203.0.113.50 and tcp.flags.syn == 1 and tcp.flags.ack == 0')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>SYN flood (DDoS) to target:</strong></p>
+                                        <code class="wireshark-filter">ip.dst == 192.168.1.1 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 192.168.1.1 and tcp.flags.syn == 1 and tcp.flags.ack == 0')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>UDP flood to target:</strong></p>
+                                        <code class="wireshark-filter">ip.dst == 192.168.1.1 and udp</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 192.168.1.1 and udp')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>ICMP flood:</strong></p>
+                                        <code class="wireshark-filter">ip.dst == 192.168.1.1 and icmp</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 192.168.1.1 and icmp')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>ARP conflicts for specific IP:</strong></p>
+                                        <code class="wireshark-filter">arp and arp.src.proto_ipv4 == 192.168.1.100</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('arp and arp.src.proto_ipv4 == 192.168.1.100')"><i class="fas fa-copy"></i> Copy</button>
+                                    </div>
+                                </details>
+
+                                <details>
+                                    <summary><strong>DNS Analysis Filters</strong></summary>
+                                    <div class="filter-examples">
+                                        <p><strong>All DNS queries:</strong></p>
+                                        <code class="wireshark-filter">dns and dns.flags.response == 0</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('dns and dns.flags.response == 0')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>All DNS responses:</strong></p>
+                                        <code class="wireshark-filter">dns and dns.flags.response == 1</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('dns and dns.flags.response == 1')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>Query for specific domain:</strong></p>
+                                        <code class="wireshark-filter">dns.qry.name == "example.com"</code>
+                                        <button class="copy-filter-btn" onclick='copyToClipboard("dns.qry.name == \"example.com\"")'><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>DNS failures (NXDOMAIN):</strong></p>
+                                        <code class="wireshark-filter">dns.flags.rcode == 3</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('dns.flags.rcode == 3')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>DNS to specific server:</strong></p>
+                                        <code class="wireshark-filter">ip.dst == 8.8.8.8 and dns</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 8.8.8.8 and dns')"><i class="fas fa-copy"></i> Copy</button>
+                                    </div>
+                                </details>
+
+                                <details>
+                                    <summary><strong>TLS/SSL Security Filters</strong></summary>
+                                    <div class="filter-examples">
+                                        <p><strong>All TLS traffic:</strong></p>
+                                        <code class="wireshark-filter">tls</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('tls')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>TLS handshakes:</strong></p>
+                                        <code class="wireshark-filter">tls.handshake.type == 1</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('tls.handshake.type == 1')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>TLS to specific server:</strong></p>
+                                        <code class="wireshark-filter">tls and ip.addr == 93.184.216.34</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('tls and ip.addr == 93.184.216.34')"><i class="fas fa-copy"></i> Copy</button>
+                                        
+                                        <p><strong>Weak TLS versions (SSLv3, TLS 1.0, 1.1):</strong></p>
+                                        <code class="wireshark-filter">tls.handshake.version <= 0x0302</code>
+                                        <button class="copy-filter-btn" onclick="copyToClipboard('tls.handshake.version <= 0x0302')"><i class="fas fa-copy"></i> Copy</button>
+                                    </div>
+                                </details>
+
+                                <h3>💡 Advanced Techniques</h3>
+                                <ul>
+                                    <li><strong>Combine filters:</strong> <code>(ip.addr == 192.168.1.100) and (tcp.port == 443 or tcp.port == 80)</code></li>
+                                    <li><strong>Exclude traffic:</strong> <code>ip.addr == 192.168.1.100 and !dns</code></li>
+                                    <li><strong>Network ranges:</strong> <code>ip.src == 192.168.0.0/16</code></li>
+                                    <li><strong>Time-based:</strong> <code>frame.time >= "2024-01-01 10:00:00"</code></li>
+                                    <li><strong>Follow streams:</strong> Right-click packet → Follow → TCP Stream</li>
+                                </ul>
+
+                                <h3>🎯 Using Timeline Data Example</h3>
+                                <p>If you find this in the page source:</p>
+                                <code>{"source":"192.168.100.203","target":"8.8.8.8","type":"TCP SYN","timestamp":1704110400}</code>
+                                <p>Build this filter:</p>
+                                <code class="wireshark-filter">ip.src == 192.168.100.203 and ip.dst == 8.8.8.8 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('ip.src == 192.168.100.203 and ip.dst == 8.8.8.8 and tcp.flags.syn == 1 and tcp.flags.ack == 0')"><i class="fas fa-copy"></i> Copy</button>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 {{end}}`
 
@@ -638,24 +778,30 @@ func generateNetworkPage(data *ReportData, outputPath string) error {
                     <div class="card">
                         <div class="card-header">
                             <i class="fas fa-phone"></i>
-                            <h2>VoIP Analysis ({{len .VoIPAnalysis}})</h2>
+                            <h2>VoIP Analysis</h2>
                         </div>
                         <div class="card-body">
+                            <p><strong>Total Calls:</strong> {{.VoIPAnalysis.TotalCalls}} | <strong>Established:</strong> {{.VoIPAnalysis.EstablishedCalls}} | <strong>Failed:</strong> {{.VoIPAnalysis.FailedCalls}}</p>
+                            <p><strong>RTP Streams:</strong> {{.VoIPAnalysis.TotalRTPStreams}} | <strong>Avg Jitter:</strong> {{printf "%.2f" .VoIPAnalysis.AvgJitter}}ms | <strong>Packet Loss:</strong> {{printf "%.2f" .VoIPAnalysis.PacketLossRate}}%</p>
+                            
+                            {{if .VoIPAnalysis.SIPCalls}}
+                            <h3>SIP Calls</h3>
                             <table class="data-table">
-                                <thead><tr><th>Call ID</th><th>From</th><th>To</th><th>Codec</th><th>Duration</th><th>Quality</th></tr></thead>
+                                <thead><tr><th>Call ID</th><th>From</th><th>To</th><th>State</th><th>Source</th><th>Destination</th></tr></thead>
                                 <tbody>
-                                    {{range .VoIPAnalysis}}
+                                    {{range .VoIPAnalysis.SIPCalls}}
                                     <tr>
                                         <td><code>{{.CallID}}</code></td>
-                                        <td>{{.From}}</td>
-                                        <td>{{.To}}</td>
-                                        <td>{{.Codec}}</td>
-                                        <td>{{.Duration}}s</td>
-                                        <td><span class="badge badge-{{if eq .Quality "Good"}}success{{else if eq .Quality "Fair"}}warning{{else}}danger{{end}}">{{.Quality}}</span></td>
+                                        <td>{{.FromURI}}</td>
+                                        <td>{{.ToURI}}</td>
+                                        <td>{{.State}}</td>
+                                        <td><code>{{.SrcIP}}</code></td>
+                                        <td><code>{{.DstIP}}</code></td>
                                     </tr>
                                     {{end}}
                                 </tbody>
                             </table>
+                            {{end}}
                         </div>
                     </div>
                     {{end}}
@@ -689,8 +835,8 @@ func generateTrafficPage(data *ReportData, outputPath string) error {
                                         <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
                                         <td>{{.Protocol}}</td>
-                                        <td>{{.Bytes}}</td>
-                                        <td>{{.Packets}}</td>
+                                        <td>{{.BytesFormatted}}</td>
+                                        <td>{{printf "%.1f" .Percentage}}%</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -703,18 +849,18 @@ func generateTrafficPage(data *ReportData, outputPath string) error {
                     <div class="card">
                         <div class="card-header">
                             <i class="fas fa-users"></i>
-                            <h2>Top Talkers</h2>
+                            <h2>Top Talkers ({{len .TopTalkers}})</h2>
                         </div>
                         <div class="card-body">
                             <table class="data-table">
-                                <thead><tr><th>IP Address</th><th>Bytes Sent</th><th>Bytes Received</th><th>Total</th></tr></thead>
+                                <thead><tr><th>IP Address</th><th>Type</th><th>Bytes</th><th>Percentage</th></tr></thead>
                                 <tbody>
                                     {{range .TopTalkers}}
                                     <tr>
                                         <td><code>{{.IP}}</code></td>
-                                        <td>{{.BytesSent}}</td>
-                                        <td>{{.BytesReceived}}</td>
-                                        <td>{{.TotalBytes}}</td>
+                                        <td>{{.Type}}</td>
+                                        <td>{{.Bytes}}</td>
+                                        <td>{{printf "%.1f" .Percent}}%</td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -726,19 +872,18 @@ func generateTrafficPage(data *ReportData, outputPath string) error {
                     {{if .ProtocolStats}}
                     <div class="card">
                         <div class="card-header">
-                            <i class="fas fa-chart-bar"></i>
-                            <h2>Protocol Statistics</h2>
+                            <i class="fas fa-chart-pie"></i>
+                            <h2>Protocol Distribution ({{len .ProtocolStats}})</h2>
                         </div>
                         <div class="card-body">
                             <table class="data-table">
-                                <thead><tr><th>Protocol</th><th>Packets</th><th>Bytes</th><th>Percentage</th></tr></thead>
+                                <thead><tr><th>Protocol</th><th>Bytes</th><th>Percentage</th></tr></thead>
                                 <tbody>
                                     {{range .ProtocolStats}}
                                     <tr>
                                         <td><strong>{{.Protocol}}</strong></td>
-                                        <td>{{.Packets}}</td>
                                         <td>{{.Bytes}}</td>
-                                        <td>{{printf "%.1f" .Percentage}}%</td>
+                                        <td>{{printf "%.1f" .Percent}}%</td>
                                     </tr>
                                     {{end}}
                                 </tbody>

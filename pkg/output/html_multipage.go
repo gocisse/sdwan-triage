@@ -377,6 +377,38 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
                             {{end}}
                         </div>
                     </div>
+
+                    <!-- Wireshark Filter Guide -->
+                    <div class="card" id="wireshark-guide">
+                        <div class="card-header">
+                            <i class="fas fa-filter"></i>
+                            <h2>Wireshark Filter Quick Reference</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>Every finding in this report includes a ready-to-use Wireshark filter. Click the <strong>Copy</strong> button next to any filter, then paste it into Wireshark's display filter bar.</p>
+                            
+                            <h3>Quick Examples:</h3>
+                            <div class="filter-examples">
+                                <p><strong>View all TCP retransmissions:</strong></p>
+                                <code class="wireshark-filter">tcp.analysis.retransmission</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('tcp.analysis.retransmission')" title="Copy filter">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                                
+                                <p><strong>View DNS queries:</strong></p>
+                                <code class="wireshark-filter">dns and dns.flags.response == 0</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('dns and dns.flags.response == 0')" title="Copy filter">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                                
+                                <p><strong>View failed TCP handshakes:</strong></p>
+                                <code class="wireshark-filter">tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('tcp.flags.syn == 1 and tcp.flags.ack == 0')" title="Copy filter">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 {{end}}`
 
