@@ -910,19 +910,28 @@ func generateNetworkJSON(r *models.TriageReport) string {
 		nodeIndex++
 	}
 
-	// Create links with traffic volume
+	// Create links with enhanced traffic information
 	for _, flow := range r.TrafficAnalysis {
 		linkKey := flow.SrcIP + "->" + flow.DstIP
+		// Estimate packet count from bytes (average packet size ~1500 bytes)
+		estimatedPackets := flow.TotalBytes / 1500
+		if estimatedPackets == 0 && flow.TotalBytes > 0 {
+			estimatedPackets = 1
+		}
+
 		if idx, exists := linkMap[linkKey]; exists {
 			// Update existing link
 			links[idx]["value"] = links[idx]["value"].(uint64) + flow.TotalBytes
+			links[idx]["packets"] = links[idx]["packets"].(uint64) + estimatedPackets
 		} else {
-			// Create new link
+			// Create new link with comprehensive data
 			linkMap[linkKey] = len(links)
 			links = append(links, map[string]interface{}{
 				"source":   flow.SrcIP,
 				"target":   flow.DstIP,
 				"value":    flow.TotalBytes,
+				"packets":  estimatedPackets,
+				"protocol": flow.Protocol,
 				"hasIssue": false,
 			})
 		}

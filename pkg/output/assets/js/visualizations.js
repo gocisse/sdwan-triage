@@ -64,28 +64,64 @@ function createNetworkDiagram(container, data) {
     // Clear existing content
     d3.select(container).selectAll("*").remove();
     
-    // Add instructions panel
-    const instructions = d3.select(container)
+    // Add comprehensive control panel
+    const controlPanel = d3.select(container)
         .append("div")
-        .attr("class", "topology-instructions")
+        .attr("class", "topology-controls")
         .style("position", "absolute")
         .style("top", "10px")
         .style("right", "10px")
-        .style("background", "rgba(255, 255, 255, 0.95)")
-        .style("padding", "10px 15px")
-        .style("border-radius", "6px")
-        .style("box-shadow", "0 2px 8px rgba(0,0,0,0.15)")
+        .style("background", "rgba(255, 255, 255, 0.98)")
+        .style("padding", "15px")
+        .style("border-radius", "8px")
+        .style("box-shadow", "0 4px 12px rgba(0,0,0,0.15)")
         .style("font-size", "12px")
         .style("z-index", "1000")
+        .style("max-width", "280px")
         .html(`
-            <div style="font-weight: 600; margin-bottom: 5px; color: #1e293b;">
-                <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Network Topology Guide
+            <div style="font-weight: 600; margin-bottom: 10px; color: #1e293b; font-size: 14px;">
+                <i class="fas fa-sliders-h" style="color: #3b82f6;"></i> Topology Controls
             </div>
-            <div style="color: #64748b; line-height: 1.6;">
-                • <strong>Hover</strong> over nodes to see details<br/>
-                • <strong>Drag</strong> nodes to reposition<br/>
-                • <strong>Scroll</strong> to zoom in/out<br/>
-                • <strong>Click</strong> node to highlight connections
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 6px; color: #475569; font-weight: 500;">
+                    <i class="fas fa-filter" style="width: 14px;"></i> Filters
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="filter-anomalies" style="margin-right: 6px;">
+                        <span style="color: #64748b;">Show Only Anomalies</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="filter-external" style="margin-right: 6px;">
+                        <span style="color: #64748b;">External Traffic Only</span>
+                    </label>
+                </div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; margin-bottom: 6px; color: #475569; font-weight: 500;">
+                    <i class="fas fa-chart-bar" style="width: 14px;"></i> Min Traffic (KB)
+                </label>
+                <input type="range" id="traffic-slider" min="0" max="1000" value="0" step="10" 
+                    style="width: 100%; margin-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between; color: #94a3b8; font-size: 10px;">
+                    <span>0</span>
+                    <span id="traffic-value">0 KB</span>
+                    <span>1 MB</span>
+                </div>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <button id="reset-layout" style="width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                    <i class="fas fa-sync-alt"></i> Reset Layout
+                </button>
+            </div>
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; margin-top: 10px;">
+                <div style="color: #64748b; line-height: 1.6; font-size: 11px;">
+                    <strong>Tips:</strong><br/>
+                    • Hover for details<br/>
+                    • Drag to reposition<br/>
+                    • Scroll to zoom<br/>
+                    • Click to pin/unpin
+                </div>
             </div>
         `);
     
@@ -140,15 +176,60 @@ function createNetworkDiagram(container, data) {
         .force("x", d3.forceX(width / 2).strength(0.05))
         .force("y", d3.forceY(height / 2).strength(0.05));
     
-    // Links
-    const link = g.append("g")
-        .selectAll("line")
+    // Enhanced links with traffic-based thickness and labels
+    const linkGroup = g.append("g").attr("class", "links");
+    
+    const link = linkGroup.selectAll("line")
         .data(data.links)
         .join("line")
-        .attr("stroke", d => d.hasIssue ? "#dc3545" : "#999")
-        .attr("stroke-opacity", 0.6)
-        .attr("stroke-width", d => Math.max(1, Math.sqrt(d.value || 1)))
-        .attr("stroke-dasharray", d => d.hasIssue ? "5,5" : "0");
+        .attr("class", "link-line")
+        .attr("stroke", d => d.hasIssue ? "#dc2626" : "#94a3b8")
+        .attr("stroke-opacity", d => d.hasIssue ? 0.8 : 0.5)
+        .attr("stroke-width", d => {
+            // Traffic-based thickness: 1-8px range
+            const bytes = d.value || 0;
+            if (bytes > 10000000) return 8;  // > 10MB
+            if (bytes > 5000000) return 6;   // > 5MB
+            if (bytes > 1000000) return 4;   // > 1MB
+            if (bytes > 100000) return 2.5;  // > 100KB
+            return 1.5;
+        })
+        .attr("stroke-dasharray", d => d.hasIssue ? "5,5" : "0")
+        .attr("marker-end", "url(#arrowhead)");
+    
+    // Add arrowhead marker
+    defs.append("marker")
+        .attr("id", "arrowhead")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 20)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", "#94a3b8");
+    
+    // Link labels with traffic info
+    const linkLabels = g.append("g").attr("class", "link-labels")
+        .selectAll("text")
+        .data(data.links.filter(d => (d.value || 0) > 100000)) // Only show labels for significant traffic
+        .join("text")
+        .attr("class", "link-label")
+        .attr("font-size", "10px")
+        .attr("fill", "#475569")
+        .attr("text-anchor", "middle")
+        .attr("dy", -5)
+        .style("pointer-events", "none")
+        .style("user-select", "none")
+        .text(d => {
+            const kb = (d.value || 0) / 1024;
+            const packets = d.packets || 0;
+            if (kb > 1024) {
+                return `${(kb/1024).toFixed(1)} MB`;
+            }
+            return `${kb.toFixed(0)} KB`;
+        });
     
     // Helper function to get human-readable node type
     function getNodeTypeLabel(group) {
@@ -339,7 +420,7 @@ function createNetworkDiagram(container, data) {
         });
     }
     
-    // Simulation tick - updated for node groups
+    // Simulation tick - updated for node groups and link labels
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x)
             .attr("y1", d => d.source.y)
@@ -348,6 +429,10 @@ function createNetworkDiagram(container, data) {
         
         node.attr("transform", d => `translate(${d.x},${d.y})`);
         labels.attr("x", d => d.x).attr("y", d => d.y);
+        
+        // Update link label positions
+        linkLabels.attr("x", d => (d.source.x + d.target.x) / 2)
+                  .attr("y", d => (d.source.y + d.target.y) / 2);
     });
     
     // Drag behavior
@@ -439,6 +524,103 @@ function createNetworkDiagram(container, data) {
         .attr("font-size", "10px")
         .attr("fill", colors.textMuted)
         .text("💡 Tip: Click node to pin/unpin");
+    
+    // Filter functionality
+    let minTrafficKB = 0;
+    let showOnlyAnomalies = false;
+    let showOnlyExternal = false;
+    
+    function applyFilters() {
+        const minBytes = minTrafficKB * 1024;
+        
+        // Filter nodes
+        node.style("display", d => {
+            if (showOnlyAnomalies && d.group !== "anomaly") return "none";
+            if (showOnlyExternal && d.group === "internal") return "none";
+            return "block";
+        });
+        
+        // Filter links
+        link.style("display", d => {
+            const bytes = d.value || 0;
+            if (bytes < minBytes) return "none";
+            
+            // Check if connected nodes are visible
+            const sourceVisible = showOnlyAnomalies ? d.source.group === "anomaly" : 
+                                 (showOnlyExternal ? d.source.group !== "internal" : true);
+            const targetVisible = showOnlyAnomalies ? d.target.group === "anomaly" : 
+                                 (showOnlyExternal ? d.target.group !== "internal" : true);
+            
+            return (sourceVisible && targetVisible) ? "block" : "none";
+        });
+        
+        // Filter link labels
+        linkLabels.style("display", d => {
+            const bytes = d.value || 0;
+            if (bytes < minBytes) return "none";
+            
+            const sourceVisible = showOnlyAnomalies ? d.source.group === "anomaly" : 
+                                 (showOnlyExternal ? d.source.group !== "internal" : true);
+            const targetVisible = showOnlyAnomalies ? d.target.group === "anomaly" : 
+                                 (showOnlyExternal ? d.target.group !== "internal" : true);
+            
+            return (sourceVisible && targetVisible) ? "block" : "none";
+        });
+        
+        // Filter labels
+        labels.style("display", d => {
+            if (showOnlyAnomalies && d.group !== "anomaly") return "none";
+            if (showOnlyExternal && d.group === "internal") return "none";
+            return "block";
+        });
+    }
+    
+    // Event handlers for filters
+    d3.select("#filter-anomalies").on("change", function() {
+        showOnlyAnomalies = this.checked;
+        if (showOnlyAnomalies) {
+            showOnlyExternal = false;
+            d3.select("#filter-external").property("checked", false);
+        }
+        applyFilters();
+    });
+    
+    d3.select("#filter-external").on("change", function() {
+        showOnlyExternal = this.checked;
+        if (showOnlyExternal) {
+            showOnlyAnomalies = false;
+            d3.select("#filter-anomalies").property("checked", false);
+        }
+        applyFilters();
+    });
+    
+    d3.select("#traffic-slider").on("input", function() {
+        minTrafficKB = +this.value;
+        d3.select("#traffic-value").text(minTrafficKB + " KB");
+        applyFilters();
+    });
+    
+    d3.select("#reset-layout").on("click", function() {
+        // Reset all filters
+        showOnlyAnomalies = false;
+        showOnlyExternal = false;
+        minTrafficKB = 0;
+        d3.select("#filter-anomalies").property("checked", false);
+        d3.select("#filter-external").property("checked", false);
+        d3.select("#traffic-slider").property("value", 0);
+        d3.select("#traffic-value").text("0 KB");
+        applyFilters();
+        
+        // Unpin all nodes
+        data.nodes.forEach(d => {
+            d.fx = null;
+            d.fy = null;
+        });
+        node.selectAll(".node-circle").attr("stroke", "#fff").attr("stroke-width", 2.5);
+        
+        // Restart simulation
+        simulation.alpha(0.5).restart();
+    });
 }
 
 // Timeline Visualization
