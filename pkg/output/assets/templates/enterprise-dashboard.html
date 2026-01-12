@@ -92,6 +92,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="#tunnels" class="nav-link" data-section="tunnels">
+                            <i class="fas fa-network-wired nav-icon"></i>
+                            <span>Tunnels & SD-WAN</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="#visualizations" class="nav-link" data-section="visualizations">
                             <i class="fas fa-project-diagram nav-icon"></i>
                             <span>Visualizations</span>
@@ -146,21 +152,44 @@
                     </div>
                 </div>
                 
-                <!-- Security Issues KPI -->
-                <div class="kpi-card {{if gt .Stats.DDoSAttacks 0}}critical{{else if gt .Stats.PortScans 0}}warning{{else}}success{{end}}">
+                <!-- CRITICAL: Failed Handshakes KPI -->
+                <div class="kpi-card {{if gt .TCPHandshakeStats.FailedCount 0}}critical{{else}}success{{end}}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-handshake-slash"></i>
+                        </div>
+                        {{if gt .TCPHandshakeStats.FailedCount 0}}
+                        <span class="kpi-badge">!</span>
+                        {{end}}
+                    </div>
+                    <div class="kpi-value">{{.TCPHandshakeStats.FailedCount}}</div>
+                    <div class="kpi-label">Failed TCP Handshakes</div>
+                    <div class="kpi-trend {{if gt .TCPHandshakeStats.FailedCount 0}}down{{end}}">
+                        {{if gt .TCPHandshakeStats.FailedCount 0}}
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Unreachable services or firewall blocks</span>
+                        {{else}}
+                        <i class="fas fa-check-circle"></i>
+                        <span>All connections successful</span>
+                        {{end}}
+                    </div>
+                </div>
+                
+                <!-- Security Threats KPI -->
+                <div class="kpi-card {{if gt .Stats.DDoSAttacks 0}}critical{{else if or (gt .Stats.PortScans 0) (gt .Stats.IOCMatches 0)}}warning{{else}}success{{end}}">
                     <div class="kpi-header">
                         <div class="kpi-icon">
                             <i class="fas fa-shield-alt"></i>
                         </div>
-                        {{if or (gt .Stats.DDoSAttacks 0) (gt .Stats.PortScans 0) (gt .Stats.IOCMatches 0)}}
+                        {{if or (gt .Stats.DDoSAttacks 0) (gt .Stats.PortScans 0) (gt .Stats.IOCMatches 0) (gt .Stats.BGPIndicators 0)}}
                         <span class="kpi-badge">!</span>
                         {{end}}
                     </div>
                     <div class="kpi-value">{{add .Stats.DDoSAttacks .Stats.PortScans .Stats.IOCMatches}}</div>
-                    <div class="kpi-label">Security Threats Detected</div>
+                    <div class="kpi-label">Security Threats</div>
                     <div class="kpi-trend">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <span>DDoS: {{.Stats.DDoSAttacks}} | Scans: {{.Stats.PortScans}} | IOCs: {{.Stats.IOCMatches}}</span>
+                        <span>DDoS: {{.Stats.DDoSAttacks}} | Scans: {{.Stats.PortScans}} | IOCs: {{.Stats.IOCMatches}} | BGP: {{.Stats.BGPIndicators}}</span>
                     </div>
                 </div>
                 
@@ -175,37 +204,52 @@
                     <div class="kpi-label">TCP Retransmissions</div>
                     <div class="kpi-trend">
                         <i class="fas fa-clock"></i>
-                        <span>High RTT Flows: {{.Stats.HighRTTFlows}}</span>
+                        <span>High RTT: {{.Stats.HighRTTFlows}} | HTTP Errors: {{.Stats.HTTPErrors}}</span>
                     </div>
                 </div>
                 
-                <!-- Total Traffic KPI -->
-                <div class="kpi-card info">
+                <!-- Tunnels & Encapsulation KPI -->
+                <div class="kpi-card {{if gt .Stats.TunnelsDetected 0}}info{{else}}success{{end}}">
                     <div class="kpi-header">
                         <div class="kpi-icon">
-                            <i class="fas fa-database"></i>
+                            <i class="fas fa-network-wired"></i>
                         </div>
                     </div>
-                    <div class="kpi-value">{{.Stats.TotalTraffic}}</div>
-                    <div class="kpi-label">Total Traffic Analyzed</div>
+                    <div class="kpi-value">{{.Stats.TunnelsDetected}}</div>
+                    <div class="kpi-label">Tunnels Detected</div>
                     <div class="kpi-trend">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>{{.PacketCount}} packets processed</span>
+                        <i class="fas fa-info-circle"></i>
+                        <span>VXLAN, GRE, IPsec, etc.</span>
                     </div>
                 </div>
                 
-                <!-- Devices Detected KPI -->
-                <div class="kpi-card success">
+                <!-- SD-WAN Vendors KPI -->
+                <div class="kpi-card {{if gt .Stats.SDWANVendors 0}}info{{else}}success{{end}}">
                     <div class="kpi-header">
                         <div class="kpi-icon">
-                            <i class="fas fa-laptop"></i>
+                            <i class="fas fa-sitemap"></i>
                         </div>
                     </div>
-                    <div class="kpi-value">{{.Stats.DevicesDetected}}</div>
-                    <div class="kpi-label">Devices Identified</div>
+                    <div class="kpi-value">{{.Stats.SDWANVendors}}</div>
+                    <div class="kpi-label">SD-WAN Vendors</div>
                     <div class="kpi-trend">
                         <i class="fas fa-fingerprint"></i>
-                        <span>Fingerprinted and classified</span>
+                        <span>Detected vendor signatures</span>
+                    </div>
+                </div>
+                
+                <!-- VoIP Calls KPI -->
+                <div class="kpi-card {{if gt .Stats.VoIPCalls 0}}info{{else}}success{{end}}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-phone-volume"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-value">{{.Stats.VoIPCalls}}</div>
+                    <div class="kpi-label">VoIP Calls</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-info-circle"></i>
+                        <span>SIP/RTP sessions detected</span>
                     </div>
                 </div>
                 
@@ -226,6 +270,21 @@
                         <i class="fas fa-check-circle"></i>
                         <span>No anomalies detected</span>
                         {{end}}
+                    </div>
+                </div>
+                
+                <!-- Devices Detected KPI -->
+                <div class="kpi-card success">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-laptop"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-value">{{.Stats.DevicesDetected}}</div>
+                    <div class="kpi-label">Devices Identified</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-fingerprint"></i>
+                        <span>ARP Conflicts: {{.Stats.ARPConflicts}}</span>
                     </div>
                 </div>
             </div>
@@ -433,6 +492,141 @@
                     </div>
                 </div>
                 {{end}}
+                
+                <!-- IOC Matches Widget -->
+                {{if gt .Stats.IOCMatches 0}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-crosshairs" style="color: var(--color-critical);"></i>
+                            IOC Matches ({{.Stats.IOCMatches}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        {{if .IOCFindings}}
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Matched Value</th>
+                                        <th>Type</th>
+                                        <th>Source IP</th>
+                                        <th>Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .IOCFindings}}
+                                    <tr>
+                                        <td><code>{{.MatchedValue}}</code></td>
+                                        <td>{{.IOCType}}</td>
+                                        <td><code>{{.SourceIP}}</code></td>
+                                        <td>
+                                            <span class="status-badge {{if eq .Confidence "High"}}critical{{else}}warning{{end}}">
+                                                <span class="status-dot"></span>
+                                                {{.Confidence}}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{else}}
+                        <p class="text-muted">No IOC matches detected.</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+                
+                <!-- BGP Indicators Widget -->
+                {{if gt .Stats.BGPIndicators 0}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-route" style="color: var(--color-warning);"></i>
+                            BGP Hijack Indicators ({{.Stats.BGPIndicators}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        {{if .BGPIndicators}}
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>IP Address</th>
+                                        <th>Expected ASN</th>
+                                        <th>Observed ASN</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .BGPIndicators}}
+                                    <tr>
+                                        <td><code>{{.IPAddress}}</code></td>
+                                        <td>AS{{.ExpectedASN}} ({{.ExpectedASName}})</td>
+                                        <td>AS{{.ObservedASN}} ({{.ObservedASName}})</td>
+                                        <td>
+                                            <span class="status-badge {{if .IsAnomaly}}critical{{else}}warning{{end}}">
+                                                <span class="status-dot"></span>
+                                                {{if .IsAnomaly}}Anomaly{{else}}Suspicious{{end}}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{else}}
+                        <p class="text-muted">No BGP indicators detected.</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+                
+                <!-- TLS Security Issues Widget -->
+                {{if gt .Stats.TLSWeaknesses 0}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-lock-open" style="color: var(--color-warning);"></i>
+                            TLS Security Issues ({{.Stats.TLSWeaknesses}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        {{if .TLSSecurityFindings}}
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Server IP</th>
+                                        <th>Issue Type</th>
+                                        <th>Details</th>
+                                        <th>Severity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .TLSSecurityFindings}}
+                                    <tr>
+                                        <td><code>{{.ServerIP}}</code></td>
+                                        <td>{{.IssueType}}</td>
+                                        <td>{{.Details}}</td>
+                                        <td>
+                                            <span class="status-badge {{if eq .Severity "High"}}critical{{else}}warning{{end}}">
+                                                <span class="status-dot"></span>
+                                                {{.Severity}}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{else}}
+                        <p class="text-muted">No TLS security issues detected.</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
             </div>
             
             <!-- DNS Anomalies Card -->
@@ -529,6 +723,141 @@
                 <i class="fas fa-chart-line" style="color: var(--color-primary);"></i>
                 Performance Analysis
             </h2>
+            
+            <!-- TCP Handshake Analysis Card (CRITICAL) -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-handshake card-title-icon"></i>
+                        TCP Connection Analysis
+                    </h3>
+                    <div class="card-actions">
+                        <span class="status-badge {{if gt .TCPHandshakeStats.FailedCount 0}}critical{{else}}healthy{{end}}">
+                            <span class="status-dot"></span>
+                            {{if gt .TCPHandshakeStats.FailedCount 0}}{{.TCPHandshakeStats.FailedCount}} Failed{{else}}All Successful{{end}}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-xl);">
+                        <!-- SYN Packets -->
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-info); margin-bottom: var(--space-sm);">
+                                {{.TCPHandshakeStats.TotalSYN}}
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
+                                SYN Packets Sent
+                            </div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                                <i class="fas fa-arrow-right"></i> Connection attempts
+                            </div>
+                        </div>
+                        
+                        <!-- SYN-ACK Packets -->
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-success); margin-bottom: var(--space-sm);">
+                                {{.TCPHandshakeStats.TotalSYNACK}}
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
+                                SYN-ACK Received
+                            </div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                                <i class="fas fa-reply"></i> Server responses
+                            </div>
+                        </div>
+                        
+                        <!-- Successful Handshakes -->
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-success); margin-bottom: var(--space-sm);">
+                                {{.TCPHandshakeStats.SuccessfulCount}}
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
+                                Successful Handshakes
+                            </div>
+                            <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
+                                <i class="fas fa-check-circle"></i> Connections established
+                            </div>
+                        </div>
+                        
+                        <!-- Failed Handshakes (CRITICAL) -->
+                        <div style="text-align: center; padding: var(--space-lg); background: {{if gt .TCPHandshakeStats.FailedCount 0}}rgba(225, 112, 85, 0.1){{else}}var(--color-surface){{end}}; border-radius: var(--radius-lg); border: {{if gt .TCPHandshakeStats.FailedCount 0}}2px solid var(--color-critical){{else}}1px solid var(--color-border){{end}};">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: {{if gt .TCPHandshakeStats.FailedCount 0}}var(--color-critical){{else}}var(--color-success){{end}}; margin-bottom: var(--space-sm);">
+                                {{.TCPHandshakeStats.FailedCount}}
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--space-xs);">
+                                <strong>Failed Handshakes</strong>
+                            </div>
+                            <div style="font-size: var(--font-size-xs); color: {{if gt .TCPHandshakeStats.FailedCount 0}}var(--color-critical){{else}}var(--color-text-muted){{end}};">
+                                {{if gt .TCPHandshakeStats.FailedCount 0}}
+                                <i class="fas fa-exclamation-triangle"></i> Unreachable/Blocked
+                                {{else}}
+                                <i class="fas fa-check"></i> No failures
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {{if gt .TCPHandshakeStats.FailedCount 0}}
+                    <div style="background: rgba(225, 112, 85, 0.1); border-left: 4px solid var(--color-critical); padding: var(--space-lg); border-radius: var(--radius-md); margin-bottom: var(--space-lg);">
+                        <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--color-critical);">
+                            <i class="fas fa-exclamation-circle"></i> Failed Handshake Analysis
+                        </h4>
+                        <p style="margin: 0 0 var(--space-md) 0; color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                            <strong>{{.TCPHandshakeStats.FailedCount}}</strong> connection attempts failed to complete the TCP handshake. 
+                            This typically indicates:
+                        </p>
+                        <ul style="margin: 0; padding-left: var(--space-xl); color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                            <li>Services are unreachable or down</li>
+                            <li>Firewall blocking connections</li>
+                            <li>Network routing issues</li>
+                            <li>Server overload or resource exhaustion</li>
+                        </ul>
+                    </div>
+                    
+                    {{if .FailedHandshakes}}
+                    <h4 class="mb-md">Failed Handshake Details (Top 10)</h4>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP:Port</th>
+                                    <th>Destination IP:Port</th>
+                                    <th>Timestamp</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $index, $flow := .FailedHandshakes}}
+                                {{if lt $index 10}}
+                                <tr>
+                                    <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
+                                    <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
+                                    <td>{{formatUnixTimeShort $flow.Timestamp}}</td>
+                                    <td>
+                                        <span class="status-badge critical">
+                                            <span class="status-dot"></span>
+                                            No Response
+                                        </span>
+                                    </td>
+                                </tr>
+                                {{end}}
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{end}}
+                    {{else}}
+                    <div style="background: rgba(0, 184, 148, 0.1); border-left: 4px solid var(--color-success); padding: var(--space-lg); border-radius: var(--radius-md);">
+                        <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--color-success);">
+                            <i class="fas fa-check-circle"></i> All Connections Successful
+                        </h4>
+                        <p style="margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                            All TCP connection attempts successfully completed the three-way handshake. No unreachable services detected.
+                        </p>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
             
             <!-- Performance Metrics Grid -->
             <div class="widget-grid mb-xl">
@@ -823,6 +1152,226 @@
                 </div>
                 <div class="card-body">
                     {{.ProtocolGuide}}
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
+        <!-- ====================================================================
+             TUNNELS & SD-WAN SECTION
+             ==================================================================== -->
+        <section id="tunnels" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-network-wired" style="color: var(--color-primary);"></i>
+                Tunnels & SD-WAN Analysis
+            </h2>
+            
+            <!-- Tunnel Detection Card -->
+            {{if gt .Stats.TunnelsDetected 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-tunnel card-title-icon"></i>
+                        Detected Tunnels ({{.Stats.TunnelsDetected}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .TunnelFindings}}
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Tunnel Type</th>
+                                    <th>Source IP</th>
+                                    <th>Destination IP</th>
+                                    <th>Encapsulated Protocol</th>
+                                    <th>Packet Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .TunnelFindings}}
+                                <tr>
+                                    <td>
+                                        <span class="status-badge info">
+                                            <span class="status-dot"></span>
+                                            {{.Type}}
+                                        </span>
+                                    </td>
+                                    <td><code>{{.OuterSrcIP}}</code></td>
+                                    <td><code>{{.OuterDstIP}}</code></td>
+                                    <td>{{.InnerProtocol}}</td>
+                                    <td>{{.Count}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No tunnel details available.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{else}}
+            <div class="card mb-xl">
+                <div class="card-body">
+                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
+                        <i class="fas fa-info-circle" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);"></i>
+                        <p>No tunnels detected in this capture.</p>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- SD-WAN Vendors Card -->
+            {{if gt .Stats.SDWANVendors 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-sitemap card-title-icon"></i>
+                        SD-WAN Vendors Detected ({{.Stats.SDWANVendors}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .SDWANVendors}}
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Vendor</th>
+                                    <th>Detected By</th>
+                                    <th>Packet Count</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .SDWANVendors}}
+                                <tr>
+                                    <td><strong>{{.Name}}</strong></td>
+                                    <td>{{.DetectedBy}}</td>
+                                    <td>{{.PacketCount}} packets</td>
+                                    <td>
+                                        <span class="status-badge {{if eq .Confidence "High"}}healthy{{else}}warning{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{.Confidence}}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No SD-WAN vendor details available.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{else}}
+            <div class="card mb-xl">
+                <div class="card-body">
+                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
+                        <i class="fas fa-info-circle" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);"></i>
+                        <p>No SD-WAN vendor signatures detected.</p>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- VoIP Analysis Card -->
+            {{if gt .Stats.VoIPCalls 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-phone-volume card-title-icon"></i>
+                        VoIP Call Analysis ({{.Stats.VoIPCalls}} Calls)
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .VoIPAnalysis}}
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-xl);">
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-info); margin-bottom: var(--space-sm);">
+                                {{.VoIPAnalysis.TotalCalls}}
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                Total SIP Calls
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-warning); margin-bottom: var(--space-sm);">
+                                {{printf "%.2f" .VoIPAnalysis.AvgJitter}} ms
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                Average Jitter
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: {{if gt .VoIPAnalysis.PacketLoss 5.0}}var(--color-critical){{else}}var(--color-success){{end}}; margin-bottom: var(--space-sm);">
+                                {{printf "%.2f" .VoIPAnalysis.PacketLoss}}%
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                Packet Loss
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-lg);">
+                            <div style="font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-info); margin-bottom: var(--space-sm);">
+                                {{.VoIPAnalysis.CodecsUsed}}
+                            </div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                Codecs Detected
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {{if gt .VoIPAnalysis.PacketLoss 5.0}}
+                    <div style="background: rgba(225, 112, 85, 0.1); border-left: 4px solid var(--color-critical); padding: var(--space-lg); border-radius: var(--radius-md);">
+                        <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--color-critical);">
+                            <i class="fas fa-exclamation-triangle"></i> High Packet Loss Detected
+                        </h4>
+                        <p style="margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm);">
+                            VoIP packet loss of {{printf "%.2f" .VoIPAnalysis.PacketLoss}}% exceeds acceptable threshold (5%). This may cause poor call quality.
+                        </p>
+                    </div>
+                    {{end}}
+                    {{else}}
+                    <p class="text-muted">No VoIP analysis details available.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- GeoIP Summary Card -->
+            {{if .GeoLocations}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-globe-americas card-title-icon"></i>
+                        Geographic Distribution
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Country</th>
+                                    <th>IP Count</th>
+                                    <th colspan="2">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .GeoLocations}}
+                                <tr>
+                                    <td><strong>{{.Country}}</strong></td>
+                                    <td>{{.Count}}</td>
+                                    <td colspan="2">-</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             {{end}}
