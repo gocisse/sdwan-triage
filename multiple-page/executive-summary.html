@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Summary - SD-WAN Network Triage Report</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/report.css">
+</head>
+<body>
+    <div class="app-container">
+        
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"><i class="fas fa-network-wired"></i></div>
+                <div>
+                    <div class="sidebar-title">SD-WAN Triage</div>
+                    <div class="sidebar-subtitle">Network Analysis</div>
+                </div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">
+                    <div class="nav-section-title">Overview</div>
+                    <a href="index.html" class="nav-item "><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                    <a href="executive-summary.html" class="nav-item active"><i class="fas fa-chart-line"></i> Executive Summary</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Security</div>
+                    <a href="security.html" class="nav-item "><i class="fas fa-shield-alt"></i> Security Findings </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Performance</div>
+                    <a href="performance.html" class="nav-item "><i class="fas fa-exchange-alt"></i> Performance <span class="nav-badge">210</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Traffic</div>
+                    <a href="traffic.html" class="nav-item "><i class="fas fa-stream"></i> Traffic Flows</a>
+                    <a href="protocols.html" class="nav-item "><i class="fas fa-layer-group"></i> Protocols</a>
+                    <a href="network.html" class="nav-item "><i class="fas fa-laptop"></i> Network & Devices</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">Visualizations</div>
+                    <a href="visualizations.html" class="nav-item "><i class="fas fa-project-diagram"></i> Charts & Maps</a>
+                </div>
+            </nav>
+            <div class="theme-toggle">
+                <span class="theme-toggle-label"><i class="fas fa-moon"></i> Dark Mode</span>
+                <div class="theme-switch" onclick="toggleTheme()"></div>
+            </div>
+        </aside>
+
+        
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                    <div class="breadcrumb">
+                        <a href="index.html">Dashboard</a>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current">Executive Summary</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-meta">
+                        <div><strong>TestFile.pcap</strong></div>
+                        <div>2026-01-12 18:27:10 • 0 packets</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                
+                <section id="executive-summary">
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-chart-line"></i>
+                            <h2>Executive Summary</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="executive-summary-explanation">
+		<p class="info-box">
+			<i class="fas fa-info-circle"></i>
+			<strong>About this Summary:</strong> This executive summary provides a high-level overview of your network's health based on analysis of the captured traffic. 
+			The <strong>Risk Level</strong> indicates the overall severity of findings detected (Low, Medium, High, or Critical), calculated from the number and type of security issues, performance problems, and anomalies found. 
+			The counters below highlight the most significant categories of issues that require attention. Use this summary to quickly assess network health and prioritize troubleshooting efforts.
+		</p>
+	</div>
+                            
+                            
+                            <div class="health-badge health-critical">
+                                <i class="fas fa-times-circle"></i> Network Health: CRITICAL
+                            </div>
+                            
+
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <span class="stat-value">14.9 MB</span>
+                                    <span class="stat-label"><i class="fas fa-database"></i> Total Traffic</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-value">1</span>
+                                    <span class="stat-label"><i class="fas fa-laptop"></i> Devices Detected</span>
+                                </div>
+                                <div class="stat-card ">
+                                    <span class="stat-value">0</span>
+                                    <span class="stat-label"><i class="fas fa-globe"></i> DNS Anomalies</span>
+                                </div>
+                                <div class="stat-card stat-warning">
+                                    <span class="stat-value">210</span>
+                                    <span class="stat-label"><i class="fas fa-redo"></i> TCP Retransmissions</span>
+                                </div>
+                                <div class="stat-card ">
+                                    <span class="stat-value">0</span>
+                                    <span class="stat-label"><i class="fas fa-network-wired"></i> ARP Conflicts</span>
+                                </div>
+                                <div class="stat-card ">
+                                    <span class="stat-value">0</span>
+                                    <span class="stat-label"><i class="fas fa-exclamation-triangle"></i> Suspicious Traffic</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="stat-value">0</span>
+                                    <span class="stat-label"><i class="fas fa-lock"></i> TLS Certificates</span>
+                                </div>
+                                <div class="stat-card ">
+                                    <span class="stat-value">0</span>
+                                    <span class="stat-label"><i class="fas fa-globe"></i> HTTP Errors</span>
+                                </div>
+                            </div>
+
+                            <div class="risk-assessment">
+                                <h3><i class="fas fa-chart-bar"></i> Risk Assessment</h3>
+                                <div class="risk-meter">
+                                    <div class="risk-score critical">137</div>
+                                    <div class="risk-label">Risk Score (0-100)</div>
+                                </div>
+                                <div class="risk-breakdown">
+                                    <div class="risk-category">
+                                        <span class="risk-category-label">Security Threats:</span>
+                                        <span class="risk-category-value">0 DDoS, 1 Scans, 0 IOCs</span>
+                                    </div>
+                                    <div class="risk-category">
+                                        <span class="risk-category-label">Performance Issues:</span>
+                                        <span class="risk-category-value">210 Retransmissions, 0 Failed Handshakes</span>
+                                    </div>
+                                    <div class="risk-category">
+                                        <span class="risk-category-label">Configuration Concerns:</span>
+                                        <span class="risk-category-value">0 DNS, 0 ARP, 0 TLS</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            
+                            <div class="next-steps">
+                                <h3><i class="fas fa-tasks"></i> Next Steps</h3>
+                                <ol>
+                                    
+                                    <li>Address network performance issues - high TCP retransmission rate indicates congestion or packet loss</li>
+                                    
+                                </ol>
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                    
+                    <div class="card" id="wireshark-guide">
+                        <div class="card-header">
+                            <i class="fas fa-filter"></i>
+                            <h2>Wireshark Filter Quick Reference</h2>
+                        </div>
+                        <div class="card-body">
+                            <p>Every finding in this report includes a ready-to-use Wireshark filter. Click the <strong>Copy</strong> button next to any filter, then paste it into Wireshark's display filter bar.</p>
+                            
+                            <h3>Quick Examples:</h3>
+                            <div class="filter-examples">
+                                <p><strong>View all TCP retransmissions:</strong></p>
+                                <code class="wireshark-filter">tcp.analysis.retransmission</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('tcp.analysis.retransmission')" title="Copy filter">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                                
+                                <p><strong>View DNS queries:</strong></p>
+                                <code class="wireshark-filter">dns and dns.flags.response == 0</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('dns and dns.flags.response == 0')" title="Copy filter">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                                
+                                <p><strong>View failed TCP handshakes:</strong></p>
+                                <code class="wireshark-filter">tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
+                                <button class="copy-filter-btn" onclick="copyToClipboard('tcp.flags.syn == 1 and tcp.flags.ack == 0')" title="Copy filter">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+    <script src="assets/visualizations.js"></script>
+</body>
+</html>

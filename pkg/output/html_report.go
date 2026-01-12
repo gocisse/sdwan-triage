@@ -18,11 +18,17 @@ import (
 //go:embed assets/css/report.css
 var cssContent string
 
+//go:embed assets/css/enterprise-dashboard.css
+var enterpriseCSSContent string
+
 //go:embed assets/js/visualizations.js
 var jsContent string
 
 //go:embed assets/templates/report.html
 var templateContent embed.FS
+
+//go:embed assets/templates/enterprise-dashboard.html
+var enterpriseTemplateContent embed.FS
 
 // formatUnixTime converts a Unix timestamp (float64 seconds since epoch) to human-readable format
 func formatUnixTime(unixTimeFloat float64) string {
@@ -529,7 +535,52 @@ type BandwidthFlowView struct {
 }
 
 // GenerateHTMLReport generates a professional HTML report using templates
+// This now uses the enterprise dashboard template by default
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
+	return GenerateEnterpriseHTMLReport(r, filename, pcapFile)
+}
+
+// GenerateEnterpriseHTMLReport generates an enterprise-grade dashboard HTML report
+func GenerateEnterpriseHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
+	// Prepare template data
+	data := prepareReportData(r, pcapFile)
+
+	// Use enterprise CSS
+	data.CSS = template.CSS(enterpriseCSSContent)
+
+	// Create template with custom functions
+	funcMap := template.FuncMap{
+		"formatUnixTime":      formatUnixTime,
+		"formatUnixTimeShort": formatUnixTimeShort,
+		"hasPrefix":           strings.HasPrefix,
+		"title":               strings.Title,
+		"add": func(a, b, c int) int {
+			return a + b + c
+		},
+	}
+
+	// Parse enterprise template with functions
+	tmpl, err := template.New("enterprise-dashboard").Funcs(funcMap).Parse(getEnterpriseTemplateContent())
+	if err != nil {
+		return fmt.Errorf("failed to parse enterprise template: %w", err)
+	}
+
+	// Execute template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("failed to execute enterprise template: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(filename, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HTML file: %w", err)
+	}
+
+	return nil
+}
+
+// GenerateLegacyHTMLReport generates the original HTML report (for backward compatibility)
+func GenerateLegacyHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
 	// Prepare template data
 	data := prepareReportData(r, pcapFile)
 
@@ -1755,6 +1806,16 @@ func formatBitrate(bitsPerSecond float64) string {
 		return fmt.Sprintf("%.2f Kbps", bitsPerSecond/1e3)
 	}
 	return fmt.Sprintf("%.0f bps", bitsPerSecond)
+}
+
+// getEnterpriseTemplateContent reads the enterprise dashboard template
+func getEnterpriseTemplateContent() string {
+	content, err := enterpriseTemplateContent.ReadFile("assets/templates/enterprise-dashboard.html")
+	if err != nil {
+		// Fallback to legacy template if enterprise template not found
+		return getTemplateContent()
+	}
+	return string(content)
 }
 
 func getTemplateContent() string {

@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>SD-WAN Network Triage - {{.FileName}}</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Enterprise Dashboard Styles -->
+    <style>{{.CSS}}</style>
+</head>
+<body>
+    <!-- ========================================================================
+         TOP NAVIGATION BAR
+         ======================================================================== -->
+    <header class="dashboard-header">
+        <div class="header-container">
+            <!-- Top Bar -->
+            <div class="header-top">
+                <!-- Brand -->
+                <div class="header-brand">
+                    <div class="brand-logo">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    <div>
+                        <h1 class="brand-title">
+                            SD-WAN Network Triage
+                            <span class="brand-subtitle">v{{.Version}} - Enterprise Dashboard</span>
+                        </h1>
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="header-actions">
+                    <!-- Search -->
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" class="search-input" id="globalSearch" placeholder="Search IPs, devices, events...">
+                    </div>
+                    
+                    <!-- Export Button -->
+                    <button class="header-button" onclick="window.print()">
+                        <i class="fas fa-download"></i>
+                        <span>Export PDF</span>
+                    </button>
+                    
+                    <!-- Refresh Button -->
+                    <button class="header-button primary" onclick="location.reload()">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Navigation Menu -->
+            <nav class="header-nav">
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                            <i class="fas fa-tachometer-alt nav-icon"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#security" class="nav-link" data-section="security">
+                            <i class="fas fa-shield-alt nav-icon"></i>
+                            <span>Security</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#performance" class="nav-link" data-section="performance">
+                            <i class="fas fa-chart-line nav-icon"></i>
+                            <span>Performance</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#traffic" class="nav-link" data-section="traffic">
+                            <i class="fas fa-exchange-alt nav-icon"></i>
+                            <span>Traffic</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#protocols" class="nav-link" data-section="protocols">
+                            <i class="fas fa-layer-group nav-icon"></i>
+                            <span>Protocols</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#visualizations" class="nav-link" data-section="visualizations">
+                            <i class="fas fa-project-diagram nav-icon"></i>
+                            <span>Visualizations</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#devices" class="nav-link" data-section="devices">
+                            <i class="fas fa-laptop nav-icon"></i>
+                            <span>Devices</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <ul class="breadcrumb-list">
+            <li class="breadcrumb-item">
+                <a href="#" class="breadcrumb-link">Home</a>
+            </li>
+            <li class="breadcrumb-item" id="currentSection">Dashboard</li>
+        </ul>
+    </div>
+    
+    <!-- ========================================================================
+         MAIN DASHBOARD CONTAINER
+         ======================================================================== -->
+    <main class="dashboard-container">
+        
+        <!-- ====================================================================
+             EXECUTIVE SUMMARY - KPI TILES
+             ==================================================================== -->
+        <section id="dashboard" class="dashboard-section">
+            <div class="kpi-grid">
+                <!-- Network Health KPI -->
+                <div class="kpi-card {{if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}critical{{end}}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-heartbeat"></i>
+                        </div>
+                        <span class="kpi-badge">
+                            {{if eq .HealthStatus "good"}}Healthy{{else if eq .HealthStatus "warning"}}Warning{{else}}Critical{{end}}
+                        </span>
+                    </div>
+                    <div class="kpi-value">{{.HealthStatus | title}}</div>
+                    <div class="kpi-label">Network Health Status</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Based on {{.TotalFindings}} findings</span>
+                    </div>
+                </div>
+                
+                <!-- Security Issues KPI -->
+                <div class="kpi-card {{if gt .Stats.DDoSAttacks 0}}critical{{else if gt .Stats.PortScans 0}}warning{{else}}success{{end}}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        {{if or (gt .Stats.DDoSAttacks 0) (gt .Stats.PortScans 0) (gt .Stats.IOCMatches 0)}}
+                        <span class="kpi-badge">!</span>
+                        {{end}}
+                    </div>
+                    <div class="kpi-value">{{add .Stats.DDoSAttacks .Stats.PortScans .Stats.IOCMatches}}</div>
+                    <div class="kpi-label">Security Threats Detected</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>DDoS: {{.Stats.DDoSAttacks}} | Scans: {{.Stats.PortScans}} | IOCs: {{.Stats.IOCMatches}}</span>
+                    </div>
+                </div>
+                
+                <!-- Performance Issues KPI -->
+                <div class="kpi-card {{if gt .Stats.TCPRetransmissions 100}}warning{{else if gt .Stats.HighRTTFlows 10}}warning{{else}}info{{end}}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-tachometer-alt"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-value">{{.Stats.TCPRetransmissions}}</div>
+                    <div class="kpi-label">TCP Retransmissions</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-clock"></i>
+                        <span>High RTT Flows: {{.Stats.HighRTTFlows}}</span>
+                    </div>
+                </div>
+                
+                <!-- Total Traffic KPI -->
+                <div class="kpi-card info">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-value">{{.Stats.TotalTraffic}}</div>
+                    <div class="kpi-label">Total Traffic Analyzed</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>{{.PacketCount}} packets processed</span>
+                    </div>
+                </div>
+                
+                <!-- Devices Detected KPI -->
+                <div class="kpi-card success">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-laptop"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-value">{{.Stats.DevicesDetected}}</div>
+                    <div class="kpi-label">Devices Identified</div>
+                    <div class="kpi-trend">
+                        <i class="fas fa-fingerprint"></i>
+                        <span>Fingerprinted and classified</span>
+                    </div>
+                </div>
+                
+                <!-- DNS Queries KPI -->
+                <div class="kpi-card {{if gt .Stats.DNSAnomalies 0}}warning{{else}}info{{end}}">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-globe"></i>
+                        </div>
+                    </div>
+                    <div class="kpi-value">{{.Stats.DNSQueries}}</div>
+                    <div class="kpi-label">DNS Queries</div>
+                    <div class="kpi-trend {{if gt .Stats.DNSAnomalies 0}}down{{end}}">
+                        {{if gt .Stats.DNSAnomalies 0}}
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>{{.Stats.DNSAnomalies}} anomalies detected</span>
+                        {{else}}
+                        <i class="fas fa-check-circle"></i>
+                        <span>No anomalies detected</span>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ================================================================
+                 EXECUTIVE SUMMARY CARD
+                 ================================================================ -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-clipboard-list card-title-icon"></i>
+                        Executive Summary
+                    </h2>
+                    <div class="card-actions">
+                        <button class="card-action-button" onclick="toggleSection('executive-summary')">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" id="executive-summary">
+                    <div class="dashboard-grid" style="grid-template-columns: 2fr 1fr; gap: var(--space-xl);">
+                        <!-- Summary Content -->
+                        <div>
+                            <h3 class="mb-md">Analysis Overview</h3>
+                            <p class="text-muted mb-lg">
+                                Analyzed <strong>{{.FileName}}</strong> containing <strong>{{.PacketCount}} packets</strong> 
+                                on <strong>{{.GeneratedAt}}</strong>.
+                            </p>
+                            
+                            {{if .ExecutiveSummaryExplanation}}
+                            <div class="mb-lg">
+                                {{.ExecutiveSummaryExplanation}}
+                            </div>
+                            {{end}}
+                            
+                            <!-- Key Findings -->
+                            <h4 class="mb-md">Key Findings</h4>
+                            <div class="d-grid gap-md mb-lg">
+                                {{if gt .Stats.DDoSAttacks 0}}
+                                <div class="status-badge critical">
+                                    <span class="status-dot"></span>
+                                    <span>{{.Stats.DDoSAttacks}} DDoS Attack(s) Detected</span>
+                                </div>
+                                {{end}}
+                                
+                                {{if gt .Stats.PortScans 0}}
+                                <div class="status-badge warning">
+                                    <span class="status-dot"></span>
+                                    <span>{{.Stats.PortScans}} Port Scan(s) Detected</span>
+                                </div>
+                                {{end}}
+                                
+                                {{if gt .Stats.TCPRetransmissions 100}}
+                                <div class="status-badge warning">
+                                    <span class="status-dot"></span>
+                                    <span>High TCP Retransmission Rate ({{.Stats.TCPRetransmissions}})</span>
+                                </div>
+                                {{end}}
+                                
+                                {{if gt .Stats.DNSAnomalies 0}}
+                                <div class="status-badge warning">
+                                    <span class="status-dot"></span>
+                                    <span>{{.Stats.DNSAnomalies}} DNS Anomalies Found</span>
+                                </div>
+                                {{end}}
+                                
+                                {{if and (eq .Stats.DDoSAttacks 0) (eq .Stats.PortScans 0) (lt .Stats.TCPRetransmissions 100)}}
+                                <div class="status-badge healthy">
+                                    <span class="status-dot"></span>
+                                    <span>No Critical Issues Detected</span>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                        
+                        <!-- Risk Assessment -->
+                        <div>
+                            <div class="card" style="background: var(--color-surface); border: none;">
+                                <div class="card-body">
+                                    <h4 class="mb-md">Risk Assessment</h4>
+                                    <div class="text-center mb-lg">
+                                        <div class="kpi-value" style="font-size: var(--font-size-4xl); color: {{if eq .RiskLevel "low"}}var(--color-success){{else if eq .RiskLevel "medium"}}var(--color-warning){{else}}var(--color-critical){{end}};">
+                                            {{.RiskScore}}
+                                        </div>
+                                        <div class="kpi-label">Risk Score</div>
+                                        <span class="status-badge {{if eq .RiskLevel "low"}}healthy{{else if eq .RiskLevel "medium"}}warning{{else}}critical{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{.RiskLevel | title}} Risk
+                                        </span>
+                                    </div>
+                                    
+                                    {{if .RecommendedActions}}
+                                    <h5 class="mb-sm">Recommended Actions</h5>
+                                    <ul style="padding-left: var(--space-lg); margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary);">
+                                        {{range .RecommendedActions}}
+                                        <li style="margin-bottom: var(--space-sm);">{{.}}</li>
+                                        {{end}}
+                                    </ul>
+                                    {{end}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <i class="fas fa-clock"></i> Last updated: {{.GeneratedAt}}
+                </div>
+            </div>
+        </section>
+        
+        <!-- ====================================================================
+             SECURITY ANALYSIS SECTION
+             ==================================================================== -->
+        <section id="security" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-shield-alt" style="color: var(--color-primary);"></i>
+                Security Analysis
+            </h2>
+            
+            <!-- Security Overview Widget Grid -->
+            <div class="widget-grid mb-xl">
+                <!-- DDoS Attacks Widget -->
+                {{if gt .Stats.DDoSAttacks 0}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-bomb" style="color: var(--color-critical);"></i>
+                            DDoS Attacks ({{.Stats.DDoSAttacks}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        {{if .DDoSFindings}}
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Source IP</th>
+                                        <th>Target IP</th>
+                                        <th>Packet Count</th>
+                                        <th>Severity</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .DDoSFindings}}
+                                    <tr>
+                                        <td><code>{{.Type}}</code></td>
+                                        <td><code>{{.SrcIP}}</code></td>
+                                        <td><code>{{.DstIP}}</code></td>
+                                        <td>{{.PacketCount}}</td>
+                                        <td>
+                                            <span class="status-badge critical">
+                                                <span class="status-dot"></span>
+                                                High
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{else}}
+                        <p class="text-muted">No DDoS attacks detected.</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+                
+                <!-- Port Scans Widget -->
+                {{if gt .Stats.PortScans 0}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-search" style="color: var(--color-warning);"></i>
+                            Port Scans ({{.Stats.PortScans}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        {{if .PortScanFindings}}
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Source IP</th>
+                                        <th>Target IP</th>
+                                        <th>Ports Scanned</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range .PortScanFindings}}
+                                    <tr>
+                                        <td><code>{{.Type}}</code></td>
+                                        <td><code>{{.SourceIP}}</code></td>
+                                        <td><code>{{.TargetIP}}</code></td>
+                                        <td>{{.PortsScanned}}</td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{else}}
+                        <p class="text-muted">No port scans detected.</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            
+            <!-- DNS Anomalies Card -->
+            {{if gt .Stats.DNSAnomalies 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-exclamation-triangle card-title-icon"></i>
+                        DNS Anomalies ({{.Stats.DNSAnomalies}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .DNSAnomalies}}
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Query</th>
+                                    <th>Answer IP</th>
+                                    <th>Server IP</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .DNSAnomalies}}
+                                <tr>
+                                    <td><code>{{.Query}}</code></td>
+                                    <td><code>{{.AnswerIP}}</code></td>
+                                    <td><code>{{.ServerIP}}</code></td>
+                                    <td>{{.Reason}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No DNS anomalies detected.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- TLS Security Findings -->
+            {{if gt .Stats.TLSWeaknesses 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-lock-open card-title-icon"></i>
+                        TLS Security Issues ({{.Stats.TLSWeaknesses}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .TLSSecurityFindings}}
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Server IP</th>
+                                    <th>Issue Type</th>
+                                    <th>Details</th>
+                                    <th>Severity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .TLSSecurityFindings}}
+                                <tr>
+                                    <td><code>{{.ServerIP}}</code></td>
+                                    <td>{{.IssueType}}</td>
+                                    <td>{{.Details}}</td>
+                                    <td>
+                                        <span class="status-badge {{if eq .Severity "High"}}critical{{else}}warning{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{.Severity}}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No TLS security issues detected.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
+        <!-- ====================================================================
+             PERFORMANCE ANALYSIS SECTION
+             ==================================================================== -->
+        <section id="performance" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-chart-line" style="color: var(--color-primary);"></i>
+                Performance Analysis
+            </h2>
+            
+            <!-- Performance Metrics Grid -->
+            <div class="widget-grid mb-xl">
+                <!-- TCP Retransmissions Widget -->
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-redo" style="color: var(--color-warning);"></i>
+                            TCP Retransmissions
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <div class="kpi-value" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);">
+                            {{.Stats.TCPRetransmissions}}
+                        </div>
+                        <p class="text-muted mb-md">Total retransmission events detected</p>
+                        {{if gt .Stats.TCPRetransmissions 100}}
+                        <div class="status-badge warning">
+                            <span class="status-dot"></span>
+                            High retransmission rate - investigate network quality
+                        </div>
+                        {{else}}
+                        <div class="status-badge healthy">
+                            <span class="status-dot"></span>
+                            Normal retransmission rate
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+                
+                <!-- High RTT Flows Widget -->
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-clock" style="color: var(--color-info);"></i>
+                            High Latency Flows
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <div class="kpi-value" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);">
+                            {{.Stats.HighRTTFlows}}
+                        </div>
+                        <p class="text-muted mb-md">Flows with elevated round-trip time</p>
+                        {{if gt .Stats.HighRTTFlows 10}}
+                        <div class="status-badge warning">
+                            <span class="status-dot"></span>
+                            Multiple high-latency connections detected
+                        </div>
+                        {{else}}
+                        <div class="status-badge healthy">
+                            <span class="status-dot"></span>
+                            Latency within acceptable range
+                        </div>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TCP Retransmissions Detail Table -->
+            {{if gt .Stats.TCPRetransmissions 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-list card-title-icon"></i>
+                        Retransmission Details
+                    </h3>
+                    <div class="card-actions">
+                        <button class="card-action-button" onclick="exportTableToCSV('retrans-table', 'tcp_retransmissions.csv')">
+                            <i class="fas fa-download"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {{if .TCPRetransmissions}}
+                    <div class="data-table-container">
+                        <table class="data-table" id="retrans-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP:Port</th>
+                                    <th>Destination IP:Port</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .TCPRetransmissions}}
+                                <tr>
+                                    <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                    <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                    <td>{{.Count}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No retransmission details available.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- High RTT Flows Detail Table -->
+            {{if gt .Stats.HighRTTFlows 0}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-stopwatch card-title-icon"></i>
+                        High Latency Flow Details
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .HighRTTFlows}}
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP:Port</th>
+                                    <th>Destination IP:Port</th>
+                                    <th>Average RTT (ms)</th>
+                                    <th>Max RTT (ms)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .HighRTTFlows}}
+                                <tr>
+                                    <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                    <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                    <td>{{printf "%.2f" .AvgRTT}}</td>
+                                    <td>{{printf "%.2f" .MaxRTT}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No high RTT flow details available.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
+        <!-- ====================================================================
+             TRAFFIC ANALYSIS SECTION
+             ==================================================================== -->
+        <section id="traffic" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-exchange-alt" style="color: var(--color-primary);"></i>
+                Traffic Analysis
+            </h2>
+            
+            <!-- Top Traffic Flows -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-chart-bar card-title-icon"></i>
+                        Top Traffic Flows
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{if .TopFlows}}
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP:Port</th>
+                                    <th>Destination IP:Port</th>
+                                    <th>Protocol</th>
+                                    <th>Total Bytes</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .TopFlows}}
+                                <tr>
+                                    <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                    <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                    <td>{{.Protocol}}</td>
+                                    <td>{{.BytesFormatted}}</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: var(--space-sm);">
+                                            <div style="flex: 1; height: 8px; background: var(--color-border); border-radius: var(--radius-full); overflow: hidden;">
+                                                <div style="width: {{printf "%.1f" .Percentage}}%; height: 100%; background: var(--color-primary);"></div>
+                                            </div>
+                                            <span style="min-width: 50px; text-align: right;">{{printf "%.1f" .Percentage}}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-muted">No traffic flow data available.</p>
+                    {{end}}
+                </div>
+            </div>
+            
+            <!-- Protocol Distribution -->
+            {{if .ProtocolStats}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-layer-group card-title-icon"></i>
+                        Protocol Distribution
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Protocol</th>
+                                    <th>Total Bytes</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .ProtocolStats}}
+                                <tr>
+                                    <td><strong>{{.Protocol}}</strong></td>
+                                    <td>{{.Bytes}}</td>
+                                    <td>{{printf "%.1f" .Percent}}%</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
+        <!-- ====================================================================
+             PROTOCOLS SECTION
+             ==================================================================== -->
+        <section id="protocols" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-layer-group" style="color: var(--color-primary);"></i>
+                Protocol Analysis
+            </h2>
+            
+            <!-- Protocol Overview Widgets -->
+            <div class="widget-grid mb-xl">
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-globe"></i>
+                            DNS Queries
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <div class="kpi-value" style="font-size: var(--font-size-3xl);">{{.Stats.DNSQueries}}</div>
+                        <p class="text-muted">Total DNS queries processed</p>
+                    </div>
+                </div>
+                
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-bolt"></i>
+                            HTTP/2 Flows
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <div class="kpi-value" style="font-size: var(--font-size-3xl);">{{.Stats.HTTP2Flows}}</div>
+                        <p class="text-muted">Modern HTTP/2 connections</p>
+                    </div>
+                </div>
+                
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-rocket"></i>
+                            QUIC Flows
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <div class="kpi-value" style="font-size: var(--font-size-3xl);">{{.Stats.QUICFlows}}</div>
+                        <p class="text-muted">QUIC protocol connections</p>
+                    </div>
+                </div>
+            </div>
+            
+            {{if .ProtocolGuide}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-book card-title-icon"></i>
+                        Protocol Reference Guide
+                    </h3>
+                </div>
+                <div class="card-body">
+                    {{.ProtocolGuide}}
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
+        <!-- ====================================================================
+             VISUALIZATIONS SECTION
+             ==================================================================== -->
+        <section id="visualizations" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-project-diagram" style="color: var(--color-primary);"></i>
+                Network Visualizations
+            </h2>
+            
+            <!-- Network Topology -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-network-wired card-title-icon"></i>
+                        Network Topology
+                    </h3>
+                    <div class="card-actions">
+                        <button class="card-action-button" onclick="resetTopology()">
+                            <i class="fas fa-sync-alt"></i> Reset
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="network-diagram" class="chart-container" style="min-height: 600px;"></div>
+                </div>
+            </div>
+            
+            <!-- Timeline Visualization -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-timeline card-title-icon"></i>
+                        Event Timeline
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div id="timeline" class="chart-container"></div>
+                </div>
+            </div>
+            
+            <!-- Sankey Diagram -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-stream card-title-icon"></i>
+                        Traffic Flow Diagram
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div id="sankey-diagram" class="chart-container"></div>
+                </div>
+            </div>
+            
+            <!-- RTT Histogram -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-chart-bar card-title-icon"></i>
+                        RTT Distribution
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div id="rtt-histogram" class="chart-container"></div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- ====================================================================
+             DEVICES SECTION
+             ==================================================================== -->
+        <section id="devices" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-laptop" style="color: var(--color-primary);"></i>
+                Device Fingerprinting
+            </h2>
+            
+            {{if .DeviceFingerprints}}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-fingerprint card-title-icon"></i>
+                        Detected Devices ({{.Stats.DevicesDetected}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>OS Type</th>
+                                    <th>Operating System</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .DeviceFingerprints}}
+                                <tr>
+                                    <td><code>{{.IP}}</code></td>
+                                    <td>{{.OSType}}</td>
+                                    <td>{{.OSName}}</td>
+                                    <td>
+                                        <span class="status-badge {{if eq .Confidence "High"}}healthy{{else if eq .Confidence "Medium"}}warning{{else}}unknown{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{.Confidence}}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted text-center">No devices fingerprinted.</p>
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
+    </main>
+    
+    <!-- ========================================================================
+         JAVASCRIPT & VISUALIZATIONS
+         ======================================================================== -->
+    <script>
+        // Visualization Data
+        const networkData = {{.NetworkDataJSON}};
+        const timelineData = {{.TimelineDataJSON}};
+        const sankeyData = {{.SankeyDataJSON}};
+        const rttHistogramData = {{.RTTHistogramJSON}};
+        
+        // Navigation handling
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Update active nav link
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show corresponding section
+                const section = this.dataset.section;
+                document.querySelectorAll('.dashboard-section').forEach(s => s.style.display = 'none');
+                document.getElementById(section).style.display = 'block';
+                
+                // Update breadcrumb
+                document.getElementById('currentSection').textContent = this.textContent.trim();
+                
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+        
+        // Global search functionality
+        document.getElementById('globalSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            // Search through all tables
+            document.querySelectorAll('.data-table tbody tr').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+        
+        // Toggle section visibility
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            const button = event.target.closest('button');
+            const icon = button.querySelector('i');
+            
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                section.style.display = 'none';
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+        
+        // Export table to CSV
+        function exportTableToCSV(tableId, filename) {
+            const table = document.getElementById(tableId);
+            let csv = [];
+            
+            // Get headers
+            const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent);
+            csv.push(headers.join(','));
+            
+            // Get rows
+            table.querySelectorAll('tbody tr').forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(td => {
+                    let text = td.textContent.trim();
+                    // Escape commas and quotes
+                    if (text.includes(',') || text.includes('"')) {
+                        text = '"' + text.replace(/"/g, '""') + '"';
+                    }
+                    return text;
+                });
+                csv.push(cells.join(','));
+            });
+            
+            // Download
+            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        // Reset topology visualization
+        function resetTopology() {
+            // This will be implemented with the visualization code
+            if (typeof createNetworkDiagram === 'function') {
+                const container = document.getElementById('network-diagram');
+                container.innerHTML = '';
+                createNetworkDiagram(container, networkData);
+            }
+        }
+        
+        // Initialize visualizations when section is shown
+        function initializeVisualizations() {
+            try {
+                if (networkData && networkData.nodes && networkData.nodes.length > 0) {
+                    createNetworkDiagram(document.getElementById('network-diagram'), networkData);
+                }
+                
+                if (timelineData && timelineData.length > 0) {
+                    createTimeline(document.getElementById('timeline'), timelineData);
+                }
+                
+                if (sankeyData && sankeyData.nodes && sankeyData.nodes.length > 0) {
+                    createSankeyDiagram(document.getElementById('sankey-diagram'), sankeyData);
+                }
+                
+                if (rttHistogramData && rttHistogramData.length > 0) {
+                    createRTTHistogram(document.getElementById('rtt-histogram'), rttHistogramData);
+                }
+            } catch (error) {
+                console.error('Error initializing visualizations:', error);
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize visualizations after a short delay to ensure DOM is ready
+            setTimeout(initializeVisualizations, 100);
+        });
+    </script>
+    
+    <!-- Visualization Functions -->
+    <script>{{.JS}}</script>
+</body>
+</html>
