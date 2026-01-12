@@ -106,6 +106,10 @@ type ReportData struct {
 	// Next steps
 	NextSteps []string
 
+	// Educational content
+	ExecutiveSummaryExplanation template.HTML
+	ProtocolGuide               template.HTML
+
 	// Security Findings
 	DNSAnomalies        []DNSAnomalyView
 	ARPConflicts        []ARPConflictView
@@ -170,16 +174,18 @@ type ReportData struct {
 
 // View structs for template rendering (with escaped/formatted data)
 type DNSAnomalyView struct {
-	Query    string
-	AnswerIP string
-	ServerIP string
-	Reason   string
+	Query       string
+	AnswerIP    string
+	ServerIP    string
+	Reason      string
+	Explanation template.HTML
 }
 
 type ARPConflictView struct {
-	IP   string
-	MAC1 string
-	MAC2 string
+	IP          string
+	MAC1        string
+	MAC2        string
+	Explanation template.HTML
 }
 
 type SuspiciousFlowView struct {
@@ -190,19 +196,22 @@ type SuspiciousFlowView struct {
 }
 
 type TCPFlowView struct {
-	SrcIP   string
-	SrcPort uint16
-	DstIP   string
-	DstPort uint16
+	SrcIP       string
+	SrcPort     uint16
+	DstIP       string
+	DstPort     uint16
+	Count       int
+	Explanation template.HTML
 }
 
 type RTTFlowView struct {
-	SrcIP   string
-	SrcPort uint16
-	DstIP   string
-	DstPort uint16
-	AvgRTT  float64
-	MaxRTT  float64
+	SrcIP       string
+	SrcPort     uint16
+	DstIP       string
+	DstPort     uint16
+	AvgRTT      float64
+	MaxRTT      float64
+	Explanation template.HTML
 }
 
 type TrafficFlowView struct {
@@ -223,12 +232,13 @@ type DeviceFingerprintView struct {
 }
 
 type HTTPErrorView struct {
-	Method     string
-	URL        string
-	StatusCode int
-	Reason     string
-	SrcIP      string
-	DstIP      string
+	Method      string
+	URL         string
+	StatusCode  int
+	Reason      string
+	SrcIP       string
+	DstIP       string
+	Explanation template.HTML
 }
 
 type TLSCertView struct {
@@ -241,10 +251,11 @@ type TLSCertView struct {
 }
 
 type FailedHandshakeView struct {
-	SrcIP   string
-	SrcPort uint16
-	DstIP   string
-	DstPort uint16
+	SrcIP       string
+	SrcPort     uint16
+	DstIP       string
+	DstPort     uint16
+	Explanation template.HTML
 }
 
 type ProtocolStatView struct {
@@ -386,6 +397,7 @@ type DDoSFindingView struct {
 	Threshold   int
 	Duration    float64
 	Severity    string
+	Explanation template.HTML
 }
 
 type PortScanFindingView struct {
@@ -396,6 +408,7 @@ type PortScanFindingView struct {
 	PortsScanned int
 	SamplePorts  string
 	Severity     string
+	Explanation  template.HTML
 }
 
 type IOCFindingView struct {
@@ -407,6 +420,7 @@ type IOCFindingView struct {
 	DestIP       string
 	Confidence   string
 	Description  string
+	Explanation  template.HTML
 }
 
 type TLSSecurityFindingView struct {
@@ -419,6 +433,7 @@ type TLSSecurityFindingView struct {
 	WeaknessType string
 	Severity     string
 	Description  string
+	Explanation  template.HTML
 }
 
 type ICMPFindingView struct {
@@ -431,6 +446,7 @@ type ICMPFindingView struct {
 	Count       int
 	IsAnomaly   bool
 	Description string
+	Explanation template.HTML
 }
 
 type VoIPAnalysisView struct {
@@ -677,6 +693,10 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.TopTalkersJSON = template.JS(generateTopTalkersJSON(data.TopTalkers))
 	data.RTTHistogramJSON = template.JS(generateRTTHistogramJSON(r.RTTHistogram))
 
+	// Add educational content
+	data.ExecutiveSummaryExplanation = template.HTML(GetExecutiveSummaryExplanation())
+	data.ProtocolGuide = GetProtocolAnalysisGuide()
+
 	return data
 }
 
@@ -723,11 +743,13 @@ func generateNextSteps(r *models.TriageReport) []string {
 func convertDNSAnomalies(anomalies []models.DNSAnomaly) []DNSAnomalyView {
 	result := make([]DNSAnomalyView, len(anomalies))
 	for i, a := range anomalies {
+		explanation := GenerateDNSAnomalyExplanation(a.Query, a.AnswerIP, a.Reason)
 		result[i] = DNSAnomalyView{
-			Query:    html.EscapeString(a.Query),
-			AnswerIP: html.EscapeString(a.AnswerIP),
-			ServerIP: html.EscapeString(a.ServerIP),
-			Reason:   html.EscapeString(a.Reason),
+			Query:       html.EscapeString(a.Query),
+			AnswerIP:    html.EscapeString(a.AnswerIP),
+			ServerIP:    html.EscapeString(a.ServerIP),
+			Reason:      html.EscapeString(a.Reason),
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -736,10 +758,12 @@ func convertDNSAnomalies(anomalies []models.DNSAnomaly) []DNSAnomalyView {
 func convertARPConflicts(conflicts []models.ARPConflict) []ARPConflictView {
 	result := make([]ARPConflictView, len(conflicts))
 	for i, c := range conflicts {
+		explanation := GenerateARPConflictExplanation(c.IP, c.MAC1, c.MAC2)
 		result[i] = ARPConflictView{
-			IP:   html.EscapeString(c.IP),
-			MAC1: html.EscapeString(c.MAC1),
-			MAC2: html.EscapeString(c.MAC2),
+			IP:          html.EscapeString(c.IP),
+			MAC1:        html.EscapeString(c.MAC1),
+			MAC2:        html.EscapeString(c.MAC2),
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -762,11 +786,15 @@ func convertTCPRetransmissions(flows []models.TCPFlow) []TCPFlowView {
 	result := make([]TCPFlowView, 0, len(flows))
 	// Convert all flows
 	for _, f := range flows {
+		// Assume count of 1 per flow entry (can be enhanced if model has count field)
+		explanation := GenerateTCPRetransmissionExplanation(f.SrcIP, f.DstIP, 1)
 		result = append(result, TCPFlowView{
-			SrcIP:   html.EscapeString(f.SrcIP),
-			SrcPort: f.SrcPort,
-			DstIP:   html.EscapeString(f.DstIP),
-			DstPort: f.DstPort,
+			SrcIP:       html.EscapeString(f.SrcIP),
+			SrcPort:     f.SrcPort,
+			DstIP:       html.EscapeString(f.DstIP),
+			DstPort:     f.DstPort,
+			Count:       1,
+			Explanation: explanation.ToHTML(),
 		})
 	}
 	return result
@@ -775,13 +803,15 @@ func convertTCPRetransmissions(flows []models.TCPFlow) []TCPFlowView {
 func convertRTTFlows(flows []models.RTTFlow) []RTTFlowView {
 	result := make([]RTTFlowView, len(flows))
 	for i, f := range flows {
+		explanation := GenerateHighRTTExplanation(f.SrcIP, f.DstIP, f.AvgRTT)
 		result[i] = RTTFlowView{
-			SrcIP:   html.EscapeString(f.SrcIP),
-			SrcPort: f.SrcPort,
-			DstIP:   html.EscapeString(f.DstIP),
-			DstPort: f.DstPort,
-			AvgRTT:  f.AvgRTT,
-			MaxRTT:  f.MaxRTT,
+			SrcIP:       html.EscapeString(f.SrcIP),
+			SrcPort:     f.SrcPort,
+			DstIP:       html.EscapeString(f.DstIP),
+			DstPort:     f.DstPort,
+			AvgRTT:      f.AvgRTT,
+			MaxRTT:      f.MaxRTT,
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1042,13 +1072,15 @@ func formatBytesForTemplate(bytes uint64) string {
 func convertHTTPErrors(errors []models.HTTPError) []HTTPErrorView {
 	result := make([]HTTPErrorView, len(errors))
 	for i, e := range errors {
+		explanation := GenerateHTTPErrorExplanation(e.Code, e.Method, e.Host+e.Path)
 		result[i] = HTTPErrorView{
-			Method:     html.EscapeString(e.Method),
-			URL:        html.EscapeString(e.Host + e.Path),
-			StatusCode: e.Code,
-			Reason:     "",
-			SrcIP:      html.EscapeString(e.Host),
-			DstIP:      "",
+			Method:      html.EscapeString(e.Method),
+			URL:         html.EscapeString(e.Host + e.Path),
+			StatusCode:  e.Code,
+			Reason:      "",
+			SrcIP:       html.EscapeString(e.Host),
+			DstIP:       "",
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1072,11 +1104,13 @@ func convertTLSCerts(certs []models.TLSCertInfo) []TLSCertView {
 func convertFailedHandshakes(flows []models.TCPFlow) []FailedHandshakeView {
 	result := make([]FailedHandshakeView, len(flows))
 	for i, f := range flows {
+		explanation := GenerateFailedHandshakeExplanation(f.SrcIP, f.DstIP, f.SrcPort, f.DstPort)
 		result[i] = FailedHandshakeView{
-			SrcIP:   html.EscapeString(f.SrcIP),
-			SrcPort: f.SrcPort,
-			DstIP:   html.EscapeString(f.DstIP),
-			DstPort: f.DstPort,
+			SrcIP:       html.EscapeString(f.SrcIP),
+			SrcPort:     f.SrcPort,
+			DstIP:       html.EscapeString(f.DstIP),
+			DstPort:     f.DstPort,
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1447,6 +1481,7 @@ func convertQoSMismatches(mismatches []models.QoSMismatch) []QoSMismatchView {
 func convertDDoSFindings(findings []models.DDoSFinding) []DDoSFindingView {
 	result := make([]DDoSFindingView, len(findings))
 	for i, f := range findings {
+		explanation := GenerateDDoSExplanation(f.Type, f.SourceIP, f.PacketCount)
 		result[i] = DDoSFindingView{
 			Timestamp:   f.Timestamp,
 			SourceIP:    html.EscapeString(f.SourceIP),
@@ -1456,6 +1491,7 @@ func convertDDoSFindings(findings []models.DDoSFinding) []DDoSFindingView {
 			Threshold:   f.Threshold,
 			Duration:    f.Duration,
 			Severity:    html.EscapeString(f.Severity),
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1470,6 +1506,7 @@ func convertPortScanFindings(findings []models.PortScanFinding) []PortScanFindin
 			portStrs[j] = fmt.Sprintf("%d", p)
 		}
 		samplePorts := strings.Join(portStrs, ", ")
+		explanation := GeneratePortScanExplanation(f.Type, f.SourceIP, f.PortsScanned)
 
 		result[i] = PortScanFindingView{
 			Timestamp:    f.Timestamp,
@@ -1479,6 +1516,7 @@ func convertPortScanFindings(findings []models.PortScanFinding) []PortScanFindin
 			PortsScanned: f.PortsScanned,
 			SamplePorts:  samplePorts,
 			Severity:     html.EscapeString(f.Severity),
+			Explanation:  explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1487,6 +1525,7 @@ func convertPortScanFindings(findings []models.PortScanFinding) []PortScanFindin
 func convertIOCFindings(findings []models.IOCFinding) []IOCFindingView {
 	result := make([]IOCFindingView, len(findings))
 	for i, f := range findings {
+		explanation := GenerateIOCExplanation(f.IOCType, f.MatchedValue, f.SourceIP)
 		result[i] = IOCFindingView{
 			Timestamp:    f.Timestamp,
 			MatchedValue: html.EscapeString(f.MatchedValue),
@@ -1496,6 +1535,7 @@ func convertIOCFindings(findings []models.IOCFinding) []IOCFindingView {
 			DestIP:       html.EscapeString(f.DestIP),
 			Confidence:   html.EscapeString(f.Confidence),
 			Description:  html.EscapeString(f.Description),
+			Explanation:  explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1504,6 +1544,11 @@ func convertIOCFindings(findings []models.IOCFinding) []IOCFindingView {
 func convertTLSSecurityFindings(findings []models.TLSSecurityFinding) []TLSSecurityFindingView {
 	result := make([]TLSSecurityFindingView, len(findings))
 	for i, f := range findings {
+		weakness := f.TLSVersion
+		if f.CipherSuite != "" {
+			weakness = f.CipherSuite
+		}
+		explanation := GenerateTLSWeaknessExplanation(weakness, f.ServerIP, f.ServerPort)
 		result[i] = TLSSecurityFindingView{
 			Timestamp:    f.Timestamp,
 			ServerIP:     html.EscapeString(f.ServerIP),
@@ -1514,6 +1559,7 @@ func convertTLSSecurityFindings(findings []models.TLSSecurityFinding) []TLSSecur
 			WeaknessType: html.EscapeString(f.WeaknessType),
 			Severity:     html.EscapeString(f.Severity),
 			Description:  html.EscapeString(f.Description),
+			Explanation:  explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1522,6 +1568,7 @@ func convertTLSSecurityFindings(findings []models.TLSSecurityFinding) []TLSSecur
 func convertICMPFindings(findings []models.ICMPFinding) []ICMPFindingView {
 	result := make([]ICMPFindingView, len(findings))
 	for i, f := range findings {
+		explanation := GenerateICMPAnomalyExplanation(f.TypeName, f.SourceIP, f.Count)
 		result[i] = ICMPFindingView{
 			Timestamp:   f.Timestamp,
 			SourceIP:    html.EscapeString(f.SourceIP),
@@ -1532,6 +1579,7 @@ func convertICMPFindings(findings []models.ICMPFinding) []ICMPFindingView {
 			Count:       f.Count,
 			IsAnomaly:   f.IsAnomaly,
 			Description: html.EscapeString(f.Description),
+			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -1860,6 +1908,8 @@ func getTemplateContent() string {
                             <h2>Executive Summary</h2>
                         </div>
                         <div class="card-body">
+                            {{.ExecutiveSummaryExplanation}}
+                            
                             {{if eq .HealthStatus "good"}}
                             <div class="health-badge health-good">
                                 <i class="fas fa-check-circle"></i> Network Health: GOOD
@@ -2008,17 +2058,12 @@ func getTemplateContent() string {
                                         <td><code>{{.AnswerIP}}</code></td>
                                         <td><code>{{.ServerIP}}</code></td>
                                         <td class="severity-high">{{.Reason}}</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
                                         <td colspan="5">
                                             <div class="action-content">
-                                                <h4><i class="fas fa-wrench"></i> Recommended Action</h4>
-                                                <ul>
-                                                    <li>Verify DNS server configuration at <strong>{{.ServerIP}}</strong></li>
-                                                    <li>Check for DNS hijacking or poisoning attempts</li>
-                                                    <li>Review firewall rules for DNS traffic</li>
-                                                </ul>
+                                                {{.Explanation}}
                                             </div>
                                         </td>
                                     </tr>
@@ -2045,10 +2090,14 @@ func getTemplateContent() string {
                                         <td><code>{{.IP}}</code></td>
                                         <td><code>{{.MAC1}}</code></td>
                                         <td><code>{{.MAC2}}</code></td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
-                                        <td colspan="4"><div class="action-content"><h4>Recommended Action</h4><ul><li>Investigate ARP spoofing</li><li>Check DHCP for duplicates</li></ul></div></td>
+                                        <td colspan="4">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2088,7 +2137,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-globe"></i> HTTP Errors ({{len .HTTPErrors}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Method</th><th>URL</th><th>Status</th><th>Source</th><th>Destination</th></tr></thead>
+                                <thead><tr><th>Method</th><th>URL</th><th>Status</th><th>Source</th><th>Destination</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .HTTPErrors}}
                                     <tr>
@@ -2097,6 +2146,14 @@ func getTemplateContent() string {
                                         <td class="severity-high">{{.StatusCode}} {{.Reason}}</td>
                                         <td><code>{{.SrcIP}}</code></td>
                                         <td><code>{{.DstIP}}</code></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="6">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2132,7 +2189,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-bomb"></i> DDoS Attacks Detected ({{len .DDoSFindings}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Time</th><th>Source IP</th><th>Target IP</th><th>Type</th><th>Packets</th><th>Severity</th></tr></thead>
+                                <thead><tr><th>Time</th><th>Source IP</th><th>Target IP</th><th>Type</th><th>Packets</th><th>Severity</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .DDoSFindings}}
                                     <tr class="severity-row-{{if eq .Severity "Critical"}}critical{{else if eq .Severity "High"}}high{{else}}medium{{end}}">
@@ -2142,6 +2199,14 @@ func getTemplateContent() string {
                                         <td><span class="badge badge-danger">{{.Type}}</span></td>
                                         <td>{{.PacketCount}} (threshold: {{.Threshold}})</td>
                                         <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="7">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2155,7 +2220,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-search"></i> Port Scanning Detected ({{len .PortScanFindings}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Time</th><th>Source IP</th><th>Target</th><th>Scan Type</th><th>Ports Scanned</th><th>Severity</th></tr></thead>
+                                <thead><tr><th>Time</th><th>Source IP</th><th>Target</th><th>Scan Type</th><th>Ports Scanned</th><th>Severity</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .PortScanFindings}}
                                     <tr>
@@ -2165,6 +2230,14 @@ func getTemplateContent() string {
                                         <td><span class="badge badge-warning">{{.Type}}</span></td>
                                         <td>{{.PortsScanned}} {{if .SamplePorts}}({{.SamplePorts}}){{end}}</td>
                                         <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="7">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2178,7 +2251,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-skull-crossbones"></i> IOC Matches ({{len .IOCFindings}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Time</th><th>Matched Value</th><th>Type</th><th>Category</th><th>Confidence</th><th>Description</th></tr></thead>
+                                <thead><tr><th>Time</th><th>Matched Value</th><th>Type</th><th>Category</th><th>Confidence</th><th>Description</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .IOCFindings}}
                                     <tr class="severity-row-high">
@@ -2188,6 +2261,14 @@ func getTemplateContent() string {
                                         <td><span class="badge badge-danger">{{.IOCType}}</span></td>
                                         <td>{{.Confidence}}</td>
                                         <td>{{.Description}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="7">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2201,7 +2282,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-unlock-alt"></i> TLS Security Weaknesses ({{len .TLSSecurityFindings}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Time</th><th>Server</th><th>TLS Version</th><th>Cipher Suite</th><th>Weakness</th><th>Severity</th></tr></thead>
+                                <thead><tr><th>Time</th><th>Server</th><th>TLS Version</th><th>Cipher Suite</th><th>Weakness</th><th>Severity</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .TLSSecurityFindings}}
                                     <tr>
@@ -2211,6 +2292,14 @@ func getTemplateContent() string {
                                         <td><code>{{.CipherSuite}}</code></td>
                                         <td>{{.WeaknessType}}</td>
                                         <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="7">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2224,7 +2313,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-satellite-dish"></i> ICMP Analysis ({{len .ICMPFindings}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Source</th><th>Destination</th><th>Type</th><th>Count</th><th>Status</th></tr></thead>
+                                <thead><tr><th>Source</th><th>Destination</th><th>Type</th><th>Count</th><th>Status</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .ICMPFindings}}
                                     <tr class="{{if .IsAnomaly}}severity-row-medium{{end}}">
@@ -2233,7 +2322,17 @@ func getTemplateContent() string {
                                         <td>{{.TypeName}} ({{.Type}}/{{.Code}})</td>
                                         <td>{{.Count}}</td>
                                         <td>{{if .IsAnomaly}}<span class="badge badge-warning">Anomaly</span> {{.Description}}{{else}}<span class="badge badge-success">Normal</span>{{end}}</td>
+                                        <td>{{if .IsAnomaly}}<button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button>{{end}}</td>
                                     </tr>
+                                    {{if .IsAnomaly}}
+                                    <tr class="action-row">
+                                        <td colspan="6">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
                                     {{end}}
                                 </tbody>
                             </table>
@@ -2256,10 +2355,14 @@ func getTemplateContent() string {
                                         <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
                                         <td>{{.DstPort}}</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Action</button></td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
                                     </tr>
                                     <tr class="action-row">
-                                        <td colspan="4"><div class="action-content"><h4>Recommended Action</h4><ul><li>Check network path for congestion</li><li>Review QoS settings</li><li>Verify MTU configuration</li></ul></div></td>
+                                        <td colspan="4">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2277,7 +2380,7 @@ func getTemplateContent() string {
                         <summary><i class="fas fa-clock"></i> High RTT Flows ({{len .HighRTTFlows}})</summary>
                         <div>
                             <table class="data-table">
-                                <thead><tr><th>Source</th><th>Destination</th><th>Avg RTT (ms)</th><th>Max RTT (ms)</th></tr></thead>
+                                <thead><tr><th>Source</th><th>Destination</th><th>Avg RTT (ms)</th><th>Max RTT (ms)</th><th>Action</th></tr></thead>
                                 <tbody>
                                     {{range .HighRTTFlows}}
                                     <tr>
@@ -2285,6 +2388,14 @@ func getTemplateContent() string {
                                         <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
                                         <td class="severity-medium">{{printf "%.1f" .AvgRTT}}</td>
                                         <td>{{printf "%.1f" .MaxRTT}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="5">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
@@ -2366,35 +2477,27 @@ func getTemplateContent() string {
                     {{if .FailedHandshakes}}
                     <details class="failed-handshakes-section">
                         <summary><i class="fas fa-handshake-slash"></i> Failed TCP Handshakes ({{len .FailedHandshakes}})</summary>
-                        <div class="failed-handshakes-container">
-                            <div class="failed-handshakes-explanation">
-                                <h4><i class="fas fa-exclamation-triangle"></i> What are Failed Handshakes?</h4>
-                                <p>A failed TCP handshake occurs when a client sends a SYN packet to initiate a connection, but does not receive a SYN-ACK response from the server. This indicates the destination host may be:</p>
-                                <ul>
-                                    <li><strong>Down or offline</strong> - The server is not running</li>
-                                    <li><strong>Unreachable</strong> - Network path issues or routing problems</li>
-                                    <li><strong>Blocking connections</strong> - Firewall rules or TCP RST responses</li>
-                                    <li><strong>Port not listening</strong> - Service not bound to the target port</li>
-                                </ul>
-                            </div>
-                            <div class="failed-handshake-list">
-                                {{range .FailedHandshakes}}
-                                <div class="failed-handshake-item">
-                                    <div class="failed-flow-info">
-                                        <span class="flow-direction">
-                                            <i class="fas fa-arrow-right"></i>
-                                            <code>{{.SrcIP}}:{{.SrcPort}}</code>
-                                            <span class="arrow">&rarr;</span>
-                                            <code>{{.DstIP}}:{{.DstPort}}</code>
-                                        </span>
-                                        <span class="status-badge badge-failed"><i class="fas fa-times-circle"></i> FAILED</span>
-                                    </div>
-                                    <div class="failed-action-hint">
-                                        <small><i class="fas fa-lightbulb"></i> Check if service on port {{.DstPort}} is running and firewall allows traffic</small>
-                                    </div>
-                                </div>
-                                {{end}}
-                            </div>
+                        <div>
+                            <table class="data-table">
+                                <thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Action</th></tr></thead>
+                                <tbody>
+                                    {{range .FailedHandshakes}}
+                                    <tr>
+                                        <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
+                                        <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
+                                        <td>{{.DstPort}}</td>
+                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
+                                    </tr>
+                                    <tr class="action-row">
+                                        <td colspan="4">
+                                            <div class="action-content">
+                                                {{.Explanation}}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {{end}}
+                                </tbody>
+                            </table>
                         </div>
                     </details>
                     {{end}}
@@ -2402,6 +2505,9 @@ func getTemplateContent() string {
 
                 <div id="tab-protocols" class="tab-content">
                     <div id="protocols"></div>
+                    
+                    {{.ProtocolGuide}}
+                    
                     <div class="protocol-summary">
                         <h3><i class="fas fa-handshake"></i> TCP Handshake Analysis</h3>
                         <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">

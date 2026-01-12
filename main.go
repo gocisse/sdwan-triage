@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -1554,6 +1555,7 @@ VERSION:
 	var jsonOutput = flag.Bool("json", false, "Output in JSON format")
 	var csvOutput = flag.String("csv", "", "Export findings to CSV file")
 	var htmlOutput = flag.String("html", "", "Export findings to HTML report")
+	var multiPageHTML = flag.String("multi-page-html", "", "Export findings to multi-page HTML report (specify output directory)")
 	var debugHTML = flag.Bool("debug-html", false, "Write raw HTML to debug_report.html for troubleshooting diagram issues")
 	var srcIP = flag.String("src-ip", "", "Filter by source IP address")
 	var dstIP = flag.String("dst-ip", "", "Filter by destination IP address")
@@ -2037,6 +2039,26 @@ VERSION:
 			os.Exit(1)
 		}
 		color.Green("✓ Findings exported to %s", filename)
+	} else if *multiPageHTML != "" {
+		outputDir := *multiPageHTML
+		if outputDir == "" {
+			outputDir = "sdwan_report"
+		}
+		// Generate multi-page HTML report
+		// Note: Using the existing single-page HTML for now as multi-page requires models.TriageReport
+		// TODO: Implement conversion from main.go TriageReport to models.TriageReport
+		color.Yellow("⚠ Multi-page HTML generation requires refactoring - using single-page HTML instead")
+		filename := filepath.Join(outputDir, "report.html")
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating output directory: %v\n", err)
+			os.Exit(1)
+		}
+		if err := exportToEnhancedHTML(report, filename, pathStats, filter, traceData); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating HTML report: %v\n", err)
+			os.Exit(1)
+		}
+		color.Green("✓ HTML report generated: %s", filename)
+		color.Cyan("  Note: Multi-page structure will be available in a future update")
 	} else if *htmlOutput != "" {
 		filename := *htmlOutput
 		if filename == "" {
