@@ -859,6 +859,144 @@
                 </div>
             </div>
             
+            <!-- Detailed TCP Connection Flows -->
+            {{if .TCPHandshakeCorrelatedFlows}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-exchange-alt card-title-icon"></i>
+                        Detailed TCP Connection Flows ({{len .TCPHandshakeCorrelatedFlows}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-md">Per-flow TCP handshake analysis showing connection attempts, flags, and status.</p>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP:Port</th>
+                                    <th>Destination IP:Port</th>
+                                    <th>TCP Flags Sequence</th>
+                                    <th>Status</th>
+                                    <th>Wireshark Filter</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $index, $flow := .TCPHandshakeCorrelatedFlows}}
+                                {{if lt $index 50}}
+                                <tr class="{{if eq $flow.Status "Failed"}}table-row-critical{{else if eq $flow.Status "Complete"}}table-row-success{{else}}table-row-warning{{end}}">
+                                    <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
+                                    <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
+                                    <td>
+                                        {{range $i, $event := $flow.Events}}
+                                        <span class="status-badge {{if eq $event.Type "SYN"}}info{{else if eq $event.Type "SYN-ACK"}}healthy{{else if eq $event.Type "ACK"}}healthy{{else if eq $event.Type "RST"}}critical{{else if eq $event.Type "FIN"}}warning{{else}}info{{end}}" style="margin-right: 4px; margin-bottom: 2px; display: inline-block;">
+                                            {{$event.Type}}
+                                        </span>
+                                        {{end}}
+                                    </td>
+                                    <td>
+                                        <span class="status-badge {{if eq $flow.Status "Complete"}}healthy{{else if eq $flow.Status "Failed"}}critical{{else}}warning{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{$flow.Status}}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <code style="font-size: var(--font-size-xs);">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}</code>
+                                    </td>
+                                </tr>
+                                {{end}}
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{if gt (len .TCPHandshakeCorrelatedFlows) 50}}
+                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .TCPHandshakeCorrelatedFlows}} TCP flows.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- SYN and SYN-ACK Flow Details -->
+            <div class="widget-grid mb-xl">
+                {{if .SYNFlows}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-arrow-right" style="color: var(--color-info);"></i>
+                            SYN Packets ({{len .SYNFlows}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <p class="text-muted mb-md">Connection initiation attempts</p>
+                        <div class="data-table-container" style="max-height: 300px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Destination</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range $index, $flow := .SYNFlows}}
+                                    {{if lt $index 20}}
+                                    <tr>
+                                        <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
+                                        <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
+                                        <td>{{formatUnixTimeShort $flow.Timestamp}}</td>
+                                    </tr>
+                                    {{end}}
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{if gt (len .SYNFlows) 20}}
+                        <p class="text-muted mt-sm" style="font-size: var(--font-size-xs);">Showing 20 of {{len .SYNFlows}}</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+                
+                {{if .SYNACKFlows}}
+                <div class="widget">
+                    <div class="widget-header">
+                        <h3 class="widget-title">
+                            <i class="fas fa-reply" style="color: var(--color-success);"></i>
+                            SYN-ACK Packets ({{len .SYNACKFlows}})
+                        </h3>
+                    </div>
+                    <div class="widget-body">
+                        <p class="text-muted mb-md">Server acknowledgments</p>
+                        <div class="data-table-container" style="max-height: 300px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Source</th>
+                                        <th>Destination</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{range $index, $flow := .SYNACKFlows}}
+                                    {{if lt $index 20}}
+                                    <tr>
+                                        <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
+                                        <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
+                                        <td>{{formatUnixTimeShort $flow.Timestamp}}</td>
+                                    </tr>
+                                    {{end}}
+                                    {{end}}
+                                </tbody>
+                            </table>
+                        </div>
+                        {{if gt (len .SYNACKFlows) 20}}
+                        <p class="text-muted mt-sm" style="font-size: var(--font-size-xs);">Showing 20 of {{len .SYNACKFlows}}</p>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+            
             <!-- Performance Metrics Grid -->
             <div class="widget-grid mb-xl">
                 <!-- TCP Retransmissions Widget -->
@@ -1142,6 +1280,177 @@
                 </div>
             </div>
             
+            <!-- DNS Query Details -->
+            {{if .DNSDetails}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-globe card-title-icon"></i>
+                        DNS Request/Response Analysis ({{len .DNSDetails}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-md">DNS queries and responses with response times and status.</p>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Query Name</th>
+                                    <th>Type</th>
+                                    <th>Source IP</th>
+                                    <th>Answer IPs</th>
+                                    <th>Response Code</th>
+                                    <th>Response Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $index, $dns := .DNSDetails}}
+                                {{if lt $index 50}}
+                                <tr class="{{if $dns.IsAnomalous}}table-row-warning{{end}}">
+                                    <td><code>{{$dns.QueryName}}</code></td>
+                                    <td>{{$dns.QueryType}}</td>
+                                    <td><code>{{$dns.SourceIP}}</code></td>
+                                    <td>
+                                        {{if $dns.AnswerIPs}}
+                                        <code>{{$dns.AnswerIPs}}</code>
+                                        {{else}}
+                                        <span class="text-muted">-</span>
+                                        {{end}}
+                                    </td>
+                                    <td>
+                                        <span class="status-badge {{if eq $dns.ResponseCode "0"}}healthy{{else if $dns.HasResponse}}warning{{else}}critical{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{$dns.ResponseCodeName}}
+                                        </span>
+                                    </td>
+                                    <td>{{if $dns.HasResponse}}{{$dns.ResponseTimeMs}}{{else}}<span class="text-muted">No Response</span>{{end}}</td>
+                                    <td>
+                                        {{if $dns.IsAnomalous}}
+                                        <span class="status-badge warning">
+                                            <span class="status-dot"></span>
+                                            Anomalous
+                                        </span>
+                                        {{else if $dns.HasResponse}}
+                                        <span class="status-badge healthy">
+                                            <span class="status-dot"></span>
+                                            OK
+                                        </span>
+                                        {{else}}
+                                        <span class="status-badge critical">
+                                            <span class="status-dot"></span>
+                                            Failed
+                                        </span>
+                                        {{end}}
+                                    </td>
+                                </tr>
+                                {{end}}
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{if gt (len .DNSDetails) 50}}
+                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .DNSDetails}} DNS queries.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{else}}
+            <div class="card mb-xl">
+                <div class="card-body">
+                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
+                        <i class="fas fa-info-circle" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);"></i>
+                        <p>No DNS queries recorded in this capture.</p>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- HTTP/2 Flow Details -->
+            {{if .HTTP2Flows}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-bolt card-title-icon"></i>
+                        HTTP/2 Flows ({{len .HTTP2Flows}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-md">Modern HTTP/2 connections detected in the capture.</p>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP</th>
+                                    <th>Source Port</th>
+                                    <th>Destination IP</th>
+                                    <th>Destination Port</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $index, $flow := .HTTP2Flows}}
+                                {{if lt $index 50}}
+                                <tr>
+                                    <td><code>{{$flow.SrcIP}}</code></td>
+                                    <td>{{$flow.SrcPort}}</td>
+                                    <td><code>{{$flow.DstIP}}</code></td>
+                                    <td>{{$flow.DstPort}}</td>
+                                </tr>
+                                {{end}}
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{if gt (len .HTTP2Flows) 50}}
+                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .HTTP2Flows}} HTTP/2 flows.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- QUIC Flow Details -->
+            {{if .QUICFlows}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-rocket card-title-icon"></i>
+                        QUIC Flows ({{len .QUICFlows}})
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-md">QUIC protocol connections (HTTP/3) detected in the capture.</p>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source IP</th>
+                                    <th>Source Port</th>
+                                    <th>Destination IP</th>
+                                    <th>Destination Port</th>
+                                    <th>Server Name (SNI)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range $index, $flow := .QUICFlows}}
+                                {{if lt $index 50}}
+                                <tr>
+                                    <td><code>{{$flow.SrcIP}}</code></td>
+                                    <td>{{$flow.SrcPort}}</td>
+                                    <td><code>{{$flow.DstIP}}</code></td>
+                                    <td>{{$flow.DstPort}}</td>
+                                    <td>{{if $flow.ServerName}}<code>{{$flow.ServerName}}</code>{{else}}<span class="text-muted">-</span>{{end}}</td>
+                                </tr>
+                                {{end}}
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{if gt (len .QUICFlows) 50}}
+                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .QUICFlows}} QUIC flows.</p>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+            
             {{if .ProtocolGuide}}
             <div class="card mb-xl">
                 <div class="card-header">
@@ -1400,7 +1709,7 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <div id="network-diagram" class="chart-container" style="min-height: 600px;"></div>
+                    <div id="network-diagram" class="chart-container" style="min-height: 600px; background: #ffffff; border: 1px solid var(--color-border); border-radius: var(--radius-md); position: relative;"></div>
                 </div>
             </div>
             

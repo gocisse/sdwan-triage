@@ -126,7 +126,7 @@ function createNetworkDiagram(container, data) {
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height])
-        .style("background", "#f8fafc");
+        .style("background", "#ffffff");
     
     // Add gradient definitions for links
     const defs = svg.append("defs");
