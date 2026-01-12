@@ -51,7 +51,7 @@ function safeD3Init(containerId, initFn, data) {
     }
 }
 
-// Network Diagram (Force-Directed Graph)
+// Network Diagram (Force-Directed Graph) - Enhanced Human-Readable Version
 function createNetworkDiagram(container, data) {
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 500;
@@ -64,35 +64,76 @@ function createNetworkDiagram(container, data) {
     // Clear existing content
     d3.select(container).selectAll("*").remove();
     
+    // Add instructions panel
+    const instructions = d3.select(container)
+        .append("div")
+        .attr("class", "topology-instructions")
+        .style("position", "absolute")
+        .style("top", "10px")
+        .style("right", "10px")
+        .style("background", "rgba(255, 255, 255, 0.95)")
+        .style("padding", "10px 15px")
+        .style("border-radius", "6px")
+        .style("box-shadow", "0 2px 8px rgba(0,0,0,0.15)")
+        .style("font-size", "12px")
+        .style("z-index", "1000")
+        .html(`
+            <div style="font-weight: 600; margin-bottom: 5px; color: #1e293b;">
+                <i class="fas fa-info-circle" style="color: #3b82f6;"></i> Network Topology Guide
+            </div>
+            <div style="color: #64748b; line-height: 1.6;">
+                • <strong>Hover</strong> over nodes to see details<br/>
+                • <strong>Drag</strong> nodes to reposition<br/>
+                • <strong>Scroll</strong> to zoom in/out<br/>
+                • <strong>Click</strong> node to highlight connections
+            </div>
+        `);
+    
     const svg = d3.select(container)
         .append("svg")
         .attr("width", width)
         .attr("height", height)
-        .attr("viewBox", [0, 0, width, height]);
+        .attr("viewBox", [0, 0, width, height])
+        .style("background", "#f8fafc");
+    
+    // Add gradient definitions for links
+    const defs = svg.append("defs");
+    const gradient = defs.append("linearGradient")
+        .attr("id", "link-gradient")
+        .attr("gradientUnits", "userSpaceOnUse");
+    gradient.append("stop").attr("offset", "0%").attr("stop-color", "#3b82f6").attr("stop-opacity", 0.3);
+    gradient.append("stop").attr("offset", "100%").attr("stop-color", "#3b82f6").attr("stop-opacity", 0.8);
     
     // Zoom behavior
     const g = svg.append("g");
     svg.call(d3.zoom()
-        .scaleExtent([0.1, 4])
+        .scaleExtent([0.3, 4])
         .on("zoom", (event) => g.attr("transform", event.transform)));
     
-    // Tooltip
+    // Enhanced tooltip with better formatting
     const tooltip = d3.select("body").append("div")
         .attr("class", "d3-tooltip")
-        .style("opacity", 0);
+        .style("opacity", 0)
+        .style("max-width", "300px");
     
-    // Color scale - theme aware
+    // Color scale - theme aware with better colors
     const colors = getThemeColors();
     const colorScale = d3.scaleOrdinal()
         .domain(["internal", "router", "external", "anomaly"])
         .range([colors.nodeInternal, colors.nodeRouter, colors.nodeExternal, colors.nodeAnomaly]);
     
-    // Force simulation
+    // Enhanced force simulation with better spacing
     const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(data.links).id(d => d.id).distance(120))
-        .force("charge", d3.forceManyBody().strength(-250))
+        .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => {
+            // Vary distance based on traffic volume
+            const traffic = d.value || 0;
+            return traffic > 1000000 ? 100 : 150; // Closer for high-traffic links
+        }))
+        .force("charge", d3.forceManyBody().strength(-400))
         .force("center", d3.forceCenter(width / 2, height / 2))
-        .force("collision", d3.forceCollide().radius(35));
+        .force("collision", d3.forceCollide().radius(45))
+        .force("x", d3.forceX(width / 2).strength(0.05))
+        .force("y", d3.forceY(height / 2).strength(0.05));
     
     // Links
     const link = g.append("g")
@@ -104,46 +145,174 @@ function createNetworkDiagram(container, data) {
         .attr("stroke-width", d => Math.max(1, Math.sqrt(d.value || 1)))
         .attr("stroke-dasharray", d => d.hasIssue ? "5,5" : "0");
     
-    // Nodes
+    // Helper function to get human-readable node type
+    function getNodeTypeLabel(group) {
+        const labels = {
+            "internal": "Internal Device",
+            "router": "Gateway/Router",
+            "external": "External Server",
+            "anomaly": "⚠️ Security Alert"
+        };
+        return labels[group] || group;
+    }
+    
+    // Helper function to format traffic volume
+    function formatTrafficVolume(bytes) {
+        if (!bytes || bytes === 0) return "No traffic data";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+    }
+    
+    // Enhanced nodes with glow effect for anomalies
     const node = g.append("g")
-        .selectAll("circle")
+        .selectAll("g")
         .data(data.nodes)
-        .join("circle")
-        .attr("r", d => d.group === "router" ? 12 : 8)
+        .join("g")
+        .attr("class", "node-group")
+        .call(drag(simulation));
+    
+    // Add outer glow for anomaly nodes
+    node.filter(d => d.group === "anomaly")
+        .append("circle")
+        .attr("r", 18)
+        .attr("fill", "none")
+        .attr("stroke", colors.nodeAnomaly)
+        .attr("stroke-width", 2)
+        .attr("stroke-opacity", 0.3)
+        .attr("class", "node-glow");
+    
+    // Main node circles with size based on traffic
+    node.append("circle")
+        .attr("r", d => {
+            if (d.group === "router") return 14;
+            if (d.group === "anomaly") return 12;
+            // Size based on traffic volume
+            const bytes = d.bytes || 0;
+            if (bytes > 10000000) return 12; // > 10MB
+            if (bytes > 1000000) return 10;  // > 1MB
+            return 8;
+        })
         .attr("fill", d => colorScale(d.group))
         .attr("stroke", "#fff")
-        .attr("stroke-width", 2)
-        .call(drag(simulation))
-        .on("mouseover", function(event, d) {
-            d3.select(this).attr("r", d.group === "router" ? 16 : 12);
+        .attr("stroke-width", 2.5)
+        .attr("class", "node-circle")
+        .style("filter", d => d.group === "anomaly" ? "drop-shadow(0 0 6px rgba(239, 68, 68, 0.6))" : "none");
+    
+    // Add icon overlay for routers and anomalies
+    node.filter(d => d.group === "router" || d.group === "anomaly")
+        .append("text")
+        .attr("text-anchor", "middle")
+        .attr("dy", "0.35em")
+        .attr("font-size", "10px")
+        .attr("fill", "#fff")
+        .attr("font-family", "Font Awesome 5 Free")
+        .attr("font-weight", "900")
+        .text(d => d.group === "router" ? "\uf233" : "\uf071"); // router or warning icon
+    
+    // Enhanced interaction
+    node.on("mouseover", function(event, d) {
+            d3.select(this).select(".node-circle")
+                .transition().duration(200)
+                .attr("r", d => {
+                    if (d.group === "router") return 18;
+                    if (d.group === "anomaly") return 16;
+                    const bytes = d.bytes || 0;
+                    if (bytes > 10000000) return 16;
+                    if (bytes > 1000000) return 14;
+                    return 12;
+                })
+                .attr("stroke-width", 3);
+            
             highlightConnections(d, true);
-            tooltip.transition().duration(200).style("opacity", 0.9);
-            tooltip.html(`<strong>${d.label || d.id}</strong><br/>Type: ${d.group}${d.bytes ? '<br/>Traffic: ' + formatBytes(d.bytes) : ''}`)
-                .style("left", (event.pageX + 10) + "px")
+            
+            // Enhanced tooltip with detailed information
+            const connections = d.connections || 0;
+            const trafficInfo = formatTrafficVolume(d.bytes);
+            const nodeType = getNodeTypeLabel(d.group);
+            const issueWarning = d.hasIssue ? '<div style="color: #dc3545; font-weight: 600; margin-top: 8px;"><i class="fas fa-exclamation-triangle"></i> Security issues detected</div>' : '';
+            
+            tooltip.transition().duration(200).style("opacity", 0.95);
+            tooltip.html(`
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #1e293b;">
+                    <i class="fas fa-network-wired" style="color: ${colorScale(d.group)};"></i> ${d.label || d.id}
+                </div>
+                <div style="color: #64748b; font-size: 12px; line-height: 1.6;">
+                    <div style="margin-bottom: 4px;"><strong>Type:</strong> ${nodeType}</div>
+                    <div style="margin-bottom: 4px;"><strong>Traffic:</strong> ${trafficInfo}</div>
+                    <div><strong>Connections:</strong> ${connections}</div>
+                </div>
+                ${issueWarning}
+            `)
+                .style("left", (event.pageX + 15) + "px")
                 .style("top", (event.pageY - 28) + "px");
         })
         .on("mouseout", function(event, d) {
-            d3.select(this).attr("r", d.group === "router" ? 12 : 8);
+            d3.select(this).select(".node-circle")
+                .transition().duration(200)
+                .attr("r", d => {
+                    if (d.group === "router") return 14;
+                    if (d.group === "anomaly") return 12;
+                    const bytes = d.bytes || 0;
+                    if (bytes > 10000000) return 12;
+                    if (bytes > 1000000) return 10;
+                    return 8;
+                })
+                .attr("stroke-width", 2.5);
+            
             highlightConnections(d, false);
             tooltip.transition().duration(500).style("opacity", 0);
+        })
+        .on("click", function(event, d) {
+            // Toggle pin on click
+            if (d.fx === null) {
+                d.fx = d.x;
+                d.fy = d.y;
+                d3.select(this).select(".node-circle").attr("stroke", "#fbbf24").attr("stroke-width", 4);
+            } else {
+                d.fx = null;
+                d.fy = null;
+                d3.select(this).select(".node-circle").attr("stroke", "#fff").attr("stroke-width", 2.5);
+            }
         });
     
-    // Labels
+    // Enhanced labels with better positioning and styling
     const labels = g.append("g")
         .selectAll("text")
         .data(data.nodes)
         .join("text")
         .attr("class", "node-label")
-        .attr("dx", 12)
+        .attr("dx", 18)
         .attr("dy", 4)
-        .text(d => d.label || d.id);
+        .attr("font-size", "11px")
+        .attr("font-weight", "500")
+        .attr("fill", colors.text)
+        .attr("stroke", colors.background)
+        .attr("stroke-width", 3)
+        .attr("paint-order", "stroke")
+        .text(d => {
+            // Shorten long IP addresses for readability
+            const label = d.label || d.id;
+            if (label.length > 20) return label.substring(0, 17) + "...";
+            return label;
+        })
+        .style("pointer-events", "none")
+        .style("user-select", "none");
     
     // Highlight connections
     function highlightConnections(d, highlight) {
         link.attr("stroke-opacity", l => {
             if (highlight && (l.source.id === d.id || l.target.id === d.id)) return 1;
             return highlight ? 0.1 : 0.6;
+        })
+        .attr("stroke-width", l => {
+            if (highlight && (l.source.id === d.id || l.target.id === d.id)) {
+                return Math.max(2, Math.sqrt(l.value || 1) * 1.5);
+            }
+            return Math.max(1, Math.sqrt(l.value || 1));
         });
+        
         node.attr("opacity", n => {
             if (!highlight) return 1;
             if (n.id === d.id) return 1;
@@ -153,15 +322,26 @@ function createNetworkDiagram(container, data) {
             );
             return connected ? 1 : 0.2;
         });
+        
+        labels.attr("opacity", n => {
+            if (!highlight) return 1;
+            if (n.id === d.id) return 1;
+            const connected = data.links.some(l => 
+                (l.source.id === d.id && l.target.id === n.id) ||
+                (l.target.id === d.id && l.source.id === n.id)
+            );
+            return connected ? 1 : 0.3;
+        });
     }
     
-    // Simulation tick
+    // Simulation tick - updated for node groups
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x)
             .attr("y1", d => d.source.y)
             .attr("x2", d => d.target.x)
             .attr("y2", d => d.target.y);
-        node.attr("cx", d => d.x).attr("cy", d => d.y);
+        
+        node.attr("transform", d => `translate(${d.x},${d.y})`);
         labels.attr("x", d => d.x).attr("y", d => d.y);
     });
     
@@ -172,26 +352,88 @@ function createNetworkDiagram(container, data) {
                 if (!event.active) simulation.alphaTarget(0.3).restart();
                 d.fx = d.x; d.fy = d.y;
             })
-            .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on("drag", (event, d) => { 
+                d.fx = event.x; 
+                d.fy = event.y; 
+            })
             .on("end", (event, d) => {
                 if (!event.active) simulation.alphaTarget(0);
-                d.fx = null; d.fy = null;
+                // Don't clear fx/fy if node was clicked (pinned)
+                // They will be cleared on next click
             });
     }
     
-    // Legend - theme aware
-    const legend = svg.append("g").attr("transform", `translate(20, 20)`);
+    // Enhanced Legend with better styling
+    const legend = svg.append("g")
+        .attr("class", "topology-legend")
+        .attr("transform", `translate(20, 20)`);
+    
+    // Legend background
+    const legendBg = legend.append("rect")
+        .attr("x", -10)
+        .attr("y", -10)
+        .attr("width", 180)
+        .attr("height", 120)
+        .attr("fill", "rgba(255, 255, 255, 0.95)")
+        .attr("stroke", "#e2e8f0")
+        .attr("stroke-width", 1)
+        .attr("rx", 6);
+    
+    // Legend title
+    legend.append("text")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("font-size", "12px")
+        .attr("font-weight", "600")
+        .attr("fill", "#1e293b")
+        .text("Node Types");
+    
     const legendData = [
-        { label: "Internal", color: colors.nodeInternal },
-        { label: "Router/Gateway", color: colors.nodeRouter },
-        { label: "External", color: colors.nodeExternal },
-        { label: "Anomaly", color: colors.nodeAnomaly }
+        { label: "Internal Device", color: colors.nodeInternal, icon: "\uf109" },
+        { label: "Gateway/Router", color: colors.nodeRouter, icon: "\uf233" },
+        { label: "External Server", color: colors.nodeExternal, icon: "\uf0ac" },
+        { label: "Security Alert", color: colors.nodeAnomaly, icon: "\uf071" }
     ];
+    
     legendData.forEach((item, i) => {
-        const lg = legend.append("g").attr("transform", `translate(0, ${i * 22})`);
-        lg.append("circle").attr("r", 6).attr("fill", item.color);
-        lg.append("text").attr("x", 12).attr("y", 4).attr("font-size", "11px").attr("fill", colors.text).text(item.label);
+        const lg = legend.append("g")
+            .attr("transform", `translate(0, ${i * 24 + 20})`);
+        
+        // Circle
+        lg.append("circle")
+            .attr("r", 7)
+            .attr("fill", item.color)
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 2);
+        
+        // Icon (for router and anomaly)
+        if (item.icon && (i === 1 || i === 3)) {
+            lg.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em")
+                .attr("font-size", "8px")
+                .attr("fill", "#fff")
+                .attr("font-family", "Font Awesome 5 Free")
+                .attr("font-weight", "900")
+                .text(item.icon);
+        }
+        
+        // Label
+        lg.append("text")
+            .attr("x", 16)
+            .attr("y", 4)
+            .attr("font-size", "11px")
+            .attr("fill", colors.text)
+            .text(item.label);
     });
+    
+    // Add traffic indicator legend
+    legend.append("text")
+        .attr("x", 0)
+        .attr("y", 120)
+        .attr("font-size", "10px")
+        .attr("fill", colors.textMuted)
+        .text("💡 Tip: Click node to pin/unpin");
 }
 
 // Timeline Visualization
