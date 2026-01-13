@@ -664,6 +664,109 @@ func extractCertsFromHandshake(data []byte) []*x509.Certificate {
 	return certs
 }
 
+// Extract ALPN protocols from TLS ClientHello
+func extractALPNProtocols(data []byte) []string {
+	// TLS record: type(1) + version(2) + length(2) + handshake
+	if len(data) < 43 || data[0] != 0x16 { // Handshake record
+		return nil
+	}
+
+	// Skip TLS record header (5 bytes)
+	pos := 5
+
+	// Handshake type should be ClientHello (0x01)
+	if pos >= len(data) || data[pos] != 0x01 {
+		return nil
+	}
+
+	// Skip handshake header: type(1) + length(3) + version(2) + random(32)
+	pos += 1 + 3 + 2 + 32
+
+	if pos >= len(data) {
+		return nil
+	}
+
+	// Session ID length
+	sessionIDLen := int(data[pos])
+	pos += 1 + sessionIDLen
+
+	if pos+2 > len(data) {
+		return nil
+	}
+
+	// Cipher suites length
+	cipherSuitesLen := int(binary.BigEndian.Uint16(data[pos : pos+2]))
+	pos += 2 + cipherSuitesLen
+
+	if pos+1 > len(data) {
+		return nil
+	}
+
+	// Compression methods length
+	compressionLen := int(data[pos])
+	pos += 1 + compressionLen
+
+	if pos+2 > len(data) {
+		return nil
+	}
+
+	// Extensions length
+	extensionsLen := int(binary.BigEndian.Uint16(data[pos : pos+2]))
+	pos += 2
+
+	if pos+extensionsLen > len(data) {
+		return nil
+	}
+
+	endPos := pos + extensionsLen
+
+	// Parse extensions
+	for pos+4 <= endPos {
+		extType := binary.BigEndian.Uint16(data[pos : pos+2])
+		extLen := int(binary.BigEndian.Uint16(data[pos+2 : pos+4]))
+		pos += 4
+
+		if pos+extLen > len(data) {
+			break
+		}
+
+		// ALPN extension (0x0010)
+		if extType == 0x0010 && extLen > 2 {
+			alpnListLen := int(binary.BigEndian.Uint16(data[pos : pos+2]))
+			alpnPos := pos + 2
+
+			if alpnPos+alpnListLen > len(data) {
+				break
+			}
+
+			var protocols []string
+			alpnEnd := alpnPos + alpnListLen
+
+			for alpnPos < alpnEnd && alpnPos < len(data) {
+				if alpnPos+1 > len(data) {
+					break
+				}
+				protoLen := int(data[alpnPos])
+				alpnPos++
+
+				if alpnPos+protoLen > len(data) {
+					break
+				}
+
+				protocol := string(data[alpnPos : alpnPos+protoLen])
+				protocols = append(protocols, protocol)
+				alpnPos += protoLen
+			}
+
+			return protocols
+		}
+
+		pos += extLen
+	}
+
+	return nil
+}
+
 // Extract SNI from QUIC Initial packet
 func extractQUICServerName(payload []byte) string {
 	if len(payload) < 1200 { // QUIC Initial packets are typically padded
@@ -1640,6 +1743,9 @@ VERSION:
 	// Initialize ApplicationBreakdown map
 	report.ApplicationBreakdown = make(map[string]AppCategory)
 
+	// Track seen HTTP/2 flows to avoid duplicates
+	http2FlowsSeen := make(map[string]bool)
+
 	packetSource := gopacket.NewPacketSource(reader, reader.LinkType())
 	for packet := range packetSource.Packets() {
 		// Set capture start time from first packet
@@ -1647,7 +1753,7 @@ VERSION:
 			captureStartTime = packet.Metadata().Timestamp
 			captureStartSet = true
 		}
-		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets, &timelineEvents, dnsQueryTracker, &dnsRecords, captureStartTime)
+		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets, &timelineEvents, dnsQueryTracker, &dnsRecords, captureStartTime, http2FlowsSeen)
 	}
 
 	// Finalize failed handshakes
@@ -2119,6 +2225,7 @@ func analyzePacket(
 	dnsQueryTracker map[uint16]*dnsQueryInfo,
 	dnsRecords *[]DNSRecord,
 	captureStartTime time.Time,
+	http2FlowsSeen map[string]bool,
 ) {
 	// Apply filters if specified
 	if !filter.isEmpty() {
@@ -2873,20 +2980,60 @@ func analyzePacket(
 		}
 	}
 
-	// HTTP/2 detection via ALPN in TLS handshake
+	// HTTP/2 detection via ALPN in TLS ClientHello or heuristics
 	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 		tcp := tcpLayer.(*layers.TCP)
 		payload := tcp.Payload
-		// TLS handshake starts with 0x16 (handshake record type)
-		if len(payload) > 5 && payload[0] == 0x16 && payload[1] == 0x03 {
-			// Check for ALPN "h2" in ClientHello (simplified heuristic)
-			if len(payload) > 100 && strings.Contains(string(payload), "h2") {
+
+		// Method 1: Parse ALPN protocols from TLS ClientHello
+		if len(payload) > 43 {
+			protocols := extractALPNProtocols(payload)
+			for _, proto := range protocols {
+				// Check for HTTP/2 protocols: "h2" or "h2c"
+				if proto == "h2" || proto == "h2c" {
+					netLayer := packet.NetworkLayer()
+					if ip4, ok := netLayer.(*layers.IPv4); ok {
+						// Create flow key to avoid duplicates
+						flowKey := fmt.Sprintf("%s:%d->%s:%d",
+							ip4.SrcIP.String(), tcp.SrcPort,
+							ip4.DstIP.String(), tcp.DstPort)
+
+						mu.Lock()
+						if !http2FlowsSeen[flowKey] {
+							http2FlowsSeen[flowKey] = true
+							report.HTTP2Flows = append(report.HTTP2Flows, TCPFlow{
+								SrcIP: ip4.SrcIP.String(), SrcPort: uint16(tcp.SrcPort),
+								DstIP: ip4.DstIP.String(), DstPort: uint16(tcp.DstPort),
+							})
+						}
+						mu.Unlock()
+					}
+					break
+				}
+			}
+		}
+
+		// Method 2: Heuristic detection for established HTTP/2 connections
+		// Look for HTTP/2 connection preface: "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+		// or HTTP/2 frame magic (starts with 24-byte length + type + flags)
+		if (tcp.DstPort == 443 || tcp.SrcPort == 443) && len(payload) > 24 {
+			// Check for HTTP/2 connection preface
+			if len(payload) >= 24 && string(payload[:24]) == "PRI * HTTP/2.0\r\n\r\nSM\r\n" {
 				netLayer := packet.NetworkLayer()
 				if ip4, ok := netLayer.(*layers.IPv4); ok {
-					report.HTTP2Flows = append(report.HTTP2Flows, TCPFlow{
-						SrcIP: ip4.SrcIP.String(), SrcPort: uint16(tcp.SrcPort),
-						DstIP: ip4.DstIP.String(), DstPort: uint16(tcp.DstPort),
-					})
+					flowKey := fmt.Sprintf("%s:%d->%s:%d",
+						ip4.SrcIP.String(), tcp.SrcPort,
+						ip4.DstIP.String(), tcp.DstPort)
+
+					mu.Lock()
+					if !http2FlowsSeen[flowKey] {
+						http2FlowsSeen[flowKey] = true
+						report.HTTP2Flows = append(report.HTTP2Flows, TCPFlow{
+							SrcIP: ip4.SrcIP.String(), SrcPort: uint16(tcp.SrcPort),
+							DstIP: ip4.DstIP.String(), DstPort: uint16(tcp.DstPort),
+						})
+					}
+					mu.Unlock()
 				}
 			}
 		}
