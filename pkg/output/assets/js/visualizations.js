@@ -237,15 +237,349 @@ function createNetworkDiagram(container, data) {
     });
 }
 
-// Placeholder functions for other visualizations
+// Timeline Visualization
 function createTimeline(container, data) {
-    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b;">Timeline visualization</div>';
+    d3.select(container).selectAll("*").remove();
+    
+    if (!data || !data.events || data.events.length === 0) {
+        container.innerHTML = '<div style="padding: 40px; text-align: center; color: #64748b;">No timeline events available</div>';
+        return;
+    }
+    
+    const width = container.clientWidth || 800;
+    const height = 400;
+    const margin = {top: 40, right: 40, bottom: 60, left: 60};
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("background", "#ffffff")
+        .style("border", "1px solid #e0e0e0")
+        .style("border-radius", "8px");
+    
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    // Parse timestamps and create time scale
+    const events = data.events.map(e => ({
+        time: new Date(e.timestamp * 1000),
+        type: e.type,
+        description: e.description
+    }));
+    
+    const xScale = d3.scaleTime()
+        .domain(d3.extent(events, d => d.time))
+        .range([0, chartWidth]);
+    
+    const eventTypes = [...new Set(events.map(e => e.type))];
+    const yScale = d3.scaleBand()
+        .domain(eventTypes)
+        .range([0, chartHeight])
+        .padding(0.3);
+    
+    const colorScale = d3.scaleOrdinal()
+        .domain(eventTypes)
+        .range(['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']);
+    
+    // Add axes
+    g.append("g")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(xScale).ticks(6))
+        .selectAll("text")
+        .style("font-size", "11px");
+    
+    g.append("g")
+        .call(d3.axisLeft(yScale))
+        .selectAll("text")
+        .style("font-size", "11px");
+    
+    // Add events
+    g.selectAll(".event")
+        .data(events)
+        .join("circle")
+        .attr("class", "event")
+        .attr("cx", d => xScale(d.time))
+        .attr("cy", d => yScale(d.type) + yScale.bandwidth() / 2)
+        .attr("r", 5)
+        .attr("fill", d => colorScale(d.type))
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 2)
+        .style("cursor", "pointer")
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("r", 7);
+            showTooltip(event, `<strong>${d.type}</strong><br/>${d.description}<br/>${d.time.toLocaleString()}`);
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("r", 5);
+            hideTooltip();
+        });
+    
+    // Add title
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("font-weight", "600")
+        .text("Event Timeline");
 }
 
+// Sankey Diagram for Traffic Flows
 function createSankeyDiagram(container, data) {
-    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b;">Sankey diagram</div>';
+    d3.select(container).selectAll("*").remove();
+    
+    if (!data || !data.nodes || !data.links || data.nodes.length === 0) {
+        container.innerHTML = '<div style="padding: 40px; text-align: center; color: #64748b;">No traffic flow data available</div>';
+        return;
+    }
+    
+    const width = container.clientWidth || 800;
+    const height = 500;
+    const margin = {top: 20, right: 20, bottom: 20, left: 20};
+    
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("background", "#ffffff")
+        .style("border", "1px solid #e0e0e0")
+        .style("border-radius", "8px");
+    
+    // Simple flow visualization (simplified Sankey)
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Group nodes by type
+    const sources = data.nodes.filter(n => n.type === 'source');
+    const destinations = data.nodes.filter(n => n.type === 'destination');
+    
+    const sourceY = d3.scaleBand()
+        .domain(sources.map(s => s.id))
+        .range([50, chartHeight - 50])
+        .padding(0.2);
+    
+    const destY = d3.scaleBand()
+        .domain(destinations.map(d => d.id))
+        .range([50, chartHeight - 50])
+        .padding(0.2);
+    
+    const maxBytes = d3.max(data.links, l => l.value) || 1;
+    const widthScale = d3.scaleLinear()
+        .domain([0, maxBytes])
+        .range([1, 20]);
+    
+    // Draw links
+    data.links.forEach(link => {
+        const sourceNode = sources.find(s => s.id === link.source);
+        const destNode = destinations.find(d => d.id === link.target);
+        
+        if (sourceNode && destNode) {
+            const path = d3.path();
+            const x1 = 100;
+            const y1 = sourceY(sourceNode.id) + sourceY.bandwidth() / 2;
+            const x2 = chartWidth - 100;
+            const y2 = destY(destNode.id) + destY.bandwidth() / 2;
+            const midX = (x1 + x2) / 2;
+            
+            path.moveTo(x1, y1);
+            path.bezierCurveTo(midX, y1, midX, y2, x2, y2);
+            
+            g.append("path")
+                .attr("d", path.toString())
+                .attr("fill", "none")
+                .attr("stroke", link.hasIssue ? "#ef4444" : "#94a3b8")
+                .attr("stroke-width", widthScale(link.value))
+                .attr("opacity", 0.6)
+                .style("cursor", "pointer")
+                .on("mouseover", function(event) {
+                    d3.select(this).attr("opacity", 1);
+                    showTooltip(event, `<strong>${sourceNode.id} → ${destNode.id}</strong><br/>Traffic: ${formatBytes(link.value)}`);
+                })
+                .on("mouseout", function() {
+                    d3.select(this).attr("opacity", 0.6);
+                    hideTooltip();
+                });
+        }
+    });
+    
+    // Draw source nodes
+    sources.forEach(node => {
+        const nodeG = g.append("g")
+            .attr("transform", `translate(100, ${sourceY(node.id) + sourceY.bandwidth() / 2})`);
+        
+        nodeG.append("rect")
+            .attr("x", -40)
+            .attr("y", -15)
+            .attr("width", 80)
+            .attr("height", 30)
+            .attr("fill", "#3b82f6")
+            .attr("rx", 4);
+        
+        nodeG.append("text")
+            .attr("text-anchor", "middle")
+            .attr("dy", 5)
+            .attr("fill", "#fff")
+            .style("font-size", "11px")
+            .text(node.id.length > 12 ? node.id.substring(0, 12) + '...' : node.id);
+    });
+    
+    // Draw destination nodes
+    destinations.forEach(node => {
+        const nodeG = g.append("g")
+            .attr("transform", `translate(${chartWidth - 100}, ${destY(node.id) + destY.bandwidth() / 2})`);
+        
+        nodeG.append("rect")
+            .attr("x", -40)
+            .attr("y", -15)
+            .attr("width", 80)
+            .attr("height", 30)
+            .attr("fill", "#10b981")
+            .attr("rx", 4);
+        
+        nodeG.append("text")
+            .attr("text-anchor", "middle")
+            .attr("dy", 5)
+            .attr("fill", "#fff")
+            .style("font-size", "11px")
+            .text(node.id.length > 12 ? node.id.substring(0, 12) + '...' : node.id);
+    });
+    
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
 }
 
+// RTT Histogram
 function createRTTHistogram(container, data) {
-    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b;">RTT histogram</div>';
+    d3.select(container).selectAll("*").remove();
+    
+    if (!data || !data.values || data.values.length === 0) {
+        container.innerHTML = '<div style="padding: 40px; text-align: center; color: #64748b;">No RTT data available</div>';
+        return;
+    }
+    
+    const width = container.clientWidth || 800;
+    const height = 400;
+    const margin = {top: 40, right: 40, bottom: 60, left: 60};
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    const svg = d3.select(container)
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("background", "#ffffff")
+        .style("border", "1px solid #e0e0e0")
+        .style("border-radius", "8px");
+    
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+    
+    // Create histogram bins
+    const xScale = d3.scaleLinear()
+        .domain([0, d3.max(data.values)])
+        .range([0, chartWidth]);
+    
+    const histogram = d3.histogram()
+        .domain(xScale.domain())
+        .thresholds(xScale.ticks(20));
+    
+    const bins = histogram(data.values);
+    
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(bins, d => d.length)])
+        .range([chartHeight, 0]);
+    
+    // Add axes
+    g.append("g")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(xScale).ticks(10))
+        .selectAll("text")
+        .style("font-size", "11px");
+    
+    g.append("g")
+        .call(d3.axisLeft(yScale))
+        .selectAll("text")
+        .style("font-size", "11px");
+    
+    // Add bars
+    g.selectAll(".bar")
+        .data(bins)
+        .join("rect")
+        .attr("class", "bar")
+        .attr("x", d => xScale(d.x0))
+        .attr("y", d => yScale(d.length))
+        .attr("width", d => Math.max(0, xScale(d.x1) - xScale(d.x0) - 1))
+        .attr("height", d => chartHeight - yScale(d.length))
+        .attr("fill", "#3b82f6")
+        .attr("opacity", 0.8)
+        .style("cursor", "pointer")
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("opacity", 1);
+            showTooltip(event, `<strong>RTT: ${d.x0.toFixed(1)} - ${d.x1.toFixed(1)} ms</strong><br/>Count: ${d.length}`);
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("opacity", 0.8);
+            hideTooltip();
+        });
+    
+    // Add labels
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("font-weight", "600")
+        .text("RTT Distribution");
+    
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height - 10)
+        .attr("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("Round Trip Time (ms)");
+    
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", 15)
+        .attr("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("Frequency");
+}
+
+// Tooltip helper functions
+function showTooltip(event, html) {
+    let tooltip = d3.select(".d3-tooltip");
+    if (tooltip.empty()) {
+        tooltip = d3.select("body")
+            .append("div")
+            .attr("class", "d3-tooltip")
+            .style("position", "absolute")
+            .style("background", "rgba(0,0,0,0.8)")
+            .style("color", "white")
+            .style("padding", "8px 12px")
+            .style("border-radius", "4px")
+            .style("font-size", "12px")
+            .style("pointer-events", "none")
+            .style("z-index", "10000");
+    }
+    tooltip.html(html)
+        .style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 10) + "px")
+        .style("opacity", 1);
+}
+
+function hideTooltip() {
+    d3.select(".d3-tooltip")
+        .style("opacity", 0);
 }
