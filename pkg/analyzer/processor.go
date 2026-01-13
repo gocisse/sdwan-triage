@@ -36,6 +36,7 @@ type Processor struct {
 	sipAnalyzer         *detector.SIPAnalyzer
 	rtpAnalyzer         *detector.RTPAnalyzer
 	tunnelAnalyzer      *detector.TunnelAnalyzer
+	bgpAnalyzer         *detector.BGPAnalyzer
 	qosEnabled          bool
 	verbose             bool
 	skippedPackets      int
@@ -68,6 +69,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		sipAnalyzer:         detector.NewSIPAnalyzer(),
 		rtpAnalyzer:         detector.NewRTPAnalyzer(),
 		tunnelAnalyzer:      detector.NewTunnelAnalyzer(),
+		bgpAnalyzer:         detector.NewBGPAnalyzer(),
 		qosEnabled:          qosEnabled,
 		verbose:             verbose,
 		skippedPackets:      0,
@@ -219,6 +221,7 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	p.sipAnalyzer.Analyze(packet, state, report)
 	p.rtpAnalyzer.Analyze(packet, state, report)
 	p.tunnelAnalyzer.Analyze(packet, state, report)
+	p.bgpAnalyzer.Analyze(packet, state, report)
 }
 
 // quickFilterCheck performs a fast pre-filter check on raw packet data
