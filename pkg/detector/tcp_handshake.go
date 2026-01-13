@@ -196,6 +196,38 @@ func (t *TCPHandshakeTracker) GetFlows() map[string]*HandshakeFlow {
 	return t.flows
 }
 
+// GetHandshakeStatistics returns handshake statistics from a list of flows
+func GetHandshakeStatistics(flows []models.TCPHandshakeFlow) HandshakeStatistics {
+	stats := HandshakeStatistics{}
+
+	for _, flow := range flows {
+		stats.Total++
+
+		switch flow.State {
+		case "Handshake Complete":
+			stats.Successful++
+			stats.TotalHandshakeTime += flow.TotalHandshakeMs
+		case "Handshake Failed":
+			stats.Failed++
+			stats.FailureReasons = append(stats.FailureReasons, flow.FailureReason)
+		case "SYN":
+			stats.Incomplete++
+		case "SYN-ACK":
+			stats.Incomplete++
+		}
+	}
+
+	if stats.Successful > 0 {
+		stats.AverageHandshakeTime = stats.TotalHandshakeTime / float64(stats.Successful)
+	}
+
+	if stats.Total > 0 {
+		stats.SuccessRate = float64(stats.Successful) / float64(stats.Total) * 100.0
+	}
+
+	return stats
+}
+
 // GetStatistics returns handshake statistics
 func (t *TCPHandshakeTracker) GetStatistics(report *models.TriageReport) HandshakeStatistics {
 	stats := HandshakeStatistics{}

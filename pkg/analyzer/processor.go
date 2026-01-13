@@ -38,6 +38,7 @@ type Processor struct {
 	rtpAnalyzer         *detector.RTPAnalyzer
 	tunnelAnalyzer      *detector.TunnelAnalyzer
 	bgpAnalyzer         *detector.BGPAnalyzer
+	handshakeTracker    *detector.TCPHandshakeTracker
 	qosEnabled          bool
 	verbose             bool
 	skippedPackets      int
@@ -72,6 +73,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		rtpAnalyzer:         detector.NewRTPAnalyzer(),
 		tunnelAnalyzer:      detector.NewTunnelAnalyzer(),
 		bgpAnalyzer:         detector.NewBGPAnalyzer(),
+		handshakeTracker:    detector.NewTCPHandshakeTracker(),
 		qosEnabled:          qosEnabled,
 		verbose:             verbose,
 		skippedPackets:      0,
@@ -189,6 +191,9 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	// TCP analysis (includes handshake, retransmission, RTT, fingerprinting)
 	p.tcpAnalyzer.Analyze(packet, state, report)
 
+	// TCP handshake tracking
+	p.handshakeTracker.TrackHandshake(packet, state, report)
+
 	// ARP analysis
 	p.arpAnalyzer.Analyze(packet, state, report)
 
@@ -291,6 +296,9 @@ func (p *Processor) matchesFilter(packet gopacket.Packet, filter *models.Filter)
 
 // finalizeReport processes collected state into final report data
 func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.TriageReport) {
+	// Check for handshake timeouts (3 second timeout)
+	p.handshakeTracker.CheckTimeouts(time.Now(), 3*time.Second, report)
+
 	// Build RTT histogram from collected samples
 	p.buildRTTHistogram(state, report)
 
