@@ -115,6 +115,31 @@ func (t *TCPHandshakeTracker) TrackHandshake(packet gopacket.Packet, state *mode
 		return
 	}
 
+	// Track RST packets (connection reset)
+	if tcp.RST {
+		// Check both directions for RST
+		flowKey := fmt.Sprintf("%s:%d->%s:%d", srcIP, srcPort, dstIP, dstPort)
+		reverseFlowKey := fmt.Sprintf("%s:%d->%s:%d", dstIP, dstPort, srcIP, srcPort)
+
+		// Check if we have a flow being tracked
+		if flow, exists := t.flows[flowKey]; exists {
+			flow.State = StateFailed
+			flow.FailureReason = "Connection reset (RST received)"
+			t.addToReport(flow, report)
+			delete(t.flows, flowKey)
+			return
+		}
+
+		if flow, exists := t.flows[reverseFlowKey]; exists {
+			flow.State = StateFailed
+			flow.FailureReason = "Connection reset (RST received)"
+			t.addToReport(flow, report)
+			delete(t.flows, reverseFlowKey)
+			return
+		}
+		return
+	}
+
 	// Track ACK packets (handshake completion)
 	if tcp.ACK && !tcp.SYN {
 		// Look for the SYN-ACK flow
@@ -277,8 +302,9 @@ func GetTroubleshootingSuggestion(reason string) string {
 	suggestions := map[string]string{
 		"SYN-ACK timeout (no server response)":            "Check if server is reachable, verify firewall rules, ensure service is listening on the destination port",
 		"ACK timeout (client did not complete handshake)": "Check client-side network connectivity, verify no packet loss, inspect client firewall rules",
-		"RST received":     "Connection refused by server - verify service is running and accepting connections",
-		"Connection reset": "Connection was forcibly closed - check for security policies or connection limits",
+		"Connection reset (RST received)":                 "Connection refused or reset by server - verify service is running, check for security policies, connection limits, or firewall blocking",
+		"RST received":                                    "Connection refused by server - verify service is running and accepting connections",
+		"Connection reset":                                "Connection was forcibly closed - check for security policies or connection limits",
 	}
 
 	for key, suggestion := range suggestions {
