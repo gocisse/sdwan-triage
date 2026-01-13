@@ -304,6 +304,122 @@
                     </details>
                     {{end}}
 
+                    {{if .TCPHandshakeFlows}}
+                    <details open>
+                        <summary><i class="fas fa-handshake"></i> TCP Handshake Visualization ({{len .TCPHandshakeFlows}} flows)</summary>
+                        <div>
+                            <!-- Handshake State Legend -->
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #007bff;">
+                                <h4 style="margin-top: 0; color: #495057;"><i class="fas fa-info-circle"></i> Handshake State Legend</h4>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="color: #007bff; font-size: 18px; font-weight: bold;">→</span>
+                                        <span style="color: #6c757d;">[SYN] - Client initiated connection</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="color: #fd7e14; font-size: 18px; font-weight: bold;">←</span>
+                                        <span style="color: #6c757d;">[SYN-ACK] - Server responded</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="color: #28a745; font-size: 18px; font-weight: bold;">✓</span>
+                                        <span style="color: #6c757d;">[Complete] - Handshake successful</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="color: #dc3545; font-size: 18px; font-weight: bold;">✗</span>
+                                        <span style="color: #6c757d;">[Failed] - Handshake failed</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Summary Statistics -->
+                            {{if .TCPHandshakeStats}}
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px; color: white;">
+                                <h4 style="margin-top: 0; color: white;"><i class="fas fa-chart-bar"></i> Summary Statistics</h4>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold;">{{.TCPHandshakeStats.TotalFlows}}</div>
+                                        <div style="opacity: 0.9;">Total Flows</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold; color: #90EE90;">{{.TCPHandshakeStats.SuccessfulCount}}</div>
+                                        <div style="opacity: 0.9;">Successful</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold; color: #FFB6C1;">{{.TCPHandshakeStats.FailedCount}}</div>
+                                        <div style="opacity: 0.9;">Failed</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 24px; font-weight: bold;">{{printf "%.1f" .TCPHandshakeStats.SuccessRate}}%</div>
+                                        <div style="opacity: 0.9;">Success Rate</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {{end}}
+
+                            <!-- Handshake Flows Table -->
+                            <div style="overflow-x: auto;">
+                                <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                                    <thead>
+                                        <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                                            <th style="padding: 12px; text-align: left; font-weight: 600;">Flow</th>
+                                            <th style="padding: 12px; text-align: center; font-weight: 600;">State</th>
+                                            <th style="padding: 12px; text-align: right; font-weight: 600;">Time (ms)</th>
+                                            <th style="padding: 12px; text-align: left; font-weight: 600;">Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{range .TCPHandshakeFlows}}
+                                        <tr style="border-bottom: 1px solid #e9ecef;">
+                                            <td style="padding: 12px; font-family: monospace; font-size: 13px;">
+                                                {{.SrcIP}}:{{.SrcPort}} → {{.DstIP}}:{{.DstPort}}
+                                                {{if .IsIPv6}}<span style="background: #e7f3ff; color: #0066cc; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 5px;">IPv6</span>{{end}}
+                                            </td>
+                                            <td style="padding: 12px; text-align: center;">
+                                                {{if eq .StateColor "success"}}
+                                                <span style="background: #d4edda; color: #155724; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                                                    <span style="font-size: 16px;">{{.StateIcon}}</span> Complete
+                                                </span>
+                                                {{else if eq .StateColor "danger"}}
+                                                <span style="background: #f8d7da; color: #721c24; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                                                    <span style="font-size: 16px;">{{.StateIcon}}</span> Failed
+                                                </span>
+                                                {{else if eq .StateColor "info"}}
+                                                <span style="background: #d1ecf1; color: #0c5460; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                                                    <span style="font-size: 16px;">{{.StateIcon}}</span> SYN
+                                                </span>
+                                                {{else if eq .StateColor "warning"}}
+                                                <span style="background: #fff3cd; color: #856404; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                                                    <span style="font-size: 16px;">{{.StateIcon}}</span> SYN-ACK
+                                                </span>
+                                                {{else}}
+                                                <span style="background: #e2e3e5; color: #383d41; padding: 6px 12px; border-radius: 20px; font-weight: 600;">
+                                                    {{.State}}
+                                                </span>
+                                                {{end}}
+                                            </td>
+                                            <td style="padding: 12px; text-align: right; font-family: monospace;">
+                                                {{if gt .TotalHandshakeMs 0}}
+                                                    {{printf "%.2f" .TotalHandshakeMs}}
+                                                {{else}}
+                                                    -
+                                                {{end}}
+                                            </td>
+                                            <td style="padding: 12px; color: #6c757d; font-size: 13px;">
+                                                {{if .FailureReason}}
+                                                <span style="color: #dc3545;">{{.FailureReason}}</span>
+                                                {{else}}
+                                                    -
+                                                {{end}}
+                                            </td>
+                                        </tr>
+                                        {{end}}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
+
                     {{if .TCPHandshakeCorrelatedFlows}}
                     <details>
                         <summary><i class="fas fa-exchange-alt"></i> TCP Handshake Analysis ({{len .TCPHandshakeCorrelatedFlows}} flows)</summary>

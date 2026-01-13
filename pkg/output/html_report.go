@@ -140,6 +140,7 @@ type ReportData struct {
 	HTTP2Flows                  []HTTP2FlowView
 	QUICFlows                   []QUICFlowView
 	TCPHandshakeStats           TCPHandshakeStatsView
+	TCPHandshakeFlows           []TCPHandshakeFlowDetailView // All handshake flows with states
 	SYNFlows                    []TCPHandshakeFlowView
 	SYNACKFlows                 []TCPHandshakeFlowView
 	SuccessfulHandshakes        []TCPHandshakeFlowView
@@ -336,6 +337,20 @@ type TCPHandshakeFlowView struct {
 	DstIP     string
 	DstPort   uint16
 	Timestamp float64
+}
+
+// TCPHandshakeFlowDetailView represents a complete handshake flow with state for HTML visualization
+type TCPHandshakeFlowDetailView struct {
+	SrcIP            string
+	SrcPort          uint16
+	DstIP            string
+	DstPort          uint16
+	State            string // "Handshake Complete", "Handshake Failed", "SYN", "SYN-ACK"
+	StateColor       string // CSS color class: "success", "danger", "info", "warning"
+	StateIcon        string // Icon: "✓", "✗", "→", "←"
+	TotalHandshakeMs float64
+	FailureReason    string
+	IsIPv6           bool
 }
 
 // TCPHandshakeEventView represents a single event in a TCP handshake sequence for display
@@ -710,6 +725,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.HTTP2Flows = convertHTTP2Flows(r.HTTP2Flows)
 	data.QUICFlows = convertQUICFlows(r.QUICFlows)
 	data.TCPHandshakeStats = convertTCPHandshakeStats(r.TCPHandshakes)
+	data.TCPHandshakeFlows = convertTCPHandshakeFlowsDetail(r.TCPHandshakeFlows) // All flows with states
 	data.SYNFlows = convertTCPHandshakeFlows(r.TCPHandshakes.SYNFlows)
 	data.SYNACKFlows = convertTCPHandshakeFlows(r.TCPHandshakes.SYNACKFlows)
 	data.SuccessfulHandshakes = convertTCPHandshakeFlows(r.TCPHandshakes.SuccessfulHandshakes)
@@ -1443,6 +1459,45 @@ func convertTCPHandshakeFlows(flows []models.TCPHandshakeFlow) []TCPHandshakeFlo
 			DstIP:     html.EscapeString(f.DstIP),
 			DstPort:   f.DstPort,
 			Timestamp: f.Timestamp,
+		}
+	}
+	return result
+}
+
+func convertTCPHandshakeFlowsDetail(flows []models.TCPHandshakeFlow) []TCPHandshakeFlowDetailView {
+	result := make([]TCPHandshakeFlowDetailView, len(flows))
+	for i, f := range flows {
+		// Determine state color and icon based on state
+		var stateColor, stateIcon string
+		switch f.State {
+		case "Handshake Complete":
+			stateColor = "success"
+			stateIcon = "✓"
+		case "Handshake Failed":
+			stateColor = "danger"
+			stateIcon = "✗"
+		case "SYN":
+			stateColor = "info"
+			stateIcon = "→"
+		case "SYN-ACK":
+			stateColor = "warning"
+			stateIcon = "←"
+		default:
+			stateColor = "secondary"
+			stateIcon = "•"
+		}
+
+		result[i] = TCPHandshakeFlowDetailView{
+			SrcIP:            html.EscapeString(f.SrcIP),
+			SrcPort:          f.SrcPort,
+			DstIP:            html.EscapeString(f.DstIP),
+			DstPort:          f.DstPort,
+			State:            html.EscapeString(f.State),
+			StateColor:       stateColor,
+			StateIcon:        stateIcon,
+			TotalHandshakeMs: f.TotalHandshakeMs,
+			FailureReason:    html.EscapeString(f.FailureReason),
+			IsIPv6:           f.IsIPv6,
 		}
 	}
 	return result
