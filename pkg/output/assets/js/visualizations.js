@@ -126,7 +126,9 @@ function createNetworkDiagram(container, data) {
         .attr("width", width)
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height])
-        .style("background", "#ffffff");
+        .style("background", "#ffffff")
+        .style("border", "1px solid #e2e8f0")
+        .style("border-radius", "8px");
     
     // Add gradient definitions for links
     const defs = svg.append("defs");
@@ -148,15 +150,15 @@ function createNetworkDiagram(container, data) {
         .style("opacity", 0)
         .style("max-width", "300px");
     
-    // Color scale - solid colors for better visibility
+    // Color scale - vibrant, high-contrast colors for better visibility
     const colors = getThemeColors();
     const colorScale = d3.scaleOrdinal()
         .domain(["internal", "router", "external", "anomaly"])
         .range([
-            "#10b981",              // Internal: Green
-            "#2563eb",              // Router: Solid Blue
-            "#f59e0b",              // External: Orange
-            "#dc2626"               // Anomaly: Solid Red
+            "#10b981",              // Internal: Bright Green
+            "#3b82f6",              // Router: Bright Blue
+            "#f59e0b",              // External: Bright Orange
+            "#ef4444"               // Anomaly: Bright Red
         ]);
     
     // Hierarchical positioning: Internal (left), Router (center), External (right)
@@ -195,32 +197,34 @@ function createNetworkDiagram(container, data) {
         .data(data.links)
         .join("line")
         .attr("class", "link-line")
-        .attr("stroke", d => d.hasIssue ? "#dc2626" : "#94a3b8")
-        .attr("stroke-opacity", d => d.hasIssue ? 0.8 : 0.5)
+        .attr("stroke", d => d.hasIssue ? "#ef4444" : "#cbd5e1")
+        .attr("stroke-opacity", d => d.hasIssue ? 0.9 : 0.6)
         .attr("stroke-width", d => {
-            // Traffic-based thickness: 1-8px range
+            // Traffic-based thickness: 1-4px range (reduced for clarity)
             const bytes = d.value || 0;
-            if (bytes > 10000000) return 8;  // > 10MB
-            if (bytes > 5000000) return 6;   // > 5MB
-            if (bytes > 1000000) return 4;   // > 1MB
-            if (bytes > 100000) return 2.5;  // > 100KB
+            if (bytes > 10000000) return 4;  // > 10MB
+            if (bytes > 5000000) return 3;   // > 5MB
+            if (bytes > 1000000) return 2.5;   // > 1MB
+            if (bytes > 100000) return 2;  // > 100KB
             return 1.5;
         })
         .attr("stroke-dasharray", d => d.hasIssue ? "5,5" : "0")
         .attr("marker-end", "url(#arrowhead)");
     
-    // Add arrowhead marker
+    // Add arrowhead marker - FIXED: Use markerUnits="strokeWidth" to prevent scaling issues
     defs.append("marker")
         .attr("id", "arrowhead")
         .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 20)
+        .attr("refX", 15)
         .attr("refY", 0)
-        .attr("markerWidth", 6)
-        .attr("markerHeight", 6)
+        .attr("markerWidth", 4)
+        .attr("markerHeight", 4)
+        .attr("markerUnits", "strokeWidth")
         .attr("orient", "auto")
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
-        .attr("fill", "#94a3b8");
+        .attr("fill", "#64748b")
+        .attr("opacity", 0.6);
     
     // Link labels with traffic info
     const linkLabels = g.append("g").attr("class", "link-labels")
@@ -271,14 +275,14 @@ function createNetworkDiagram(container, data) {
         .attr("class", "node-group")
         .call(drag(simulation));
     
-    // Add outer glow for anomaly nodes
+    // Add outer glow for anomaly nodes - more subtle
     node.filter(d => d.group === "anomaly" || d.hasIssue)
         .append("circle")
-        .attr("r", 22)
+        .attr("r", 20)
         .attr("fill", "none")
-        .attr("stroke", "#dc2626")
-        .attr("stroke-width", 2.5)
-        .attr("stroke-opacity", 0.4)
+        .attr("stroke", "#ef4444")
+        .attr("stroke-width", 2)
+        .attr("stroke-opacity", 0.3)
         .attr("class", "node-glow");
     
     // Router nodes: Use squares (rectangles)
@@ -499,9 +503,9 @@ function createNetworkDiagram(container, data) {
     
     const legendData = [
         { label: "Internal Device", color: "#10b981", shape: "circle" },
-        { label: "Gateway/Router", color: "#2563eb", shape: "square" },
+        { label: "Gateway/Router", color: "#3b82f6", shape: "square" },
         { label: "External Server", color: "#f59e0b", shape: "circle" },
-        { label: "Security Alert", color: "#dc2626", shape: "circle", dashed: true }
+        { label: "Security Alert", color: "#ef4444", shape: "circle", dashed: true }
     ];
     
     legendData.forEach((item, i) => {
