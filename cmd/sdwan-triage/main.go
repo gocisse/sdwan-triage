@@ -203,6 +203,9 @@ For more information and documentation:
 	service := flag.String("service", "", "Filter by service port or name")
 	protocol := flag.String("protocol", "", "Filter by protocol (tcp or udp)")
 	qosAnalysis := flag.Bool("qos-analysis", false, "Enable QoS/DSCP traffic class analysis")
+	showHandshakes := flag.Bool("show-handshakes", false, "Display detailed TCP handshake analysis")
+	handshakeTimeout := flag.Int("handshake-timeout", 3, "Timeout for TCP handshake completion (seconds)")
+	failedOnly := flag.Bool("failed-only", false, "Show only failed TCP handshakes")
 	verbose = flag.Bool("verbose", false, "Enable verbose/debug output")
 	showHelp := flag.Bool("help", false, "Show help message")
 	flag.Parse()
@@ -324,6 +327,11 @@ For more information and documentation:
 		processor = analyzer.NewProcessorWithOptions(false, *verbose)
 	}
 
+	// Set handshake timeout if specified
+	if *handshakeTimeout > 0 {
+		processor.SetHandshakeTimeout(time.Duration(*handshakeTimeout) * time.Second)
+	}
+
 	color.Cyan("SD-WAN Network Triage v%s", version)
 	color.Cyan("Analyzing: %s\n", filepath.Base(absPath))
 
@@ -344,6 +352,11 @@ For more information and documentation:
 		// Print human-readable output
 		output.PrintExecutiveSummary(report)
 		output.PrintDetailedReport(report)
+
+		// Print TCP handshake analysis if requested or if there are failures
+		if *showHandshakes || (len(report.TCPHandshakeFlows) > 0 && *failedOnly) {
+			output.PrintHandshakeAnalysis(report, *showHandshakes, *failedOnly)
+		}
 	}
 
 	// Export to CSV if requested

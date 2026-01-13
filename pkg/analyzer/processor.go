@@ -39,6 +39,7 @@ type Processor struct {
 	tunnelAnalyzer      *detector.TunnelAnalyzer
 	bgpAnalyzer         *detector.BGPAnalyzer
 	handshakeTracker    *detector.TCPHandshakeTracker
+	handshakeTimeout    time.Duration
 	qosEnabled          bool
 	verbose             bool
 	skippedPackets      int
@@ -74,11 +75,17 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		tunnelAnalyzer:      detector.NewTunnelAnalyzer(),
 		bgpAnalyzer:         detector.NewBGPAnalyzer(),
 		handshakeTracker:    detector.NewTCPHandshakeTracker(),
+		handshakeTimeout:    3 * time.Second, // Default 3 second timeout
 		qosEnabled:          qosEnabled,
 		verbose:             verbose,
 		skippedPackets:      0,
 		errorCount:          0,
 	}
+}
+
+// SetHandshakeTimeout sets the timeout for TCP handshake completion
+func (p *Processor) SetHandshakeTimeout(timeout time.Duration) {
+	p.handshakeTimeout = timeout
 }
 
 // logDebug logs a debug message if verbose mode is enabled
@@ -296,8 +303,8 @@ func (p *Processor) matchesFilter(packet gopacket.Packet, filter *models.Filter)
 
 // finalizeReport processes collected state into final report data
 func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.TriageReport) {
-	// Check for handshake timeouts (3 second timeout)
-	p.handshakeTracker.CheckTimeouts(time.Now(), 3*time.Second, report)
+	// Check for handshake timeouts
+	p.handshakeTracker.CheckTimeouts(time.Now(), p.handshakeTimeout, report)
 
 	// Build RTT histogram from collected samples
 	p.buildRTTHistogram(state, report)
