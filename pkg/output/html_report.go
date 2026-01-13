@@ -341,16 +341,18 @@ type TCPHandshakeFlowView struct {
 
 // TCPHandshakeFlowDetailView represents a complete handshake flow with state for HTML visualization
 type TCPHandshakeFlowDetailView struct {
-	SrcIP            string
-	SrcPort          uint16
-	DstIP            string
-	DstPort          uint16
-	State            string // "Handshake Complete", "Handshake Failed", "SYN", "SYN-ACK"
-	StateColor       string // CSS color class: "success", "danger", "info", "warning"
-	StateIcon        string // Icon: "✓", "✗", "→", "←"
-	TotalHandshakeMs float64
-	FailureReason    string
-	IsIPv6           bool
+	SrcIP               string
+	SrcPort             uint16
+	DstIP               string
+	DstPort             uint16
+	State               string // "Handshake Complete", "Handshake Failed", "SYN", "SYN-ACK"
+	StateColor          string // CSS color class: "success", "danger", "info", "warning"
+	StateIcon           string // Icon: "✓", "✗", "→", "←"
+	TotalHandshakeMs    float64
+	FailureReason       string
+	IsIPv6              bool
+	WiresharkFilter     string // Wireshark filter for this flow
+	WiresharkFilterBidi string // Bidirectional Wireshark filter
 }
 
 // TCPHandshakeEventView represents a single event in a TCP handshake sequence for display
@@ -1487,17 +1489,35 @@ func convertTCPHandshakeFlowsDetail(flows []models.TCPHandshakeFlow) []TCPHandsh
 			stateIcon = "•"
 		}
 
+		// Generate Wireshark filters
+		var wiresharkFilter, wiresharkFilterBidi string
+		if f.IsIPv6 {
+			// IPv6 filters
+			wiresharkFilter = fmt.Sprintf("ipv6.src==%s && ipv6.dst==%s && tcp.port==%d",
+				f.SrcIP, f.DstIP, f.DstPort)
+			wiresharkFilterBidi = fmt.Sprintf("ipv6.addr==%s && ipv6.addr==%s && tcp.port==%d",
+				f.SrcIP, f.DstIP, f.DstPort)
+		} else {
+			// IPv4 filters
+			wiresharkFilter = fmt.Sprintf("ip.src==%s && ip.dst==%s && tcp.port==%d",
+				f.SrcIP, f.DstIP, f.DstPort)
+			wiresharkFilterBidi = fmt.Sprintf("ip.addr==%s && ip.addr==%s && tcp.port==%d",
+				f.SrcIP, f.DstIP, f.DstPort)
+		}
+
 		result[i] = TCPHandshakeFlowDetailView{
-			SrcIP:            html.EscapeString(f.SrcIP),
-			SrcPort:          f.SrcPort,
-			DstIP:            html.EscapeString(f.DstIP),
-			DstPort:          f.DstPort,
-			State:            html.EscapeString(f.State),
-			StateColor:       stateColor,
-			StateIcon:        stateIcon,
-			TotalHandshakeMs: f.TotalHandshakeMs,
-			FailureReason:    html.EscapeString(f.FailureReason),
-			IsIPv6:           f.IsIPv6,
+			SrcIP:               html.EscapeString(f.SrcIP),
+			SrcPort:             f.SrcPort,
+			DstIP:               html.EscapeString(f.DstIP),
+			DstPort:             f.DstPort,
+			State:               html.EscapeString(f.State),
+			StateColor:          stateColor,
+			StateIcon:           stateIcon,
+			TotalHandshakeMs:    f.TotalHandshakeMs,
+			FailureReason:       html.EscapeString(f.FailureReason),
+			IsIPv6:              f.IsIPv6,
+			WiresharkFilter:     wiresharkFilter,
+			WiresharkFilterBidi: wiresharkFilterBidi,
 		}
 	}
 	return result

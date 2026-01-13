@@ -47,9 +47,12 @@ OPTIONS:
     -protocol <proto>  Filter by protocol: tcp or udp
 
   Analysis Options:
-    -qos-analysis      Enable QoS/DSCP traffic class analysis and prioritization checks
-    -verbose           Enable verbose/debug output for troubleshooting
-    -help              Show this help message
+    -qos-analysis          Enable QoS/DSCP traffic class analysis and prioritization checks
+    -show-handshakes       Display detailed TCP handshake analysis with color-coded states
+    -handshake-timeout <N> Timeout for TCP handshake completion in seconds (default: 3)
+    -failed-only           Show only failed TCP handshakes for troubleshooting
+    -verbose               Enable verbose/debug output for troubleshooting
+    -help                  Show this help message
 
 FEATURES:
   Security Analysis:
@@ -61,9 +64,11 @@ FEATURES:
     • GeoIP Analysis with country-based traffic distribution
 
   Performance Monitoring:
+    • TCP Handshake Analysis (SYN → SYN-ACK → ACK tracking with color-coded states)
+    • Wireshark Filter Generation (per-flow directional and bidirectional filters)
     • TCP Retransmission Analysis
     • RTT Distribution with histogram visualization
-    • Failed Handshake Detection
+    • Failed Handshake Detection with troubleshooting tips
     • Bandwidth Tracking (per-flow and aggregate)
     • Jitter & Packet Loss metrics for VoIP/RTP
 
@@ -151,6 +156,19 @@ EXAMPLES:
 
     # Troubleshoot VoIP quality issues
     sdwan-triage -service sip -html voip-quality.html call-problems.pcap
+
+  TCP Handshake Analysis:
+    # Display detailed handshake analysis with color-coded states
+    sdwan-triage --show-handshakes capture.pcap
+
+    # Show only failed handshakes for troubleshooting
+    sdwan-triage --show-handshakes --failed-only capture.pcap
+
+    # Custom handshake timeout for slow networks (5 seconds)
+    sdwan-triage --handshake-timeout 5 capture.pcap
+
+    # Generate HTML report with Wireshark filters for each flow
+    sdwan-triage -html handshake-report.html --show-handshakes capture.pcap
 
   SD-WAN Analysis:
     # Detect SD-WAN vendor and analyze tunnels

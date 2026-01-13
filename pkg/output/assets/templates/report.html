@@ -371,8 +371,23 @@
                                         {{range .TCPHandshakeFlows}}
                                         <tr style="border-bottom: 1px solid #e9ecef;">
                                             <td style="padding: 12px; font-family: monospace; font-size: 13px;">
-                                                {{.SrcIP}}:{{.SrcPort}} → {{.DstIP}}:{{.DstPort}}
-                                                {{if .IsIPv6}}<span style="background: #e7f3ff; color: #0066cc; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 5px;">IPv6</span>{{end}}
+                                                <div>{{.SrcIP}}:{{.SrcPort}} → {{.DstIP}}:{{.DstPort}}</div>
+                                                {{if .IsIPv6}}<span style="background: #e7f3ff; color: #0066cc; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-top: 4px; display: inline-block;">IPv6</span>{{end}}
+                                                <details style="margin-top: 8px;">
+                                                    <summary style="cursor: pointer; color: #007bff; font-size: 12px; user-select: none;">
+                                                        <i class="fas fa-filter"></i> Wireshark Filters
+                                                    </summary>
+                                                    <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; font-size: 11px;">
+                                                        <div style="margin-bottom: 6px;">
+                                                            <strong style="color: #495057;">Directional:</strong>
+                                                            <code style="display: block; margin-top: 4px; padding: 4px 8px; background: white; border: 1px solid #dee2e6; border-radius: 3px; word-break: break-all;">{{.WiresharkFilter}}</code>
+                                                        </div>
+                                                        <div>
+                                                            <strong style="color: #495057;">Bidirectional:</strong>
+                                                            <code style="display: block; margin-top: 4px; padding: 4px 8px; background: white; border: 1px solid #dee2e6; border-radius: 3px; word-break: break-all;">{{.WiresharkFilterBidi}}</code>
+                                                        </div>
+                                                    </div>
+                                                </details>
                                             </td>
                                             <td style="padding: 12px; text-align: center;">
                                                 {{if eq .StateColor "success"}}
