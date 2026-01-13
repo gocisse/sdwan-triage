@@ -306,6 +306,9 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Check for handshake timeouts
 	p.handshakeTracker.CheckTimeouts(time.Now(), p.handshakeTimeout, report)
 
+	// Export all remaining handshake flows to report (including incomplete ones)
+	p.handshakeTracker.ExportAllFlows(report)
+
 	// Build RTT histogram from collected samples
 	p.buildRTTHistogram(state, report)
 

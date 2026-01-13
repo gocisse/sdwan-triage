@@ -221,6 +221,13 @@ func (t *TCPHandshakeTracker) GetFlows() map[string]*HandshakeFlow {
 	return t.flows
 }
 
+// ExportAllFlows exports all remaining flows to the report (including incomplete ones)
+func (t *TCPHandshakeTracker) ExportAllFlows(report *models.TriageReport) {
+	for _, flow := range t.flows {
+		t.addToReport(flow, report)
+	}
+}
+
 // GetHandshakeStatistics returns handshake statistics from a list of flows
 func GetHandshakeStatistics(flows []models.TCPHandshakeFlow) HandshakeStatistics {
 	stats := HandshakeStatistics{}
