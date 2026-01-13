@@ -58,6 +58,7 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 	// Traffic summary
 	fmt.Printf("TRAFFIC SUMMARY:\n")
 	fmt.Printf("  • Total Bytes:          %s\n", formatBytes(r.TotalBytes))
+	fmt.Printf("  • TLS Connections:      %d\n", len(r.TLSFlows))
 	fmt.Printf("  • HTTP/2 Flows:         %d\n", len(r.HTTP2Flows))
 	fmt.Printf("  • QUIC Flows:           %d\n", len(r.QUICFlows))
 

@@ -12,6 +12,7 @@ type TriageReport struct {
 	ARPConflicts                []ARPConflict                `json:"arp_conflicts"`
 	HTTPErrors                  []HTTPError                  `json:"http_errors"`
 	TLSCerts                    []TLSCertInfo                `json:"tls_certs"`
+	TLSFlows                    []TCPFlow                    `json:"tls_flows"`
 	HTTP2Flows                  []TCPFlow                    `json:"http2_flows"`
 	QUICFlows                   []UDPFlow                    `json:"quic_flows"`
 	TrafficAnalysis             []TrafficFlow                `json:"traffic_analysis"`

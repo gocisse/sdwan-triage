@@ -36,6 +36,7 @@ type TriageReport struct {
 	ARPConflicts                []ARPConflict                `json:"arp_conflicts"`
 	HTTPErrors                  []HTTPError                  `json:"http_errors"`
 	TLSCerts                    []TLSCertInfo                `json:"tls_certs"`
+	TLSFlows                    []TCPFlow                    `json:"tls_flows"`
 	HTTP2Flows                  []TCPFlow                    `json:"http2_flows"`
 	QUICFlows                   []UDPFlow                    `json:"quic_flows"`
 	TrafficAnalysis             []TrafficFlow                `json:"traffic_analysis"`
@@ -1743,8 +1744,9 @@ VERSION:
 	// Initialize ApplicationBreakdown map
 	report.ApplicationBreakdown = make(map[string]AppCategory)
 
-	// Track seen HTTP/2 flows to avoid duplicates
+	// Track seen HTTP/2 and TLS flows to avoid duplicates
 	http2FlowsSeen := make(map[string]bool)
+	tlsFlowsSeen := make(map[string]bool)
 
 	packetSource := gopacket.NewPacketSource(reader, reader.LinkType())
 	for packet := range packetSource.Packets() {
@@ -1753,7 +1755,7 @@ VERSION:
 			captureStartTime = packet.Metadata().Timestamp
 			captureStartSet = true
 		}
-		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets, &timelineEvents, dnsQueryTracker, &dnsRecords, captureStartTime, http2FlowsSeen)
+		analyzePacket(packet, synSent, synAckReceived, arpIPToMAC, dnsQueries, tcpFlows, udpFlows, httpRequests, tlsSNICache, deviceFingerprints, appStats, report, &mu, filter, pathStats, conversations, timeBuckets, &timelineEvents, dnsQueryTracker, &dnsRecords, captureStartTime, http2FlowsSeen, tlsFlowsSeen)
 	}
 
 	// Finalize failed handshakes
@@ -2226,6 +2228,7 @@ func analyzePacket(
 	dnsRecords *[]DNSRecord,
 	captureStartTime time.Time,
 	http2FlowsSeen map[string]bool,
+	tlsFlowsSeen map[string]bool,
 ) {
 	// Apply filters if specified
 	if !filter.isEmpty() {
@@ -2850,6 +2853,25 @@ func analyzePacket(
 
 			// Parse TLS handshakes for certificates and SNI
 			if len(tcp.Payload) > 0 && (tcp.DstPort == 443 || tcp.SrcPort == 443) {
+				// Detect TLS Handshake record (0x16 = Handshake, 0x03 = TLS version)
+				isTLSHandshake := len(tcp.Payload) >= 6 &&
+					tcp.Payload[0] == 0x16 && // TLS Handshake record type
+					tcp.Payload[1] == 0x03 // TLS version major (0x03 for TLS 1.x)
+
+				if isTLSHandshake {
+					mu.Lock()
+					if !tlsFlowsSeen[flowKey] {
+						tlsFlowsSeen[flowKey] = true
+						report.TLSFlows = append(report.TLSFlows, TCPFlow{
+							SrcIP:   ip4.SrcIP.String(),
+							SrcPort: uint16(tcp.SrcPort),
+							DstIP:   ip4.DstIP.String(),
+							DstPort: uint16(tcp.DstPort),
+						})
+					}
+					mu.Unlock()
+				}
+
 				certs, sni := parseTLSHandshake(tcp.Payload)
 				if sni != "" {
 					mu.Lock()
