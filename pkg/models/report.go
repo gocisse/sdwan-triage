@@ -8,6 +8,7 @@ type TriageReport struct {
 	TCPRetransmissions          []TCPFlow                    `json:"tcp_retransmissions"`
 	FailedHandshakes            []TCPFlow                    `json:"failed_handshakes"`
 	TCPHandshakes               TCPHandshakeAnalysis         `json:"tcp_handshakes"`
+	TCPHandshakeFlows           []TCPHandshakeFlow           `json:"tcp_handshake_flows,omitempty"`
 	TCPHandshakeCorrelatedFlows []TCPHandshakeCorrelatedFlow `json:"tcp_handshake_correlated_flows,omitempty"`
 	ARPConflicts                []ARPConflict                `json:"arp_conflicts"`
 	HTTPErrors                  []HTTPError                  `json:"http_errors"`
@@ -78,12 +79,21 @@ type DNSRecord struct {
 
 // TCPHandshakeFlow represents a TCP handshake flow
 type TCPHandshakeFlow struct {
-	SrcIP     string  `json:"src_ip"`
-	SrcPort   uint16  `json:"src_port"`
-	DstIP     string  `json:"dst_ip"`
-	DstPort   uint16  `json:"dst_port"`
-	Timestamp float64 `json:"timestamp"`
-	Count     int     `json:"count"`
+	SrcIP            string    `json:"src_ip"`
+	SrcPort          uint16    `json:"src_port"`
+	DstIP            string    `json:"dst_ip"`
+	DstPort          uint16    `json:"dst_port"`
+	Timestamp        float64   `json:"timestamp"`
+	Count            int       `json:"count"`
+	State            string    `json:"state"` // "SYN", "SYN-ACK", "Handshake Complete", "Handshake Failed"
+	SynTime          time.Time `json:"syn_time"`
+	SynAckTime       time.Time `json:"syn_ack_time"`
+	AckTime          time.Time `json:"ack_time"`
+	FailureReason    string    `json:"failure_reason,omitempty"`
+	IsIPv6           bool      `json:"is_ipv6"`
+	SynToSynAckMs    float64   `json:"syn_to_synack_ms,omitempty"`   // Time from SYN to SYN-ACK in milliseconds
+	SynAckToAckMs    float64   `json:"synack_to_ack_ms,omitempty"`   // Time from SYN-ACK to ACK in milliseconds
+	TotalHandshakeMs float64   `json:"total_handshake_ms,omitempty"` // Total handshake time in milliseconds
 }
 
 // TCPHandshakeAnalysis contains TCP handshake analysis results
