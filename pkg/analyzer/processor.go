@@ -31,6 +31,7 @@ type Processor struct {
 	iocAnalyzer         *detector.IOCAnalyzer
 	tlsSecurityAnalyzer *detector.TLSSecurityAnalyzer
 	icmpAnalyzer        *detector.ICMPAnalyzer
+	icmpv6Analyzer      *detector.ICMPv6Analyzer
 	geoipAnalyzer       *detector.GeoIPAnalyzer
 	sdwanAnalyzer       *detector.SDWANVendorAnalyzer
 	sipAnalyzer         *detector.SIPAnalyzer
@@ -64,6 +65,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		iocAnalyzer:         detector.NewIOCAnalyzer(),
 		tlsSecurityAnalyzer: detector.NewTLSSecurityAnalyzer(),
 		icmpAnalyzer:        detector.NewICMPAnalyzer(),
+		icmpv6Analyzer:      detector.NewICMPv6Analyzer(),
 		geoipAnalyzer:       detector.NewGeoIPAnalyzer(),
 		sdwanAnalyzer:       detector.NewSDWANVendorAnalyzer(),
 		sipAnalyzer:         detector.NewSIPAnalyzer(),
@@ -214,6 +216,7 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	p.iocAnalyzer.AnalyzeDNS(packet, state, report)
 	p.tlsSecurityAnalyzer.Analyze(packet, state, report)
 	p.icmpAnalyzer.Analyze(packet, state, report)
+	p.icmpv6Analyzer.Analyze(packet, state, report)
 
 	// Advanced network analysis
 	p.geoipAnalyzer.Analyze(packet, state, report)
