@@ -2552,6 +2552,11 @@ func analyzePacket(
 			return
 		}
 		if ip4, ok := netLayer.(*layers.IPv4); ok {
+			// Debug: Check for port 443 packets
+			if (tcp.DstPort == 443 || tcp.SrcPort == 443) && len(tcp.Payload) >= 6 {
+				fmt.Printf("DEBUG TCP: Port 443 packet, payload len=%d, first bytes: %02x %02x\n",
+					len(tcp.Payload), tcp.Payload[0], tcp.Payload[1])
+			}
 			key := fmt.Sprintf("%s:%d->%s:%d", ip4.SrcIP.String(), tcp.SrcPort, ip4.DstIP.String(), tcp.DstPort)
 			revKey := fmt.Sprintf("%s:%d->%s:%d", ip4.DstIP.String(), tcp.DstPort, ip4.SrcIP.String(), tcp.SrcPort)
 
@@ -2858,6 +2863,12 @@ func analyzePacket(
 					tcp.Payload[0] == 0x16 && // TLS Handshake record type
 					tcp.Payload[1] == 0x03 // TLS version major (0x03 for TLS 1.x)
 
+				if len(tcp.Payload) >= 6 && tcp.Payload[0] == 0x16 {
+					fmt.Printf("DEBUG: Port 443 packet with 0x16: %s:%d -> %s:%d, payload[0-1]: %02x %02x, isTLS: %v\n",
+						ip4.SrcIP.String(), tcp.SrcPort, ip4.DstIP.String(), tcp.DstPort,
+						tcp.Payload[0], tcp.Payload[1], isTLSHandshake)
+				}
+
 				if isTLSHandshake {
 					mu.Lock()
 					if !tlsFlowsSeen[flowKey] {
@@ -2868,6 +2879,8 @@ func analyzePacket(
 							DstIP:   ip4.DstIP.String(),
 							DstPort: uint16(tcp.DstPort),
 						})
+						fmt.Printf("DEBUG: TLS flow detected: %s:%d -> %s:%d\n",
+							ip4.SrcIP.String(), tcp.SrcPort, ip4.DstIP.String(), tcp.DstPort)
 					}
 					mu.Unlock()
 				}

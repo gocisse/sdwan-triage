@@ -50,6 +50,8 @@ type AnalysisState struct {
 	UDPFlows           map[string]*UDPFlowState
 	HTTPRequests       map[string]*HTTPRequest
 	TLSSNICache        map[string]string
+	TLSFlowsSeen       map[string]bool
+	HTTP2FlowsSeen     map[string]bool
 	DeviceFingerprints map[string]*TCPFingerprint
 	AppStats           map[string]*AppCategory
 
@@ -102,6 +104,8 @@ func NewAnalysisState() *AnalysisState {
 		UDPFlows:           make(map[string]*UDPFlowState),
 		HTTPRequests:       make(map[string]*HTTPRequest),
 		TLSSNICache:        make(map[string]string),
+		TLSFlowsSeen:       make(map[string]bool),
+		HTTP2FlowsSeen:     make(map[string]bool),
 		DeviceFingerprints: make(map[string]*TCPFingerprint),
 		AppStats:           make(map[string]*AppCategory),
 		SecurityState:      NewSecurityState(),

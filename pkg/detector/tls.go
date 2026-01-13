@@ -52,9 +52,42 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		return
 	}
 
+	// Track TLS flow (any TLS handshake on port 443)
+	if (dstPort == 443 || srcPort == 443) && payload[0] == 0x16 && payload[1] == 0x03 {
+		tlsFlowKey := fmt.Sprintf("%s:%d->%s:%d", srcIP, srcPort, dstIP, dstPort)
+		if !state.TLSFlowsSeen[tlsFlowKey] {
+			state.TLSFlowsSeen[tlsFlowKey] = true
+			report.TLSFlows = append(report.TLSFlows, models.TCPFlow{
+				SrcIP:   srcIP,
+				SrcPort: srcPort,
+				DstIP:   dstIP,
+				DstPort: dstPort,
+			})
+		}
+	}
+
 	// Extract SNI from ClientHello
 	if sni := extractSNI(payload); sni != "" {
 		state.TLSSNICache[flowKey] = sni
+	}
+
+	// Extract ALPN protocols and detect HTTP/2
+	alpnProtocols := extractALPN(payload)
+	for _, proto := range alpnProtocols {
+		if proto == "h2" || proto == "h2c" {
+			// HTTP/2 detected via ALPN
+			http2FlowKey := fmt.Sprintf("%s:%d->%s:%d", srcIP, srcPort, dstIP, dstPort)
+			if !state.HTTP2FlowsSeen[http2FlowKey] {
+				state.HTTP2FlowsSeen[http2FlowKey] = true
+				report.HTTP2Flows = append(report.HTTP2Flows, models.TCPFlow{
+					SrcIP:   srcIP,
+					SrcPort: srcPort,
+					DstIP:   dstIP,
+					DstPort: dstPort,
+				})
+			}
+			break
+		}
 	}
 
 	// Extract certificates from Certificate message
@@ -212,6 +245,117 @@ func extractSNI(data []byte) string {
 	}
 
 	return ""
+}
+
+// extractALPN extracts ALPN protocols from TLS ClientHello
+func extractALPN(data []byte) []string {
+	var protocols []string
+
+	if len(data) < 6 || data[0] != 0x16 { // TLS Handshake
+		return protocols
+	}
+
+	// Skip TLS record header (5 bytes)
+	if len(data) < 5 {
+		return protocols
+	}
+
+	recordLen := int(data[3])<<8 | int(data[4])
+	if len(data) < 5+recordLen {
+		return protocols
+	}
+
+	handshake := data[5:]
+	if len(handshake) < 4 || handshake[0] != 0x01 { // ClientHello
+		return protocols
+	}
+
+	// Skip handshake header (4 bytes)
+	hsLen := int(handshake[1])<<16 | int(handshake[2])<<8 | int(handshake[3])
+	if len(handshake) < 4+hsLen {
+		return protocols
+	}
+
+	clientHello := handshake[4:]
+
+	// Skip version (2 bytes) + random (32 bytes)
+	if len(clientHello) < 34 {
+		return protocols
+	}
+	pos := 34
+
+	// Skip session ID
+	if pos >= len(clientHello) {
+		return protocols
+	}
+	sessionIDLen := int(clientHello[pos])
+	pos += 1 + sessionIDLen
+
+	// Skip cipher suites
+	if pos+2 > len(clientHello) {
+		return protocols
+	}
+	cipherSuitesLen := int(clientHello[pos])<<8 | int(clientHello[pos+1])
+	pos += 2 + cipherSuitesLen
+
+	// Skip compression methods
+	if pos >= len(clientHello) {
+		return protocols
+	}
+	compressionLen := int(clientHello[pos])
+	pos += 1 + compressionLen
+
+	// Parse extensions
+	if pos+2 > len(clientHello) {
+		return protocols
+	}
+	extensionsLen := int(clientHello[pos])<<8 | int(clientHello[pos+1])
+	pos += 2
+
+	extensionsEnd := pos + extensionsLen
+	if extensionsEnd > len(clientHello) {
+		extensionsEnd = len(clientHello)
+	}
+
+	// Look for ALPN extension (type 16)
+	for pos+4 <= extensionsEnd {
+		extType := int(clientHello[pos])<<8 | int(clientHello[pos+1])
+		extLen := int(clientHello[pos+2])<<8 | int(clientHello[pos+3])
+		pos += 4
+
+		if extType == 16 { // ALPN extension
+			if pos+extLen <= extensionsEnd && extLen > 2 {
+				// ALPN extension format: length (2 bytes) + protocols
+				alpnLen := int(clientHello[pos])<<8 | int(clientHello[pos+1])
+				alpnPos := pos + 2
+				alpnEnd := alpnPos + alpnLen
+
+				if alpnEnd <= pos+extLen {
+					// Parse protocol list
+					for alpnPos < alpnEnd {
+						if alpnPos >= len(clientHello) {
+							break
+						}
+						protoLen := int(clientHello[alpnPos])
+						alpnPos++
+
+						if alpnPos+protoLen <= alpnEnd && alpnPos+protoLen <= len(clientHello) {
+							proto := string(clientHello[alpnPos : alpnPos+protoLen])
+							protocols = append(protocols, proto)
+							alpnPos += protoLen
+						} else {
+							break
+						}
+					}
+				}
+			}
+			break
+		}
+
+		pos += extLen
+	}
+
+	return protocols
 }
 
 // extractCertificates extracts X.509 certificates from TLS Certificate message
