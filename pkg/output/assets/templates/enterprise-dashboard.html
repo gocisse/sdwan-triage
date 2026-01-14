@@ -1928,88 +1928,380 @@
             </div>
             {{end}}
             
-            <!-- HTTP/2 Flow Details -->
+            <!-- HTTP/2 Flow Details - Complete Redesign with Inline Styles -->
             {{if .HTTP2Flows}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-bolt card-title-icon"></i>
-                        HTTP/2 Flows ({{len .HTTP2Flows}})
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-bolt"></i>
+                        HTTP/2 Flow Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .HTTP2Flows}} flows</span>
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Modern multiplexed HTTP connections for faster web performance</p>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted mb-md">Modern HTTP/2 connections detected in the capture.</p>
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Source IP</th>
-                                    <th>Source Port</th>
-                                    <th>Destination IP</th>
-                                    <th>Destination Port</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range $index, $flow := .HTTP2Flows}}
-                                {{if lt $index 50}}
-                                <tr>
-                                    <td><code>{{$flow.SrcIP}}</code></td>
-                                    <td>{{$flow.SrcPort}}</td>
-                                    <td><code>{{$flow.DstIP}}</code></td>
-                                    <td>{{$flow.DstPort}}</td>
-                                </tr>
-                                {{end}}
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #ecfeff; border-bottom: 1px solid #a5f3fc; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #0891b2; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #0e7490; font-size: 1rem;">What is HTTP/2?</h4>
+                            <p style="margin: 0 0 12px 0; color: #0891b2; font-size: 0.875rem; line-height: 1.6;">
+                                HTTP/2 is a major revision of HTTP that enables <strong>multiplexing</strong> (multiple requests over one connection), 
+                                <strong>header compression</strong>, and <strong>server push</strong>. It significantly improves web performance compared to HTTP/1.1.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">Active = Healthy connection</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 50%;"></span>
+                                    <span style="color: #1d4ed8;">ALPN = h2 (TLS negotiated)</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    {{if gt (len .HTTP2Flows) 50}}
-                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .HTTP2Flows}} HTTP/2 flows.</p>
+                </div>
+                
+                <!-- Key Benefits Box -->
+                <div style="padding: 16px 24px; background: #f0fdfa; border-bottom: 1px solid #99f6e4;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-layer-group" style="color: #0d9488; font-size: 1.25rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #134e4a; font-size: 0.875rem;">Multiplexing</div>
+                                <div style="font-size: 0.75rem; color: #5eead4;">Multiple streams per connection</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-compress-alt" style="color: #0d9488; font-size: 1.25rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #134e4a; font-size: 0.875rem;">Header Compression</div>
+                                <div style="font-size: 0.75rem; color: #5eead4;">HPACK reduces overhead</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-lock" style="color: #0d9488; font-size: 1.25rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #134e4a; font-size: 0.875rem;">TLS Required</div>
+                                <div style="font-size: 0.75rem; color: #5eead4;">Encrypted by default (h2)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- HTTP/2 Flow List -->
+                <div style="padding: 16px 24px;">
+                    {{range $index, $flow := .HTTP2Flows}}
+                    {{if lt $index 20}}
+                    <details style="margin-bottom: 12px; border: 1px solid #86efac; border-radius: 8px; overflow: hidden; background: #f0fdf4;">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #f0fdf4; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-bolt" style="color: #22c55e;"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.SrcIP}}:{{$flow.SrcPort}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.DstIP}}:{{$flow.DstPort}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-check-circle"></i> Active
+                                </span>
+                                <span style="background: #dbeafe; color: #1d4ed8; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    HTTP/2
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Connection Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Source</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.SrcIP}}:{{$flow.SrcPort}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Destination</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.DstIP}}:{{$flow.DstPort}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Protocol</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">HTTP/2 (h2)</span>
+                                </div>
+                            </div>
+                            
+                            <!-- What This Means -->
+                            <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-check-circle"></i>
+                                    Connection Status: Healthy
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    This HTTP/2 connection is functioning normally. The client and server successfully negotiated HTTP/2 via ALPN (Application-Layer Protocol Negotiation) during the TLS handshake.
+                                </p>
+                            </div>
+                            
+                            <!-- HTTP/2 Specific Info -->
+                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    HTTP/2 Features in Use
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #64748b; line-height: 1.8;">
+                                    <li><strong>Stream Multiplexing:</strong> Multiple requests/responses share this single TCP connection</li>
+                                    <li><strong>Header Compression:</strong> HPACK algorithm reduces header overhead</li>
+                                    <li><strong>Binary Protocol:</strong> More efficient than HTTP/1.1 text format</li>
+                                    <li><strong>Flow Control:</strong> Per-stream and connection-level flow control</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && http2</code>
+                            </div>
+                        </div>
+                    </details>
                     {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .HTTP2Flows) 20}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .HTTP2Flows}} HTTP/2 flows.
+                    </div>
+                    {{end}}
+                </div>
+                
+                <!-- Troubleshooting Guide -->
+                <div style="background: #fefce8; border-top: 1px solid #fef08a; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #854d0e; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-wrench"></i>
+                        HTTP/2 Troubleshooting Guide
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <div style="background: #ffffff; border: 1px solid #fde68a; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #92400e; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> RST_STREAM Errors
+                            </div>
+                            <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #78716c;">Stream was reset - check application logs for errors.</p>
+                            <code style="font-size: 0.75rem; color: #7c3aed; background: #faf5ff; padding: 4px 8px; border-radius: 4px;">http2.type == 3</code>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #fde68a; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #92400e; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-times-circle" style="color: #ef4444;"></i> GOAWAY Frames
+                            </div>
+                            <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #78716c;">Server is shutting down connection gracefully.</p>
+                            <code style="font-size: 0.75rem; color: #7c3aed; background: #faf5ff; padding: 4px 8px; border-radius: 4px;">http2.type == 7</code>
+                        </div>
+                    </div>
                 </div>
             </div>
             {{end}}
             
-            <!-- QUIC Flow Details -->
+            <!-- QUIC Flow Details - Complete Redesign with Inline Styles -->
             {{if .QUICFlows}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-rocket card-title-icon"></i>
-                        QUIC Flows ({{len .QUICFlows}})
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-rocket"></i>
+                        QUIC Flow Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .QUICFlows}} flows</span>
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Next-generation transport protocol powering HTTP/3</p>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted mb-md">QUIC protocol connections (HTTP/3) detected in the capture.</p>
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Source IP</th>
-                                    <th>Source Port</th>
-                                    <th>Destination IP</th>
-                                    <th>Destination Port</th>
-                                    <th>Server Name (SNI)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range $index, $flow := .QUICFlows}}
-                                {{if lt $index 50}}
-                                <tr>
-                                    <td><code>{{$flow.SrcIP}}</code></td>
-                                    <td>{{$flow.SrcPort}}</td>
-                                    <td><code>{{$flow.DstIP}}</code></td>
-                                    <td>{{$flow.DstPort}}</td>
-                                    <td>{{if $flow.ServerName}}<code>{{$flow.ServerName}}</code>{{else}}<span class="text-muted">-</span>{{end}}</td>
-                                </tr>
-                                {{end}}
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #faf5ff; border-bottom: 1px solid #e9d5ff; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #8b5cf6; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #5b21b6; font-size: 1rem;">What is QUIC?</h4>
+                            <p style="margin: 0 0 12px 0; color: #7c3aed; font-size: 0.875rem; line-height: 1.6;">
+                                QUIC is a modern transport protocol that runs over <strong>UDP</strong> instead of TCP. It provides 
+                                <strong>built-in encryption</strong>, <strong>faster connection establishment</strong> (0-RTT), and 
+                                <strong>improved performance</strong> on lossy networks. QUIC is the foundation for HTTP/3.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">Connected = Active session</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #8b5cf6; border-radius: 50%;"></span>
+                                    <span style="color: #5b21b6;">UDP Port 443 = Standard</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    {{if gt (len .QUICFlows) 50}}
-                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .QUICFlows}} QUIC flows.</p>
+                </div>
+                
+                <!-- Key Benefits Box -->
+                <div style="padding: 16px 24px; background: #fdf4ff; border-bottom: 1px solid #f5d0fe;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-bolt" style="color: #a855f7; font-size: 1.25rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #581c87; font-size: 0.875rem;">0-RTT Handshake</div>
+                                <div style="font-size: 0.75rem; color: #c084fc;">Instant reconnection</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-shield-alt" style="color: #a855f7; font-size: 1.25rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #581c87; font-size: 0.875rem;">Built-in TLS 1.3</div>
+                                <div style="font-size: 0.75rem; color: #c084fc;">Always encrypted</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-exchange-alt" style="color: #a855f7; font-size: 1.25rem;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #581c87; font-size: 0.875rem;">Connection Migration</div>
+                                <div style="font-size: 0.75rem; color: #c084fc;">Survives IP changes</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- QUIC Flow List -->
+                <div style="padding: 16px 24px;">
+                    {{range $index, $flow := .QUICFlows}}
+                    {{if lt $index 20}}
+                    <details style="margin-bottom: 12px; border: 1px solid #c4b5fd; border-radius: 8px; overflow: hidden; background: #faf5ff;">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #faf5ff; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-rocket" style="color: #8b5cf6;"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.SrcIP}}:{{$flow.SrcPort}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.DstIP}}:{{$flow.DstPort}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                {{if $flow.ServerName}}
+                                <span style="background: #dbeafe; color: #1d4ed8; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 500; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    {{$flow.ServerName}}
+                                </span>
+                                {{end}}
+                                <span style="background: #ede9fe; color: #5b21b6; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-check-circle"></i> Active
+                                </span>
+                                <span style="background: #f3e8ff; color: #7c3aed; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    QUIC
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Connection Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Source</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.SrcIP}}:{{$flow.SrcPort}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Destination</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.DstIP}}:{{$flow.DstPort}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Server Name (SNI)</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 500;">{{if $flow.ServerName}}{{$flow.ServerName}}{{else}}<span style="color: #9ca3af;">Not available</span>{{end}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Transport</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">UDP (QUIC)</span>
+                                </div>
+                            </div>
+                            
+                            <!-- What This Means -->
+                            <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-check-circle"></i>
+                                    Connection Status: Active
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    This QUIC connection is functioning normally. The client is using HTTP/3 to communicate with the server, 
+                                    benefiting from faster connection establishment and improved performance on mobile networks.
+                                </p>
+                            </div>
+                            
+                            <!-- QUIC Specific Info -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    QUIC Protocol Features
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #64748b; line-height: 1.8;">
+                                    <li><strong>UDP-Based:</strong> Runs over UDP port 443, not TCP</li>
+                                    <li><strong>Built-in Encryption:</strong> TLS 1.3 integrated into the protocol</li>
+                                    <li><strong>Connection ID:</strong> Survives network changes (WiFi to cellular)</li>
+                                    <li><strong>Stream Multiplexing:</strong> No head-of-line blocking between streams</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #ecfeff; border: 1px solid #a5f3fc; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #0891b2; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #67e8f9; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #0e7490;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && quic</code>
+                            </div>
+                        </div>
+                    </details>
                     {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .QUICFlows) 20}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .QUICFlows}} QUIC flows.
+                    </div>
+                    {{end}}
+                </div>
+                
+                <!-- Troubleshooting Guide -->
+                <div style="background: #fef2f2; border-top: 1px solid #fecaca; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #991b1b; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-wrench"></i>
+                        QUIC Troubleshooting Guide
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <div style="background: #ffffff; border: 1px solid #fecaca; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #991b1b; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-ban" style="color: #ef4444;"></i> QUIC Blocked
+                            </div>
+                            <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #78716c;">Firewall may be blocking UDP 443. Check firewall rules.</p>
+                            <p style="margin: 0; font-size: 0.75rem; color: #64748b;"><strong>Action:</strong> Allow UDP port 443 outbound</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #fecaca; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #991b1b; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-exclamation-triangle" style="color: #f59e0b;"></i> Version Mismatch
+                            </div>
+                            <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #78716c;">Client and server may not support same QUIC version.</p>
+                            <p style="margin: 0; font-size: 0.75rem; color: #64748b;"><strong>Action:</strong> Update browser/application</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #fecaca; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #991b1b; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-network-wired" style="color: #f59e0b;"></i> NAT Issues
+                            </div>
+                            <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #78716c;">Some NAT devices don't handle QUIC well.</p>
+                            <p style="margin: 0; font-size: 0.75rem; color: #64748b;"><strong>Action:</strong> Check NAT timeout settings</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             {{end}}
