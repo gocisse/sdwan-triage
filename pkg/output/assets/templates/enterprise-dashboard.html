@@ -608,8 +608,8 @@
                                     {{range .TLSSecurityFindings}}
                                     <tr>
                                         <td><code>{{.ServerIP}}</code></td>
-                                        <td>{{.IssueType}}</td>
-                                        <td>{{.Details}}</td>
+                                        <td>{{.WeaknessType}}</td>
+                                        <td>{{.Description}}</td>
                                         <td>
                                             <span class="status-badge {{if eq .Severity "High"}}critical{{else}}warning{{end}}">
                                                 <span class="status-dot"></span>
@@ -694,8 +694,8 @@
                                 {{range .TLSSecurityFindings}}
                                 <tr>
                                     <td><code>{{.ServerIP}}</code></td>
-                                    <td>{{.IssueType}}</td>
-                                    <td>{{.Details}}</td>
+                                    <td>{{.WeaknessType}}</td>
+                                    <td>{{.Description}}</td>
                                     <td>
                                         <span class="status-badge {{if eq .Severity "High"}}critical{{else}}warning{{end}}">
                                             <span class="status-dot"></span>
@@ -794,7 +794,7 @@
                                 <tr>
                                     <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
                                     <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
-                                    <td>{{formatUnixTimeShort $flow.Timestamp}}</td>
+                                    <td>-</td>
                                     <td>
                                         <span class="status-badge critical">
                                             <span class="status-dot"></span>
