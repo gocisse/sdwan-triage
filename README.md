@@ -233,6 +233,47 @@ Open `report.html` in your browser to view:
 ./sdwan-triage -html tunnel-report.html overlay-traffic.pcap
 ```
 
+### TCP Handshake Examples
+
+```bash
+# Analyze PCAP file (handshakes tracked automatically)
+./sdwan-triage TestFile.pcap
+```
+
+### **Show Handshake Analysis**
+```bash
+# Display detailed handshake analysis
+./sdwan-triage --show-handshakes TestFile.pcap
+```
+
+### **Show Only Failed Handshakes**
+```bash
+# Troubleshooting mode - show only failures
+./sdwan-triage --show-handshakes --failed-only TestFile.pcap
+```
+
+### **Custom Timeout**
+```bash
+# Use 5 second timeout for slow networks
+./sdwan-triage --handshake-timeout 5 TestFile.pcap
+```
+
+### **Combined Flags**
+```bash
+# Full analysis with custom timeout
+./sdwan-triage --show-handshakes --handshake-timeout 5 --failed-only TestFile.pcap
+```
+
+### **With Other Flags**
+```bash
+# HTML report with handshake analysis
+./sdwan-triage -html report.html --show-handshakes TestFile.pcap
+
+# Filter by IP and show handshakes
+./sdwan-triage -src-ip 192.168.1.100 --show-handshakes TestFile.pcap
+```
+
+
 ---
 
 ## 📊 Output Formats
