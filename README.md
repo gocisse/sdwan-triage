@@ -1,4 +1,4 @@
-# SD-WAN Triage v2.7.0
+# SD-WAN Triage v2.9.0
 
 [![GitHub release](https://img.shields.io/github/v/release/gocisse/sdwan-triage.svg)](https://github.com/gocisse/sdwan-triage/releases/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gocisse/sdwan-triage)](https://goreportcard.com/report/github.com/gocisse/sdwan-triage)
@@ -41,12 +41,12 @@ Download the latest release for your platform from the [GitHub Releases](https:/
 
 ```bash
 # Linux/macOS
-wget https://github.com/gocisse/sdwan-triage/releases/download/v2.7.0/sdwan-triage-linux-amd64
+wget https://github.com/gocisse/sdwan-triage/releases/download/v2.9.0/sdwan-triage-linux-amd64
 chmod +x sdwan-triage-linux-amd64
 mv sdwan-triage-linux-amd64 /usr/local/bin/sdwan-triage
 
 # macOS (ARM64)
-wget https://github.com/gocisse/sdwan-triage/releases/download/v2.7.0/sdwan-triage-darwin-arm64
+wget https://github.com/gocisse/sdwan-triage/releases/download/v2.9.0/sdwan-triage-darwin-arm64
 chmod +x sdwan-triage-darwin-arm64
 mv sdwan-triage-darwin-arm64 /usr/local/bin/sdwan-triage
 ```
@@ -90,7 +90,7 @@ Analyze a PCAP file and generate an interactive HTML report:
 
 **Expected Output:**
 ```
-SD-WAN Network Triage v2.7.0
+SD-WAN Network Triage v2.9.0
 Analyzing: sample.pcap
 ✓ Processed 17,564 packets in 2.3s
 ✓ Generated report.html
@@ -136,7 +136,8 @@ Open `report.html` in your browser to view:
 - ✅ **MPLS Label Analysis** - Label stack inspection and tracking
 - ✅ **IPsec Detection** - ESP and AH protocol identification
 - ✅ **GTP Tunnels** - GTP-U and GTP-C for mobile networks
-- ✅ **L2TP, OpenVPN, WireGuard** - VPN protocol detection
+- ✅ **L2TP, OpenVPN, WireGuard** - VPN protocol detection with DPI (v2.8.0+)
+- ✅ **False Positive Prevention** - Smart whitelisting for DNS servers and common services (v2.9.0)
 
 ### SD-WAN Specific
 - ✅ **Vendor Detection** - Cisco (Viptela), VMware (VeloCloud), Fortinet, Palo Alto Prisma, Silver Peak, Citrix, Versa
