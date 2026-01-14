@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Report - TestFile4.pcap</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #1a1a2e; color: #eee; }
+        h1, h2, h3 { color: #00d9ff; }
+        .section { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .count { color: #00ff88; font-weight: bold; }
+        .warning { color: #ffaa00; }
+        .error { color: #ff4444; }
+        pre { background: #0f0f23; padding: 10px; overflow-x: auto; border-radius: 4px; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+        th { background: #1a1a4e; }
+        tr:nth-child(even) { background: #1a1a3e; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Debug Report</h1>
+    <p>Generated: 2026-01-14 20:49:50</p>
+    <p>PCAP File: TestFile4.pcap</p>
+
+    <div class="section">
+        <h2>📊 Summary Statistics</h2>
+        <ul>
+            <li>Total Bytes: <span class="count">31823901</span></li>
+            <li>DNS Anomalies: <span class="count">43</span></li>
+            <li>TCP Retransmissions: <span class="count">1240</span></li>
+            <li>Failed Handshakes: <span class="count">31</span></li>
+            <li>TLS Certificates: <span class="count">1</span></li>
+            <li>ARP Conflicts: <span class="count">0</span></li>
+            <li>HTTP Errors: <span class="count">6</span></li>
+            <li>Traffic Flows: <span class="count">3163</span></li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🔒 Security Analysis</h2>
+        <ul>
+            <li>DDoS Findings: <span class="count">27</span></li>
+            <li>Port Scan Findings: <span class="count">4</span></li>
+            <li>IOC Findings: <span class="count">0</span></li>
+            <li>TLS Security Issues: <span class="count">5</span></li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🌐 Network Analysis</h2>
+        <ul>
+            <li>ICMP Findings: <span class="count">131</span></li>
+            <li>Tunnel Findings: <span class="count">0</span></li>
+            <li>SD-WAN Vendors: <span class="count">1</span></li>
+            <li>BGP Hijack Indicators: <span class="count">0</span></li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📋 Risk Assessment</h2>
+        <ul>
+            <li>Risk Score: <span class="count">1585</span></li>
+            <li>Risk Level: <span class="error">Critical</span></li>
+            <li>Top Issue: TCP Retransmissions</li>
+        </ul>
+    </div>
+
+    
+    <div class="section">
+        <h2>🔍 DNS Anomalies (First 20)</h2>
+        <table>
+            <tr><th>Query</th><th>Answer IP</th><th>Server IP</th><th>Reason</th></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.2.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>dc01core002.vccuonline.net</td><td>10.51.1.191</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>dc01core002.vccuonline.net</td><td>10.51.1.191</td><td>10.199.2.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.2.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>ManageEngine001.vccuonline.net</td><td>10.199.1.59</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>usersfs.vccuonline.net</td><td>10.199.1.128</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>usersfs.vccuonline.net</td><td>10.199.1.128</td><td>10.199.2.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>usersfs.vccuonline.net</td><td>10.199.1.128</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>aws-prod-dc1.vccuonline.net</td><td>10.199.1.100</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>AWS-PROD-DC1.vccuonline.net</td><td>10.199.1.100</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.2.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.1.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>4.tlu.dl.delivery.mp.microsoft.com</td><td>92.223.96.6</td><td>10.199.2.100</td><td>Suspicious domain pattern detected</td></tr>
+            
+            <tr><td>usersfs.vccuonline.net</td><td>10.199.1.128</td><td>10.199.1.100</td><td>Private IP returned for public domain (possible DNS hijacking)</td></tr>
+            
+        </table>
+    </div>
+    
+
+    
+    <div class="section">
+        <h2>⚠️ DDoS Findings</h2>
+        <table>
+            <tr><th>Type</th><th>Source IP</th><th>Target IP</th><th>Packet Count</th></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.199.1.118</td><td>10.11.2.31</td><td>100</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.199.1.118</td><td>10.11.4.8</td><td>200</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>8.8.8.8</td><td>10.11.1.246</td><td>100</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.199.1.100</td><td>10.11.2.17</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.216</td><td>10.77.1.71</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.2.17</td><td>10.199.1.100</td><td>200</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.242</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.240</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.238</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.243</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.245</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.244</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>UDP Flood</td><td>158.115.136.228</td><td>10.11.1.244</td><td>200</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.247</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.241</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>ICMP Flood</td><td>10.11.1.246</td><td>8.8.8.8</td><td>100</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.199.1.87</td><td>10.11.4.9</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.4.9</td><td>10.199.1.87</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.28</td><td>10.77.1.71</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.245</td><td>10.199.1.118</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.240</td><td>10.199.1.118</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.238</td><td>10.199.1.118</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.241</td><td>10.199.1.118</td><td>200</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.242</td><td>10.199.1.118</td><td>200</td></tr>
+            
+            <tr><td>SYN Flood</td><td>10.11.2.207</td><td>10.199.2.100</td><td>100</td></tr>
+            
+            <tr><td>UDP Flood</td><td>10.11.1.243</td><td>10.199.1.118</td><td>200</td></tr>
+            
+            <tr><td>SYN Flood</td><td>10.199.1.118</td><td>10.11.4.13</td><td>100</td></tr>
+            
+        </table>
+    </div>
+    
+
+    
+    <div class="section">
+        <h2>🔐 TLS Security Issues</h2>
+        <table>
+            <tr><th>Server IP</th><th>Weakness Type</th><th>Severity</th><th>Description</th></tr>
+            
+            <tr><td>10.11.4.2</td><td>Weak Cipher Suite</td><td>Medium</td><td>Weak cipher suite detected: TLS_RSA_WITH_AES_256_GCM_SHA384</td></tr>
+            
+            <tr><td>10.11.4.8</td><td>Weak Cipher Suite</td><td>Medium</td><td>Weak cipher suite detected: TLS_RSA_WITH_AES_256_GCM_SHA384</td></tr>
+            
+            <tr><td>10.11.7.235</td><td>Weak TLS Version</td><td>High</td><td>TLS 1.0 is deprecated and vulnerable to BEAST attack</td></tr>
+            
+            <tr><td>10.11.7.235</td><td>Weak Cipher Suite</td><td>Medium</td><td>CBC cipher without forward secrecy: TLS_RSA_WITH_AES_128_CBC_SHA</td></tr>
+            
+            <tr><td>10.11.4.5</td><td>Weak Cipher Suite</td><td>Medium</td><td>Weak cipher suite detected: TLS_RSA_WITH_AES_256_GCM_SHA384</td></tr>
+            
+        </table>
+    </div>
+    
+
+    <div class="section">
+        <h2>ℹ️ Debug Info</h2>
+        <p>This is a simplified debug report. For full analysis, use the standard HTML report.</p>
+        <p>Report generated by SD-WAN Triage Tool</p>
+    </div>
+</body>
+</html>

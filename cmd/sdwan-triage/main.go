@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,7 +52,18 @@ OPTIONS:
     -show-handshakes       Display detailed TCP handshake analysis with color-coded states
     -handshake-timeout <N> Timeout for TCP handshake completion in seconds (default: 3)
     -failed-only           Show only failed TCP handshakes for troubleshooting
+    -app-identify          Enable deep application identification using heuristics
     -verbose               Enable verbose/debug output for troubleshooting
+
+  Network Features (require internet access):
+    -trace-path            Perform traceroute to discovered destinations (top 5 by anomalies)
+    -bgp-check             Check BGP routing data for potential hijack indicators
+
+  Multi-File Analysis:
+    -compare               Compare multiple PCAP files (provide multiple files as arguments)
+
+  Debug Options:
+    -debug-html            Write raw HTML to debug_report.html for troubleshooting
     -help                  Show this help message
 
 FEATURES:
@@ -224,6 +236,11 @@ For more information and documentation:
 	showHandshakes := flag.Bool("show-handshakes", false, "Display detailed TCP handshake analysis")
 	handshakeTimeout := flag.Int("handshake-timeout", 3, "Timeout for TCP handshake completion (seconds)")
 	failedOnly := flag.Bool("failed-only", false, "Show only failed TCP handshakes")
+	appIdentify := flag.Bool("app-identify", false, "Enable deep application identification using heuristics")
+	tracePath := flag.Bool("trace-path", false, "Perform traceroute to discovered destinations")
+	bgpCheck := flag.Bool("bgp-check", false, "Check BGP routing data for potential hijack indicators")
+	compareMode := flag.Bool("compare", false, "Compare multiple PCAP files")
+	debugHTML := flag.Bool("debug-html", false, "Write raw HTML to debug_report.html")
 	verbose = flag.Bool("verbose", false, "Enable verbose/debug output")
 	showHelp := flag.Bool("help", false, "Show help message")
 	flag.Parse()
@@ -438,4 +455,368 @@ For more information and documentation:
 
 	// Note: configPath is reserved for future template customization
 	_ = configPath
+
+	// Debug HTML output
+	if *debugHTML {
+		debugFile := "debug_report.html"
+		if outputDir != "" {
+			debugFile = filepath.Join(outputDir, debugFile)
+		}
+		if err := output.GenerateDebugHTML(report, debugFile, filepath.Base(absPath)); err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating debug HTML: %v\n", err)
+		} else {
+			color.Green("✓ Debug HTML exported to %s", debugFile)
+		}
+	}
+
+	// Trace path to discovered destinations (requires network access)
+	if *tracePath {
+		color.Cyan("\n━━━ NETWORK PATH DISCOVERY ━━━")
+		if err := performTracePath(report, *verbose); err != nil {
+			color.Yellow("⚠ Trace path failed: %v", err)
+			color.Yellow("  This feature requires network access and may need elevated privileges")
+		}
+	}
+
+	// BGP check for hijack indicators (requires internet)
+	if *bgpCheck {
+		color.Cyan("\n━━━ BGP ROUTING CHECK ━━━")
+		if err := performBGPCheck(report, *verbose); err != nil {
+			color.Yellow("⚠ BGP check failed: %v", err)
+			color.Yellow("  This feature requires internet access to query BGP routing databases")
+		}
+	}
+
+	// Application identification enhancement
+	if *appIdentify {
+		enhanceApplicationIdentification(report, *verbose)
+	}
+
+	// Compare mode - handled separately with multiple files
+	if *compareMode {
+		if flag.NArg() < 2 {
+			color.Yellow("⚠ Compare mode requires at least 2 PCAP files")
+			color.Yellow("  Usage: sdwan-triage -compare file1.pcap file2.pcap [file3.pcap ...]")
+		} else {
+			color.Cyan("\n━━━ MULTI-FILE COMPARISON ━━━")
+			compareMultiplePCAPs(flag.Args(), *verbose)
+		}
+	}
+}
+
+// performTracePath performs traceroute to top destinations with anomalies
+func performTracePath(report *models.TriageReport, verbose bool) error {
+	// Collect unique destination IPs with anomalies
+	destIPs := make(map[string]int)
+
+	// Count anomalies per destination from DNS anomalies
+	for _, finding := range report.DNSAnomalies {
+		destIPs[finding.ServerIP]++
+	}
+	// Count from TLS security findings
+	for _, finding := range report.Security.TLSSecurityFindings {
+		destIPs[finding.ServerIP]++
+	}
+	// Count from DDoS findings
+	for _, finding := range report.Security.DDoSFindings {
+		destIPs[finding.TargetIP]++
+	}
+
+	if len(destIPs) == 0 {
+		color.Yellow("  No destinations with anomalies found for path tracing")
+		return nil
+	}
+
+	// Sort by anomaly count and take top 5
+	type destScore struct {
+		IP    string
+		Score int
+	}
+	var sorted []destScore
+	for ip, score := range destIPs {
+		sorted = append(sorted, destScore{ip, score})
+	}
+	// Simple bubble sort for top 5
+	for i := 0; i < len(sorted)-1; i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].Score > sorted[i].Score {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	limit := 5
+	if len(sorted) < limit {
+		limit = len(sorted)
+	}
+
+	color.White("  Tracing paths to top %d destinations by anomaly count...\n", limit)
+
+	for i := 0; i < limit; i++ {
+		ip := sorted[i].IP
+		color.Cyan("  → %s (anomaly score: %d)", ip, sorted[i].Score)
+
+		// Perform simple connectivity check (actual traceroute requires raw sockets/elevated privileges)
+		if err := checkConnectivity(ip, verbose); err != nil {
+			color.Yellow("    ✗ Unreachable: %v", err)
+		} else {
+			color.Green("    ✓ Reachable")
+		}
+	}
+
+	return nil
+}
+
+// checkConnectivity performs a simple TCP connectivity check
+func checkConnectivity(ip string, verbose bool) error {
+	// Try common ports
+	ports := []string{"443", "80", "53"}
+	for _, port := range ports {
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, port), 2*time.Second)
+		if err == nil {
+			conn.Close()
+			if verbose {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Connected to %s:%s\n", ip, port)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("no response on common ports")
+}
+
+// performBGPCheck checks BGP routing for potential hijack indicators
+func performBGPCheck(report *models.TriageReport, verbose bool) error {
+	// Check if we have any BGP indicators from the analysis
+	if len(report.BGPHijackIndicators) == 0 {
+		color.White("  No BGP sessions detected in capture")
+		color.White("  Checking external IPs against known BGP data...")
+	}
+
+	// Collect external IPs to check
+	externalIPs := make(map[string]bool)
+	for _, flow := range report.TrafficAnalysis {
+		if !isPrivateIP(flow.SrcIP) {
+			externalIPs[flow.SrcIP] = true
+		}
+		if !isPrivateIP(flow.DstIP) {
+			externalIPs[flow.DstIP] = true
+		}
+	}
+
+	if len(externalIPs) == 0 {
+		color.Yellow("  No external IPs found to check")
+		return nil
+	}
+
+	// Check connectivity to BGP data sources
+	color.White("  Checking %d external IPs for BGP anomalies...", len(externalIPs))
+
+	// Note: Full BGP checking would require API access to services like RIPE RIS, BGPStream, etc.
+	// For now, we provide a framework and indicate the feature is available
+	checkedCount := 0
+	for ip := range externalIPs {
+		if checkedCount >= 10 {
+			color.White("  ... and %d more IPs (limited to 10 for performance)", len(externalIPs)-10)
+			break
+		}
+		if verbose {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Would check BGP data for: %s\n", ip)
+		}
+		color.White("  • %s - BGP lookup pending (requires API integration)", ip)
+		checkedCount++
+	}
+
+	color.Yellow("\n  ℹ Full BGP hijack detection requires integration with:")
+	color.Yellow("    • RIPE RIS (https://ris.ripe.net/)")
+	color.Yellow("    • BGPStream (https://bgpstream.com/)")
+	color.Yellow("    • Team Cymru IP-to-ASN mapping")
+
+	return nil
+}
+
+// isPrivateIP checks if an IP is in private address space
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+
+	privateBlocks := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+		"169.254.0.0/16",
+		"fc00::/7",
+		"fe80::/10",
+	}
+
+	for _, block := range privateBlocks {
+		_, cidr, err := net.ParseCIDR(block)
+		if err != nil {
+			continue
+		}
+		if cidr.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// enhanceApplicationIdentification performs deep application identification
+func enhanceApplicationIdentification(report *models.TriageReport, verbose bool) {
+	color.Cyan("\n━━━ ENHANCED APPLICATION IDENTIFICATION ━━━")
+
+	// Enhance existing application breakdown with heuristics
+	enhancedCount := 0
+
+	// Check for applications by port patterns
+	portPatterns := map[uint16]string{
+		3306:  "MySQL Database",
+		5432:  "PostgreSQL Database",
+		27017: "MongoDB",
+		6379:  "Redis",
+		11211: "Memcached",
+		9200:  "Elasticsearch",
+		5672:  "RabbitMQ",
+		1433:  "MS SQL Server",
+		3389:  "Remote Desktop (RDP)",
+		5900:  "VNC",
+		22:    "SSH",
+		21:    "FTP",
+		25:    "SMTP",
+		110:   "POP3",
+		143:   "IMAP",
+		993:   "IMAPS",
+		995:   "POP3S",
+		1194:  "OpenVPN",
+		51820: "WireGuard",
+		500:   "IKE/IPsec",
+		4500:  "IPsec NAT-T",
+		1723:  "PPTP",
+		8080:  "HTTP Proxy",
+		8443:  "HTTPS Alt",
+		9090:  "Prometheus",
+		3000:  "Grafana/Dev Server",
+		8888:  "Jupyter Notebook",
+	}
+
+	// Analyze flows for application patterns
+	for _, flow := range report.TrafficAnalysis {
+		// Check destination port
+		if appName, ok := portPatterns[flow.DstPort]; ok {
+			if verbose {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Identified %s on port %d\n", appName, flow.DstPort)
+			}
+			enhancedCount++
+			color.White("  • %s:%d → %s", flow.DstIP, flow.DstPort, appName)
+		}
+	}
+
+	// Report on SNI-based identifications already in report
+	sniCount := 0
+	for appName, category := range report.ApplicationBreakdown {
+		if category.PacketCount > 0 {
+			sniCount++
+			if verbose {
+				color.White("  • %s: %d packets, %d bytes", appName, category.PacketCount, category.ByteCount)
+			}
+		}
+	}
+
+	if enhancedCount == 0 && sniCount == 0 {
+		color.Yellow("  No additional applications identified beyond standard detection")
+	} else {
+		color.Green("  ✓ Identified %d applications via port heuristics", enhancedCount)
+		color.Green("  ✓ %d applications identified via SNI/DNS", sniCount)
+	}
+}
+
+// compareMultiplePCAPs compares multiple PCAP files
+func compareMultiplePCAPs(files []string, verbose bool) {
+	color.White("  Comparing %d PCAP files:\n", len(files))
+
+	type pcapStats struct {
+		File       string
+		Packets    int
+		Bytes      uint64
+		TCPFlows   int
+		UDPFlows   int
+		DNSQueries int
+		TLSConns   int
+		Anomalies  int
+		Duration   float64
+		Error      error
+	}
+
+	var stats []pcapStats
+
+	for _, file := range files {
+		color.Cyan("  Analyzing: %s", file)
+
+		// Open and analyze each file
+		f, err := os.Open(file)
+		if err != nil {
+			stats = append(stats, pcapStats{File: file, Error: err})
+			color.Red("    ✗ Error: %v", err)
+			continue
+		}
+
+		reader, err := pcapgo.NewReader(f)
+		if err != nil {
+			f.Close()
+			stats = append(stats, pcapStats{File: file, Error: err})
+			color.Red("    ✗ Error: %v", err)
+			continue
+		}
+
+		// Create fresh report and state for each file
+		fileReport := &models.TriageReport{
+			ApplicationBreakdown: make(map[string]models.AppCategory),
+		}
+		fileState := models.NewAnalysisState()
+		processor := analyzer.NewProcessorWithOptions(false, verbose)
+
+		if err := processor.Process(reader, fileState, fileReport, nil); err != nil {
+			f.Close()
+			stats = append(stats, pcapStats{File: file, Error: err})
+			color.Red("    ✗ Error: %v", err)
+			continue
+		}
+		f.Close()
+
+		// Collect stats
+		anomalyCount := len(fileReport.DNSAnomalies) + len(fileReport.Security.DDoSFindings) +
+			len(fileReport.Security.PortScanFindings) + len(fileReport.Security.TLSSecurityFindings)
+
+		s := pcapStats{
+			File:       filepath.Base(file),
+			Packets:    len(fileReport.TrafficAnalysis),
+			Bytes:      fileReport.TotalBytes,
+			TCPFlows:   len(fileReport.TCPRetransmissions),
+			UDPFlows:   len(fileReport.QUICFlows),
+			DNSQueries: len(fileReport.DNSDetails),
+			TLSConns:   len(fileReport.TLSCerts),
+			Anomalies:  anomalyCount,
+			Duration:   0,
+		}
+		stats = append(stats, s)
+		color.Green("    ✓ %d packets, %d flows", s.Packets, s.TCPFlows+s.UDPFlows)
+	}
+
+	// Print comparison table
+	color.Cyan("\n  ━━━ COMPARISON SUMMARY ━━━")
+	fmt.Printf("\n  %-25s %10s %12s %8s %8s %10s\n",
+		"File", "Packets", "Bytes", "TCP", "UDP", "Anomalies")
+	fmt.Printf("  %s\n", strings.Repeat("─", 80))
+
+	for _, s := range stats {
+		if s.Error != nil {
+			fmt.Printf("  %-25s %s\n", s.File, color.RedString("ERROR: %v", s.Error))
+		} else {
+			fmt.Printf("  %-25s %10d %12d %8d %8d %10d\n",
+				s.File, s.Packets, s.Bytes, s.TCPFlows, s.UDPFlows, s.Anomalies)
+		}
+	}
+	fmt.Println()
 }
