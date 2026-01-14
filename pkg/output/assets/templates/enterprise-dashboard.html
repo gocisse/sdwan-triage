@@ -759,61 +759,6 @@
                         </div>
                     </div>
                     
-                    <!-- Per-Flow Detailed Table -->
-                    {{if .TCPHandshakeCorrelatedFlows}}
-                    <div class="mb-md">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
-                            <h4 style="margin: 0;"><i class="fas fa-list"></i> Per-Flow Details ({{len .TCPHandshakeCorrelatedFlows}} flows)</h4>
-                            <input type="text" id="tcp-flow-search" placeholder="Filter by IP address..." 
-                                   style="padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm); width: 250px;"
-                                   onkeyup="filterTCPFlows(this.value)">
-                        </div>
-                        <div class="data-table-container" style="max-height: 500px; overflow-y: auto;">
-                            <table class="data-table" id="tcp-flow-table">
-                                <thead style="position: sticky; top: 0; background: var(--color-background); z-index: 10;">
-                                    <tr>
-                                        <th style="cursor: pointer;" onclick="sortTCPTable(0)">Source IP:Port <i class="fas fa-sort"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortTCPTable(1)">Destination IP:Port <i class="fas fa-sort"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortTCPTable(2)">Status <i class="fas fa-sort"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortTCPTable(3)">SYN Sent <i class="fas fa-sort"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortTCPTable(4)">SYN-ACK Recv <i class="fas fa-sort"></i></th>
-                                        <th>Wireshark Filter</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {{range $index, $flow := .TCPHandshakeCorrelatedFlows}}
-                                    <tr class="tcp-flow-row {{if eq $flow.Status "Complete"}}status-row-success{{else if eq $flow.Status "Failed"}}status-row-failed{{else}}status-row-partial{{end}}">
-                                        <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
-                                        <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
-                                        <td>
-                                            <span class="tcp-status-badge {{if eq $flow.Status "Complete"}}tcp-status-success{{else if eq $flow.Status "Failed"}}tcp-status-failed{{else}}tcp-status-partial{{end}}">
-                                                {{if eq $flow.Status "Complete"}}<i class="fas fa-check-circle"></i>{{else if eq $flow.Status "Failed"}}<i class="fas fa-times-circle"></i>{{else}}<i class="fas fa-clock"></i>{{end}}
-                                                {{$flow.Status}}
-                                            </span>
-                                        </td>
-                                        <td style="text-align: center;">{{$flow.SynCount}}</td>
-                                        <td style="text-align: center;">{{$flow.SynAckCount}}</td>
-                                        <td>
-                                            <div style="display: flex; align-items: center; gap: var(--space-xs);">
-                                                <code class="wireshark-filter" style="font-size: var(--font-size-xs); flex: 1; overflow: hidden; text-overflow: ellipsis;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}</code>
-                                                <button class="copy-filter-btn" onclick="copyToClipboard('ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}', this)" title="Copy filter">
-                                                    <i class="fas fa-copy"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {{end}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {{else}}
-                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
-                        <i class="fas fa-info-circle" style="font-size: var(--font-size-2xl); margin-bottom: var(--space-md);"></i>
-                        <p>No TCP handshake flows recorded in this capture.</p>
-                    </div>
-                    {{end}}
-                    
                     {{if gt .TCPHandshakeStats.FailedCount 0}}
                     <div style="background: rgba(225, 112, 85, 0.1); border-left: 4px solid var(--color-critical); padding: var(--space-lg); border-radius: var(--radius-md); margin-top: var(--space-lg);">
                         <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--color-critical);">
@@ -1290,72 +1235,327 @@
                 </div>
             </div>
             
-            <!-- TCP Retransmissions Detail Table (Collapsible) -->
+            <!-- TCP Retransmissions - Complete Redesign with Inline Styles -->
             {{if gt .Stats.TCPRetransmissions 0}}
-            <details>
-                <summary><i class="fas fa-redo"></i> Retransmission Details ({{.Stats.TCPRetransmissions}})</summary>
-                <div>
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #dc2626 0%, #f97316 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-redo"></i>
+                        TCP Retransmission Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{.Stats.TCPRetransmissions}} events</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Packets that had to be sent again due to network issues</p>
+                </div>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #fef2f2; border-bottom: 1px solid #fecaca; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #991b1b; font-size: 1rem;">What are TCP Retransmissions?</h4>
+                            <p style="margin: 0 0 12px 0; color: #b91c1c; font-size: 0.875rem; line-height: 1.6;">
+                                When a packet is lost or corrupted during transmission, TCP automatically resends it. 
+                                <strong>High retransmission rates indicate network problems</strong> like congestion, packet loss, or faulty hardware.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">0-1% = Normal</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #b45309;">1-5% = Moderate</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                                    <span style="color: #b91c1c;">>5% = Critical</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Retransmission List -->
+                <div style="padding: 16px 24px;">
                     {{if .TCPRetransmissions}}
-                    <table class="data-table" id="retrans-table">
-                        <thead>
-                            <tr>
-                                <th>Source IP:Port</th>
-                                <th>Destination IP:Port</th>
-                                <th>Count</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{range .TCPRetransmissions}}
-                            <tr>
-                                <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
-                                <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                <td>{{.Count}}</td>
-                            </tr>
-                            {{end}}
-                        </tbody>
-                    </table>
+                    {{range $index, $retrans := .TCPRetransmissions}}
+                    {{if lt $index 20}}
+                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if gt $retrans.Count 50}}border-color: #fca5a5; background: #fef2f2;{{else if gt $retrans.Count 10}}border-color: #fcd34d; background: #fffbeb;{{else}}border-color: #86efac; background: #f0fdf4;{{end}}">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if gt $retrans.Count 50}}#fef2f2{{else if gt $retrans.Count 10}}#fffbeb{{else}}#f0fdf4{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-redo" style="color: {{if gt $retrans.Count 50}}#ef4444{{else if gt $retrans.Count 10}}#f59e0b{{else}}#22c55e{{end}};"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$retrans.SrcIP}}:{{$retrans.SrcPort}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$retrans.DstIP}}:{{$retrans.DstPort}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: {{if gt $retrans.Count 50}}#fee2e2{{else if gt $retrans.Count 10}}#fef3c7{{else}}#d1fae5{{end}}; color: {{if gt $retrans.Count 50}}#b91c1c{{else if gt $retrans.Count 10}}#b45309{{else}}#047857{{end}}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    {{if gt $retrans.Count 50}}<i class="fas fa-exclamation-triangle"></i> Critical{{else if gt $retrans.Count 10}}<i class="fas fa-exclamation-circle"></i> Warning{{else}}<i class="fas fa-check-circle"></i> Low{{end}}
+                                </span>
+                                <span style="background: #f3f4f6; color: #374151; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$retrans.Count}} retransmissions
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Severity Indicator -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: #374151; font-size: 0.875rem;">Severity Level:</span>
+                                    <div style="flex: 1; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+                                        <div style="width: {{if gt $retrans.Count 100}}100{{else}}{{$retrans.Count}}{{end}}%; height: 100%; background: {{if gt $retrans.Count 50}}#ef4444{{else if gt $retrans.Count 10}}#f59e0b{{else}}#22c55e{{end}}; border-radius: 4px;"></div>
+                                    </div>
+                                    <span style="font-size: 0.75rem; color: #6b7280;">{{$retrans.Count}}/100</span>
+                                </div>
+                            </div>
+                            
+                            <!-- What This Means -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #475569; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-lightbulb" style="color: #eab308;"></i>
+                                    What This Means
+                                </h4>
+                                {{if gt $retrans.Count 50}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #b91c1c; line-height: 1.6;">
+                                    <strong>Critical Issue:</strong> This connection has severe packet loss. Users will experience slow loading, timeouts, and poor application performance. Immediate investigation required.
+                                </p>
+                                {{else if gt $retrans.Count 10}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #b45309; line-height: 1.6;">
+                                    <strong>Warning:</strong> Moderate retransmission rate detected. This may cause noticeable delays for users. Monitor this connection and investigate if it persists.
+                                </p>
+                                {{else}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    <strong>Low Impact:</strong> Minor retransmissions within normal range. No immediate action required, but continue monitoring.
+                                </p>
+                                {{end}}
+                            </div>
+                            
+                            <!-- Next Actions -->
+                            <div style="background: {{if gt $retrans.Count 50}}#fef2f2{{else if gt $retrans.Count 10}}#fffbeb{{else}}#f0fdf4{{end}}; border: 1px solid {{if gt $retrans.Count 50}}#fecaca{{else if gt $retrans.Count 10}}#fcd34d{{else}}#86efac{{end}}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: {{if gt $retrans.Count 50}}#991b1b{{else if gt $retrans.Count 10}}#92400e{{else}}#166534{{end}}; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-tasks"></i>
+                                    Next Actions
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #64748b; line-height: 1.8;">
+                                    {{if gt $retrans.Count 50}}
+                                    <li><strong>Check network congestion</strong> on the path between {{$retrans.SrcIP}} and {{$retrans.DstIP}}</li>
+                                    <li><strong>Verify link quality</strong> - look for interface errors, CRC errors, or duplex mismatches</li>
+                                    <li><strong>Review QoS settings</strong> - ensure traffic is properly prioritized</li>
+                                    <li><strong>Check for bandwidth saturation</strong> on intermediate links</li>
+                                    <li><strong>Contact ISP</strong> if destination is external and issue persists</li>
+                                    {{else if gt $retrans.Count 10}}
+                                    <li><strong>Monitor this flow</strong> over the next 24 hours for patterns</li>
+                                    <li><strong>Check interface statistics</strong> on devices in the path</li>
+                                    <li><strong>Review application behavior</strong> at {{$retrans.SrcIP}}</li>
+                                    {{else}}
+                                    <li><strong>No immediate action required</strong> - retransmissions within normal range</li>
+                                    <li><strong>Continue monitoring</strong> for any increase in retransmissions</li>
+                                    {{end}}
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$retrans.SrcIP}} && ip.addr=={{$retrans.DstIP}} && tcp.analysis.retransmission</code>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .TCPRetransmissions) 20}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .TCPRetransmissions}} retransmission flows (sorted by count).
+                    </div>
+                    {{end}}
                     {{else}}
-                    <p class="text-muted">No retransmission details available.</p>
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">No significant retransmission issues detected.</p>
+                    </div>
                     {{end}}
                 </div>
-            </details>
+            </div>
             {{end}}
             
-            <!-- High RTT Flows Detail Table -->
+            <!-- High Latency Flow Details - Complete Redesign with Inline Styles -->
             {{if gt .Stats.HighRTTFlows 0}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-stopwatch card-title-icon"></i>
-                        High Latency Flow Details
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-stopwatch"></i>
+                        High Latency Flow Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{.Stats.HighRTTFlows}} flows</span>
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Connections with elevated round-trip time affecting performance</p>
                 </div>
-                <div class="card-body">
-                    {{if .HighRTTFlows}}
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Source IP:Port</th>
-                                    <th>Destination IP:Port</th>
-                                    <th>Average RTT (ms)</th>
-                                    <th>Max RTT (ms)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .HighRTTFlows}}
-                                <tr>
-                                    <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
-                                    <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                    <td>{{printf "%.2f" .AvgRTT}}</td>
-                                    <td>{{printf "%.2f" .MaxRTT}}</td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #faf5ff; border-bottom: 1px solid #e9d5ff; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #8b5cf6; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #5b21b6; font-size: 1rem;">What is Network Latency (RTT)?</h4>
+                            <p style="margin: 0 0 12px 0; color: #7c3aed; font-size: 0.875rem; line-height: 1.6;">
+                                Round-Trip Time (RTT) measures how long it takes for a packet to travel to a destination and back. 
+                                <strong>High latency causes slow response times</strong>, affecting user experience and application performance.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">&lt;50ms = Excellent</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #b45309;">50-150ms = Moderate</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                                    <span style="color: #b91c1c;">&gt;150ms = High</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+                
+                <!-- High Latency Flow List -->
+                <div style="padding: 16px 24px;">
+                    {{if .HighRTTFlows}}
+                    {{range $index, $flow := .HighRTTFlows}}
+                    {{if lt $index 20}}
+                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if gt $flow.AvgRTT 150.0}}border-color: #fca5a5; background: #fef2f2;{{else if gt $flow.AvgRTT 50.0}}border-color: #fcd34d; background: #fffbeb;{{else}}border-color: #86efac; background: #f0fdf4;{{end}}">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if gt $flow.AvgRTT 150.0}}#fef2f2{{else if gt $flow.AvgRTT 50.0}}#fffbeb{{else}}#f0fdf4{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-clock" style="color: {{if gt $flow.AvgRTT 150.0}}#ef4444{{else if gt $flow.AvgRTT 50.0}}#f59e0b{{else}}#22c55e{{end}};"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.SrcIP}}:{{$flow.SrcPort}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.DstIP}}:{{$flow.DstPort}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: {{if gt $flow.AvgRTT 150.0}}#fee2e2{{else if gt $flow.AvgRTT 50.0}}#fef3c7{{else}}#d1fae5{{end}}; color: {{if gt $flow.AvgRTT 150.0}}#b91c1c{{else if gt $flow.AvgRTT 50.0}}#b45309{{else}}#047857{{end}}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    {{if gt $flow.AvgRTT 150.0}}<i class="fas fa-exclamation-triangle"></i> High{{else if gt $flow.AvgRTT 50.0}}<i class="fas fa-exclamation-circle"></i> Moderate{{else}}<i class="fas fa-check-circle"></i> OK{{end}}
+                                </span>
+                                <span style="background: #f3f4f6; color: #374151; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    Avg: {{printf "%.1f" $flow.AvgRTT}}ms
+                                </span>
+                                <span style="background: #fef3c7; color: #b45309; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    Max: {{printf "%.1f" $flow.MaxRTT}}ms
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Latency Visualization -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: #374151; font-size: 0.875rem;">Latency Level:</span>
+                                    <div style="flex: 1; height: 8px; background: linear-gradient(to right, #22c55e 0%, #22c55e 33%, #f59e0b 33%, #f59e0b 66%, #ef4444 66%, #ef4444 100%); border-radius: 4px;"></div>
+                                    <span style="font-size: 0.75rem; color: #6b7280; min-width: 60px;">{{printf "%.1f" $flow.AvgRTT}}ms</span>
+                                </div>
+                            </div>
+                            
+                            <!-- What This Means -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #475569; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-lightbulb" style="color: #eab308;"></i>
+                                    What This Means
+                                </h4>
+                                {{if gt $flow.AvgRTT 150.0}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #b91c1c; line-height: 1.6;">
+                                    <strong>High Latency:</strong> Users will experience noticeable delays. Real-time applications (VoIP, video) will be severely impacted. Interactive applications will feel sluggish.
+                                </p>
+                                {{else if gt $flow.AvgRTT 50.0}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #b45309; line-height: 1.6;">
+                                    <strong>Moderate Latency:</strong> Some delay may be noticeable for interactive applications. Acceptable for most business applications but may affect real-time communications.
+                                </p>
+                                {{else}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    <strong>Acceptable Latency:</strong> This latency level is within normal range for most applications. Users should not experience significant delays.
+                                </p>
+                                {{end}}
+                            </div>
+                            
+                            <!-- Common Causes -->
+                            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #0369a1; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-question-circle"></i>
+                                    Common Causes of High Latency
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #64748b; line-height: 1.8;">
+                                    <li><strong>Geographic distance</strong> - Data traveling long distances (e.g., cross-continent)</li>
+                                    <li><strong>Network congestion</strong> - Too much traffic on the network path</li>
+                                    <li><strong>Routing inefficiency</strong> - Packets taking suboptimal paths</li>
+                                    <li><strong>Hardware bottlenecks</strong> - Overloaded routers or switches</li>
+                                    <li><strong>ISP issues</strong> - Problems with internet service provider</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Next Actions -->
+                            <div style="background: {{if gt $flow.AvgRTT 150.0}}#fef2f2{{else if gt $flow.AvgRTT 50.0}}#fffbeb{{else}}#f0fdf4{{end}}; border: 1px solid {{if gt $flow.AvgRTT 150.0}}#fecaca{{else if gt $flow.AvgRTT 50.0}}#fcd34d{{else}}#86efac{{end}}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: {{if gt $flow.AvgRTT 150.0}}#991b1b{{else if gt $flow.AvgRTT 50.0}}#92400e{{else}}#166534{{end}}; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-tasks"></i>
+                                    Troubleshooting Steps
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #64748b; line-height: 1.8;">
+                                    {{if gt $flow.AvgRTT 150.0}}
+                                    <li><strong>Run traceroute</strong> to {{$flow.DstIP}} to identify where delay occurs</li>
+                                    <li><strong>Check for network congestion</strong> on intermediate links</li>
+                                    <li><strong>Verify routing tables</strong> for optimal path selection</li>
+                                    <li><strong>Review QoS policies</strong> to prioritize latency-sensitive traffic</li>
+                                    <li><strong>Contact ISP</strong> if destination is external and latency is on their network</li>
+                                    {{else if gt $flow.AvgRTT 50.0}}
+                                    <li><strong>Monitor this flow</strong> for latency spikes during peak hours</li>
+                                    <li><strong>Check interface utilization</strong> on devices in the path</li>
+                                    <li><strong>Consider SD-WAN optimization</strong> for this traffic type</li>
+                                    {{else}}
+                                    <li><strong>No immediate action required</strong> - latency is acceptable</li>
+                                    <li><strong>Continue monitoring</strong> for any degradation</li>
+                                    {{end}}
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}</code>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .HighRTTFlows) 20}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .HighRTTFlows}} high latency flows (sorted by RTT).
+                    </div>
+                    {{end}}
                     {{else}}
-                    <p class="text-muted">No high RTT flow details available.</p>
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">No high latency flows detected.</p>
+                    </div>
                     {{end}}
                 </div>
             </div>
