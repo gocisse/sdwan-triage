@@ -1571,82 +1571,365 @@
                 Traffic Analysis
             </h2>
             
-            <!-- Top Traffic Flows -->
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-bar card-title-icon"></i>
-                        Top Traffic Flows
+            <!-- Top Traffic Flows - Complete Redesign with Inline Styles -->
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-chart-bar"></i>
+                        Top Traffic Flow Analysis
+                        {{if .TopFlows}}<span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .TopFlows}} flows</span>{{end}}
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Identify bandwidth consumers and traffic patterns</p>
                 </div>
-                <div class="card-body">
-                    {{if .TopFlows}}
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Source IP:Port</th>
-                                    <th>Destination IP:Port</th>
-                                    <th>Protocol</th>
-                                    <th>Total Bytes</th>
-                                    <th>Percentage</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .TopFlows}}
-                                <tr>
-                                    <td><code>{{.SrcIP}}:{{.SrcPort}}</code></td>
-                                    <td><code>{{.DstIP}}:{{.DstPort}}</code></td>
-                                    <td>{{.Protocol}}</td>
-                                    <td>{{.BytesFormatted}}</td>
-                                    <td>
-                                        <div style="display: flex; align-items: center; gap: var(--space-sm);">
-                                            <div style="flex: 1; height: 8px; background: var(--color-border); border-radius: var(--radius-full); overflow: hidden;">
-                                                <div style="width: {{printf "%.1f" .Percentage}}%; height: 100%; background: var(--color-primary);"></div>
-                                            </div>
-                                            <span style="min-width: 50px; text-align: right;">{{printf "%.1f" .Percentage}}%</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #fff7ed; border-bottom: 1px solid #fed7aa; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #ea580c; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #c2410c; font-size: 1rem;">Understanding Traffic Flows</h4>
+                            <p style="margin: 0 0 12px 0; color: #ea580c; font-size: 0.875rem; line-height: 1.6;">
+                                Traffic flows show which connections consume the most bandwidth. High-volume flows may indicate 
+                                <strong>large file transfers</strong>, <strong>video streaming</strong>, <strong>backups</strong>, or potentially 
+                                <strong>unauthorized data exfiltration</strong>. Monitoring top consumers helps optimize network performance.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">0-5% = Normal usage</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #92400e;">5-15% = High usage</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                                    <span style="color: #dc2626;">&gt;15% = Bandwidth hog</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    {{else}}
-                    <p class="text-muted">No traffic flow data available.</p>
+                </div>
+                
+                <!-- Traffic Flow List -->
+                <div style="padding: 16px 24px;">
+                    {{if .TopFlows}}
+                    {{range $index, $flow := .TopFlows}}
+                    {{if lt $index 15}}
+                    <details style="margin-bottom: 12px; border: 1px solid {{if gt $flow.Percentage 15.0}}#fecaca{{else if gt $flow.Percentage 5.0}}#fde68a{{else}}#bbf7d0{{end}}; border-radius: 8px; overflow: hidden; background: {{if gt $flow.Percentage 15.0}}#fef2f2{{else if gt $flow.Percentage 5.0}}#fefce8{{else}}#f0fdf4{{end}};">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-exchange-alt" style="color: {{if gt $flow.Percentage 15.0}}#ef4444{{else if gt $flow.Percentage 5.0}}#f59e0b{{else}}#22c55e{{end}};"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.SrcIP}}:{{$flow.SrcPort}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.DstIP}}:{{$flow.DstPort}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: {{if gt $flow.Percentage 15.0}}#fecaca{{else if gt $flow.Percentage 5.0}}#fde68a{{else}}#d1fae5{{end}}; color: {{if gt $flow.Percentage 15.0}}#dc2626{{else if gt $flow.Percentage 5.0}}#92400e{{else}}#047857{{end}}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                    {{printf "%.1f" $flow.Percentage}}%
+                                </span>
+                                <span style="background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$flow.Protocol}}
+                                </span>
+                                <span style="color: #6b7280; font-size: 0.8125rem; font-weight: 500;">
+                                    {{$flow.BytesFormatted}}
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Traffic Volume Visualization -->
+                            <div style="margin-bottom: 16px;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: #374151; font-size: 0.875rem;">Bandwidth Usage:</span>
+                                    <div style="flex: 1; height: 12px; background: #e5e7eb; border-radius: 6px; overflow: hidden;">
+                                        <div style="width: {{printf "%.1f" $flow.Percentage}}%; height: 100%; background: {{if gt $flow.Percentage 15.0}}#ef4444{{else if gt $flow.Percentage 5.0}}#f59e0b{{else}}#22c55e{{end}}; border-radius: 6px;"></div>
+                                    </div>
+                                    <span style="font-size: 0.875rem; color: #374151; font-weight: 600; min-width: 60px;">{{printf "%.1f" $flow.Percentage}}%</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Connection Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Source</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.SrcIP}}:{{$flow.SrcPort}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Destination</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.DstIP}}:{{$flow.DstPort}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Protocol</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$flow.Protocol}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Data Transferred</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$flow.BytesFormatted}}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- What This Means -->
+                            <div style="background: {{if gt $flow.Percentage 15.0}}#fef2f2{{else if gt $flow.Percentage 5.0}}#fefce8{{else}}#f0fdf4{{end}}; border: 1px solid {{if gt $flow.Percentage 15.0}}#fecaca{{else if gt $flow.Percentage 5.0}}#fde68a{{else}}#bbf7d0{{end}}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: {{if gt $flow.Percentage 15.0}}#dc2626{{else if gt $flow.Percentage 5.0}}#92400e{{else}}#166534{{end}}; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas {{if gt $flow.Percentage 15.0}}fa-exclamation-circle{{else if gt $flow.Percentage 5.0}}fa-exclamation-triangle{{else}}fa-check-circle{{end}}"></i>
+                                    {{if gt $flow.Percentage 15.0}}High Bandwidth Consumer{{else if gt $flow.Percentage 5.0}}Elevated Traffic{{else}}Normal Traffic{{end}}
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: {{if gt $flow.Percentage 15.0}}#991b1b{{else if gt $flow.Percentage 5.0}}#78350f{{else}}#047857{{end}}; line-height: 1.6;">
+                                    {{if gt $flow.Percentage 15.0}}This flow is consuming a significant portion of available bandwidth. This could indicate large file transfers, video streaming, backup operations, or potentially unauthorized data movement. Immediate investigation recommended.
+                                    {{else if gt $flow.Percentage 5.0}}This flow shows elevated traffic levels. While not critical, it's worth monitoring to ensure it's legitimate business traffic and not impacting other users.
+                                    {{else}}This flow shows normal traffic patterns. No immediate action required, but continue monitoring for changes.{{end}}
+                                </p>
+                            </div>
+                            
+                            <!-- Next Actions -->
+                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-tasks"></i>
+                                    Next Actions
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
+                                    {{if gt $flow.Percentage 15.0}}
+                                    <li><strong>Identify Application:</strong> Determine what application is generating this traffic</li>
+                                    <li><strong>Verify Legitimacy:</strong> Confirm this is authorized business traffic</li>
+                                    <li><strong>Check QoS:</strong> Review QoS policies for this traffic class</li>
+                                    <li><strong>Contact User:</strong> If source is a workstation, verify user activity</li>
+                                    {{else if gt $flow.Percentage 5.0}}
+                                    <li><strong>Monitor Trend:</strong> Watch if this flow continues to grow</li>
+                                    <li><strong>Identify Application:</strong> Determine the application type</li>
+                                    <li><strong>Review Policies:</strong> Ensure traffic aligns with acceptable use policy</li>
+                                    {{else}}
+                                    <li><strong>Continue Monitoring:</strong> No immediate action needed</li>
+                                    <li><strong>Baseline:</strong> Use this as reference for normal traffic patterns</li>
+                                    {{end}}
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}}</code>
+                            </div>
+                        </div>
+                    </details>
                     {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .TopFlows) 15}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 15 of {{len .TopFlows}} traffic flows.
+                    </div>
+                    {{end}}
+                    {{else}}
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">No traffic flow data available.</p>
+                    </div>
+                    {{end}}
+                </div>
+                
+                <!-- Traffic Management Tips -->
+                <div style="background: #f0fdf4; border-top: 1px solid #bbf7d0; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-lightbulb"></i>
+                        Traffic Management Tips
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #166534; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-tachometer-alt" style="color: #22c55e;"></i> QoS Prioritization
+                            </div>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #047857;">Implement QoS policies to prioritize critical business traffic over bulk transfers.</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #166534; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-clock" style="color: #22c55e;"></i> Schedule Large Transfers
+                            </div>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #047857;">Schedule backups and large file transfers during off-peak hours.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Protocol Distribution -->
+            <!-- Protocol Distribution - Complete Redesign with Inline Styles -->
             {{if .ProtocolStats}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-layer-group card-title-icon"></i>
-                        Protocol Distribution
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-layer-group"></i>
+                        Protocol Distribution Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .ProtocolStats}} protocols</span>
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Understand network protocol usage and identify anomalies</p>
                 </div>
-                <div class="card-body">
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Protocol</th>
-                                    <th>Total Bytes</th>
-                                    <th>Percentage</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .ProtocolStats}}
-                                <tr>
-                                    <td><strong>{{.Protocol}}</strong></td>
-                                    <td>{{.Bytes}}</td>
-                                    <td>{{printf "%.1f" .Percent}}%</td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #eef2ff; border-bottom: 1px solid #c7d2fe; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #4f46e5; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #3730a3; font-size: 1rem;">Understanding Protocol Distribution</h4>
+                            <p style="margin: 0 0 12px 0; color: #4338ca; font-size: 0.875rem; line-height: 1.6;">
+                                Protocol distribution shows how network bandwidth is divided among different protocols. 
+                                <strong>TCP</strong> typically dominates (web, email, apps), while <strong>UDP</strong> handles real-time traffic (VoIP, video). 
+                                Unusual protocols may indicate <strong>security concerns</strong> or <strong>misconfigured applications</strong>.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">Expected protocols</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #92400e;">Monitor closely</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                                    <span style="color: #dc2626;">Investigate</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Protocol List -->
+                <div style="padding: 16px 24px;">
+                    {{range $index, $proto := .ProtocolStats}}
+                    {{if lt $index 10}}
+                    <details style="margin-bottom: 12px; border: 1px solid #c7d2fe; border-radius: 8px; overflow: hidden; background: #f5f3ff;">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-network-wired" style="color: #6366f1;"></i>
+                                <span style="font-weight: 600; color: #1f2937; font-size: 1rem;">
+                                    {{$proto.Protocol}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 120px; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: {{printf "%.0f" $proto.Percent}}%; height: 100%; background: #6366f1; border-radius: 4px;"></div>
+                                </div>
+                                <span style="background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; min-width: 60px; text-align: center;">
+                                    {{printf "%.1f" $proto.Percent}}%
+                                </span>
+                                <span style="color: #6b7280; font-size: 0.8125rem; font-weight: 500; min-width: 80px; text-align: right;">
+                                    {{$proto.Bytes}}
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Protocol Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Protocol Name</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 700;">{{$proto.Protocol}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Total Data</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 600;">{{$proto.Bytes}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Share of Traffic</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 600;">{{printf "%.1f" $proto.Percent}}%</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Protocol Information -->
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    About This Protocol
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    {{if eq $proto.Protocol "TCP"}}TCP (Transmission Control Protocol) is the most common transport protocol. It provides reliable, ordered delivery of data and is used by web browsing, email, file transfers, and most applications.
+                                    {{else if eq $proto.Protocol "UDP"}}UDP (User Datagram Protocol) is used for real-time applications where speed is more important than reliability. Common uses include VoIP, video streaming, DNS queries, and online gaming.
+                                    {{else if eq $proto.Protocol "ICMP"}}ICMP (Internet Control Message Protocol) is used for network diagnostics like ping and traceroute. High ICMP traffic may indicate network scanning or troubleshooting activity.
+                                    {{else if eq $proto.Protocol "DNS"}}DNS (Domain Name System) traffic resolves domain names to IP addresses. Unusual DNS patterns may indicate tunneling or data exfiltration attempts.
+                                    {{else if eq $proto.Protocol "HTTP"}}HTTP (Hypertext Transfer Protocol) is used for unencrypted web traffic. Consider migrating to HTTPS for security.
+                                    {{else if eq $proto.Protocol "HTTPS"}}HTTPS is encrypted web traffic using TLS. This is the expected protocol for secure web browsing and API communications.
+                                    {{else if eq $proto.Protocol "TLS"}}TLS (Transport Layer Security) provides encryption for various protocols. This indicates secure communications.
+                                    {{else}}This protocol is part of your network traffic mix. Review if this protocol is expected for your environment.{{end}}
+                                </p>
+                            </div>
+                            
+                            <!-- Security Considerations -->
+                            <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #854d0e; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-shield-alt"></i>
+                                    Security Considerations
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #78350f; line-height: 1.8;">
+                                    {{if eq $proto.Protocol "TCP"}}
+                                    <li>Monitor for unusual port usage or connections to suspicious destinations</li>
+                                    <li>Check for excessive SYN packets which may indicate scanning</li>
+                                    {{else if eq $proto.Protocol "UDP"}}
+                                    <li>Watch for UDP floods which could indicate DDoS attacks</li>
+                                    <li>Verify UDP traffic is from expected applications</li>
+                                    {{else if eq $proto.Protocol "ICMP"}}
+                                    <li>High ICMP may indicate network reconnaissance</li>
+                                    <li>Consider rate-limiting ICMP at network boundaries</li>
+                                    {{else if eq $proto.Protocol "DNS"}}
+                                    <li>Monitor for DNS tunneling attempts</li>
+                                    <li>Check for queries to suspicious domains</li>
+                                    {{else}}
+                                    <li>Verify this protocol is expected in your environment</li>
+                                    <li>Review firewall rules for this protocol</li>
+                                    {{end}}
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">{{if eq $proto.Protocol "TCP"}}tcp{{else if eq $proto.Protocol "UDP"}}udp{{else if eq $proto.Protocol "ICMP"}}icmp{{else if eq $proto.Protocol "DNS"}}dns{{else if eq $proto.Protocol "HTTP"}}http{{else if eq $proto.Protocol "HTTPS"}}tls{{else if eq $proto.Protocol "TLS"}}tls{{else}}ip.proto{{end}}</code>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .ProtocolStats) 10}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 10 of {{len .ProtocolStats}} protocols.
+                    </div>
+                    {{end}}
+                </div>
+                
+                <!-- Protocol Best Practices -->
+                <div style="background: #eef2ff; border-top: 1px solid #c7d2fe; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #3730a3; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-clipboard-check"></i>
+                        Protocol Best Practices
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <div style="background: #ffffff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #3730a3; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-lock" style="color: #6366f1;"></i> Encrypt Traffic
+                            </div>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #4338ca;">Ensure sensitive data uses encrypted protocols (HTTPS, TLS, SSH).</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #3730a3; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-ban" style="color: #6366f1;"></i> Block Unnecessary
+                            </div>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #4338ca;">Disable protocols not required for business operations.</p>
+                        </div>
                     </div>
                 </div>
             </div>
