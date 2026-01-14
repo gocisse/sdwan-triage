@@ -160,8 +160,8 @@ func (b *BGPAnalyzer) handleBGPOpen(msg *BGPMessage, session *BGPSession, ipInfo
 		session.RemoteAS = myAS
 	}
 
-	// Check for AS number anomalies
-	if myAS == 0 || myAS > 4294967295 {
+	// Check for AS number anomalies (AS 0 is reserved/invalid)
+	if myAS == 0 {
 		b.reportBGPAnomaly(report, "Invalid AS Number", ipInfo, timestamp,
 			fmt.Sprintf("BGP OPEN with invalid AS number: %d from %s", myAS, bgpID.String()))
 	}
@@ -243,21 +243,21 @@ func (b *BGPAnalyzer) parseASPath(attrs []byte) []uint32 {
 	return asPath
 }
 
-// detectBGPHijack detects potential BGP hijacking
+// detectBGPHijack detects potential BGP hijacking using 6 heuristics
 func (b *BGPAnalyzer) detectBGPHijack(asPath []uint32, ipInfo *PacketIPInfo, timestamp float64, report *models.TriageReport) {
 	if len(asPath) == 0 {
 		return
 	}
 
 	// Heuristic 1: Unusually short AS path (potential hijack)
+	// A path length of 1 from an external peer is suspicious
 	if len(asPath) == 1 {
 		b.reportBGPAnomaly(report, "Suspicious Short AS Path", ipInfo, timestamp,
-			fmt.Sprintf("AS path length of 1 detected from %s (AS%d)", ipInfo.SrcIP, asPath[0]))
+			fmt.Sprintf("AS path length of 1 detected from %s (AS%d) - potential route hijack", ipInfo.SrcIP, asPath[0]))
 	}
 
-	// Heuristic 2: AS path prepending (potential traffic engineering or hijack)
+	// Heuristic 2: AS path prepending detection (potential traffic engineering or hijack)
 	if len(asPath) > 3 {
-		// Check for repeated AS numbers
 		asCounts := make(map[uint32]int)
 		for _, as := range asPath {
 			asCounts[as]++
@@ -265,23 +265,50 @@ func (b *BGPAnalyzer) detectBGPHijack(asPath []uint32, ipInfo *PacketIPInfo, tim
 		for as, count := range asCounts {
 			if count > 3 {
 				b.reportBGPAnomaly(report, "AS Path Prepending Detected", ipInfo, timestamp,
-					fmt.Sprintf("AS%d appears %d times in path from %s", as, count, ipInfo.SrcIP))
+					fmt.Sprintf("AS%d appears %d times in path from %s - verify if intentional", as, count, ipInfo.SrcIP))
 			}
 		}
 	}
 
-	// Heuristic 3: Private AS numbers in public internet (potential misconfiguration)
+	// Heuristic 3: Private AS numbers in public internet (potential misconfiguration or leak)
 	for _, as := range asPath {
+		// RFC 6996: Private AS ranges
 		if (as >= 64512 && as <= 65534) || (as >= 4200000000 && as <= 4294967294) {
 			b.reportBGPAnomaly(report, "Private AS in Public Path", ipInfo, timestamp,
-				fmt.Sprintf("Private AS%d detected in path from %s", as, ipInfo.SrcIP))
+				fmt.Sprintf("Private AS%d detected in path from %s - should be stripped at edge", as, ipInfo.SrcIP))
+			break // Report only once per path
 		}
 	}
 
-	// Heuristic 4: Reserved AS numbers
-	if asPath[0] == 0 || asPath[0] == 23456 || asPath[0] == 65535 || asPath[0] == 4294967295 {
-		b.reportBGPAnomaly(report, "Reserved AS Number", ipInfo, timestamp,
-			fmt.Sprintf("Reserved AS%d detected from %s", asPath[0], ipInfo.SrcIP))
+	// Heuristic 4: Reserved AS numbers (RFC 7607)
+	for _, as := range asPath {
+		if as == 0 || as == 23456 || as == 65535 || as == 4294967295 {
+			b.reportBGPAnomaly(report, "Reserved AS Number", ipInfo, timestamp,
+				fmt.Sprintf("Reserved AS%d detected in path from %s - invalid route", as, ipInfo.SrcIP))
+			break // Report only once per path
+		}
+	}
+
+	// Heuristic 5: AS path loop detection (same AS appears non-consecutively)
+	if len(asPath) >= 3 {
+		seen := make(map[uint32]int)
+		for i, as := range asPath {
+			if prevIdx, exists := seen[as]; exists {
+				// Check if it's not consecutive (which would be prepending)
+				if i-prevIdx > 1 {
+					b.reportBGPAnomaly(report, "AS Path Loop Detected", ipInfo, timestamp,
+						fmt.Sprintf("AS%d appears at positions %d and %d in path from %s - potential routing loop or hijack", as, prevIdx+1, i+1, ipInfo.SrcIP))
+					break
+				}
+			}
+			seen[as] = i
+		}
+	}
+
+	// Heuristic 6: Unusually long AS path (potential hijack with path inflation)
+	if len(asPath) > 15 {
+		b.reportBGPAnomaly(report, "Unusually Long AS Path", ipInfo, timestamp,
+			fmt.Sprintf("AS path length of %d detected from %s - potential path manipulation", len(asPath), ipInfo.SrcIP))
 	}
 }
 

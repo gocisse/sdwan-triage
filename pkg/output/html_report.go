@@ -520,6 +520,12 @@ type TunnelFindingView struct {
 	ByteCount   uint64
 	FirstSeen   float64
 	LastSeen    float64
+	// DPI-enhanced fields
+	DetectionMethod string
+	Confidence      string
+	ProtocolVersion string
+	SessionState    string
+	IsAuthorized    bool
 }
 
 type SDWANVendorView struct {
@@ -1795,6 +1801,12 @@ func convertTunnelFindings(tunnels []models.TunnelFinding) []TunnelFindingView {
 			ByteCount:   t.ByteCount,
 			FirstSeen:   t.FirstSeen,
 			LastSeen:    t.LastSeen,
+			// DPI-enhanced fields
+			DetectionMethod: html.EscapeString(t.DetectionMethod),
+			Confidence:      html.EscapeString(t.Confidence),
+			ProtocolVersion: html.EscapeString(t.ProtocolVersion),
+			SessionState:    html.EscapeString(t.SessionState),
+			IsAuthorized:    t.IsAuthorized,
 		}
 	}
 	return result

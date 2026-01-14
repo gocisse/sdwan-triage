@@ -2667,11 +2667,11 @@
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-shield-alt" style="color: #0891b2;"></i>
                                 <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
-                                    {{$tunnel.OuterSrcIP}}
+                                    {{$tunnel.SrcIP}}
                                 </span>
                                 <span style="color: #9ca3af; font-weight: bold;">→</span>
                                 <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
-                                    {{$tunnel.OuterDstIP}}
+                                    {{$tunnel.DstIP}}
                                 </span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
@@ -2679,7 +2679,7 @@
                                     {{$tunnel.Type}}
                                 </span>
                                 <span style="background: #d1fae5; color: #047857; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
-                                    {{$tunnel.Count}} pkts
+                                    {{$tunnel.PacketCount}} pkts
                                 </span>
                             </div>
                         </summary>
@@ -2693,15 +2693,15 @@
                                 </div>
                                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
                                     <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Outer Source</div>
-                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$tunnel.OuterSrcIP}}</code>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$tunnel.SrcIP}}</code>
                                 </div>
                                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
                                     <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Outer Destination</div>
-                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$tunnel.OuterDstIP}}</code>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$tunnel.DstIP}}</code>
                                 </div>
                                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
                                     <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Inner Protocol</div>
-                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$tunnel.InnerProtocol}}</span>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$tunnel.InnerProto}}</span>
                                 </div>
                             </div>
                             
@@ -2731,10 +2731,10 @@
                                     Next Actions
                                 </h4>
                                 <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
-                                    <li><strong>Verify tunnel endpoints:</strong> Confirm both {{$tunnel.OuterSrcIP}} and {{$tunnel.OuterDstIP}} are expected</li>
+                                    <li><strong>Verify tunnel endpoints:</strong> Confirm both {{$tunnel.SrcIP}} and {{$tunnel.DstIP}} are expected</li>
                                     <li><strong>Check MTU settings:</strong> Ensure tunnel overhead doesn't cause fragmentation</li>
-                                    <li><strong>Monitor packet counts:</strong> {{$tunnel.Count}} packets observed - verify this is expected volume</li>
-                                    <li><strong>Review inner protocol:</strong> Confirm {{$tunnel.InnerProtocol}} traffic should traverse this tunnel</li>
+                                    <li><strong>Monitor packet counts:</strong> {{$tunnel.PacketCount}} packets observed - verify this is expected volume</li>
+                                    <li><strong>Review inner protocol:</strong> Confirm {{$tunnel.InnerProto}} traffic should traverse this tunnel</li>
                                 </ul>
                             </div>
                             
@@ -2744,7 +2744,7 @@
                                     <i class="fas fa-filter"></i>
                                     Wireshark Filter
                                 </h4>
-                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$tunnel.OuterSrcIP}} && ip.addr=={{$tunnel.OuterDstIP}}</code>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$tunnel.SrcIP}} && ip.addr=={{$tunnel.DstIP}}</code>
                             </div>
                         </div>
                     </details>

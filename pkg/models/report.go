@@ -426,6 +426,12 @@ type TunnelFinding struct {
 	ByteCount   uint64  `json:"byte_count"`
 	FirstSeen   float64 `json:"first_seen"`
 	LastSeen    float64 `json:"last_seen"`
+	// DPI-enhanced fields for VPN tunnels
+	DetectionMethod string `json:"detection_method,omitempty"` // "DPI", "Port-based", "Signature"
+	Confidence      string `json:"confidence,omitempty"`       // "High", "Medium", "Low"
+	ProtocolVersion string `json:"protocol_version,omitempty"` // Protocol version if detected
+	SessionState    string `json:"session_state,omitempty"`    // "Handshake", "Established", "Data"
+	IsAuthorized    bool   `json:"is_authorized,omitempty"`    // For SD-WAN security validation
 }
 
 // SDWANVendor represents a detected SD-WAN vendor
