@@ -884,9 +884,10 @@
                     <div class="handshake-intro">
                         <p>TCP handshake events grouped by flow for correlation analysis. Click on each flow to expand/collapse details.</p>
                         <div class="handshake-legend">
-                            <span class="legend-item"><span class="legend-color legend-syn"></span> SYN (Connection Request)</span>
-                            <span class="legend-item"><span class="legend-color legend-synack"></span> SYN-ACK (Server Response)</span>
-                            <span class="legend-item"><span class="legend-color legend-complete"></span> Handshake Complete</span>
+                            <span class="legend-item"><span class="legend-color legend-syn"></span> <i class="fas fa-arrow-right" style="color: #3b82f6;"></i> SYN (Client initiated)</span>
+                            <span class="legend-item"><span class="legend-color legend-synack"></span> <i class="fas fa-arrow-left" style="color: #f97316;"></i> SYN-ACK (Server responded)</span>
+                            <span class="legend-item"><span class="legend-color legend-complete"></span> <i class="fas fa-check" style="color: #10b981;"></i> Complete (Successful)</span>
+                            <span class="legend-item"><span class="legend-color legend-failed"></span> <i class="fas fa-times" style="color: #ef4444;"></i> Failed (Handshake failed)</span>
                         </div>
                     </div>
                     
@@ -931,10 +932,10 @@
                                     <span class="event-time">Client initiates connection</span>
                                     <span class="event-desc"></span>
                                 </div>
-                                <div class="event event-synack" style="background: #fef3c7; border-left-color: #f59e0b;">
+                                <div class="event event-failed">
                                     <span class="event-icon"><i class="fas fa-times"></i></span>
                                     <span class="event-type">FAILED</span>
-                                    <span class="event-time" style="color: #ef4444;">{{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}Connection failed{{end}}</span>
+                                    <span class="event-time">{{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}Connection failed{{end}}</span>
                                     <span class="event-desc"></span>
                                 </div>
                             {{else if eq $flow.StateColor "info"}}
@@ -1018,62 +1019,6 @@
             </details>
             {{end}}
             
-            <!-- Detailed TCP Connection Flows -->
-            {{if .TCPHandshakeCorrelatedFlows}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-exchange-alt card-title-icon"></i>
-                        Detailed TCP Connection Flows ({{len .TCPHandshakeCorrelatedFlows}})
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-md">Per-flow TCP handshake analysis showing connection attempts, flags, and status.</p>
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Source IP:Port</th>
-                                    <th>Destination IP:Port</th>
-                                    <th>TCP Flags Sequence</th>
-                                    <th>Status</th>
-                                    <th>Wireshark Filter</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range $index, $flow := .TCPHandshakeCorrelatedFlows}}
-                                {{if lt $index 50}}
-                                <tr class="{{if eq $flow.Status "Failed"}}table-row-critical{{else if eq $flow.Status "Complete"}}table-row-success{{else}}table-row-warning{{end}}">
-                                    <td><code>{{$flow.SrcIP}}:{{$flow.SrcPort}}</code></td>
-                                    <td><code>{{$flow.DstIP}}:{{$flow.DstPort}}</code></td>
-                                    <td>
-                                        {{range $i, $event := $flow.Events}}
-                                        <span class="status-badge {{if eq $event.Type "SYN"}}info{{else if eq $event.Type "SYN-ACK"}}healthy{{else if eq $event.Type "ACK"}}healthy{{else if eq $event.Type "RST"}}critical{{else if eq $event.Type "FIN"}}warning{{else}}info{{end}}" style="margin-right: 4px; margin-bottom: 2px; display: inline-block;">
-                                            {{$event.Type}}
-                                        </span>
-                                        {{end}}
-                                    </td>
-                                    <td>
-                                        <span class="status-badge {{if eq $flow.Status "Complete"}}healthy{{else if eq $flow.Status "Failed"}}critical{{else}}warning{{end}}">
-                                            <span class="status-dot"></span>
-                                            {{$flow.Status}}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <code style="font-size: var(--font-size-xs);">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}} && tcp.port=={{$flow.DstPort}}</code>
-                                    </td>
-                                </tr>
-                                {{end}}
-                                {{end}}
-                            </tbody>
-                        </table>
-                    </div>
-                    {{if gt (len .TCPHandshakeCorrelatedFlows) 50}}
-                    <p class="text-muted mt-md"><i class="fas fa-info-circle"></i> Showing first 50 of {{len .TCPHandshakeCorrelatedFlows}} TCP flows.</p>
-                    {{end}}
-                </div>
-            </div>
-            {{end}}
             
             
             <!-- Performance Metrics Grid -->
