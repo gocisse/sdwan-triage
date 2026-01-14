@@ -691,6 +691,14 @@ func (p *Processor) finalizeTunnelAnalysis(report *models.TriageReport) {
 			ByteCount:   tunnel.ByteCount,
 			FirstSeen:   float64(tunnel.FirstSeen.UnixNano()) / 1e9,
 			LastSeen:    float64(tunnel.LastSeen.UnixNano()) / 1e9,
+			// DPI-enhanced fields
+			DetectionMethod: tunnel.DetectionMethod,
+			Confidence:      tunnel.Confidence,
+			ProtocolVersion: tunnel.ProtocolVersion,
+			SessionState:    tunnel.SessionState,
+			IsAuthorized:    tunnel.IsAuthorized,
+			// SD-WAN specific fields
+			SDWANPath: tunnel.SDWANPath,
 		})
 	}
 }

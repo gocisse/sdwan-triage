@@ -22,6 +22,37 @@ const (
 	WireGuardPort = 51820
 )
 
+// SD-WAN Vendor-Specific Ports (highest priority detection)
+const (
+	// Cisco SD-WAN (Viptela / IOS-XE SD-WAN)
+	CiscoSDWANDataPort    = 12346 // UDP data plane tunnels
+	CiscoSDWANControlPort = 23456 // TCP/UDP control plane (vSmart, vManage)
+	CiscoSDWANNATPort     = 12366 // UDP NAT-traversal / fallback
+
+	// VMware Velocloud
+	VelocloudVCMPPort = 2426 // UDP VCMP tunnels (primary identifier)
+
+	// Fortinet Secure SD-WAN
+	FortinetSDWANPort = 541 // TCP/UDP control and data
+
+	// Aruba EdgeConnect / Silver Peak / Palo Alto Prisma / Zscaler (IPsec-based)
+	IPsecIKEPort  = 500  // IKE key exchange
+	IPsecNATTPort = 4500 // IPsec NAT-Traversal
+
+	// Juniper Session Smart (Mist / 128T) - uses dynamic ports, identified by behavior
+)
+
+// SD-WAN Vendor identifiers
+const (
+	SDWANVendorCisco     = "Cisco SD-WAN"
+	SDWANVendorVelocloud = "VMware Velocloud"
+	SDWANVendorFortinet  = "Fortinet SD-WAN"
+	SDWANVendorAruba     = "Aruba EdgeConnect"
+	SDWANVendorPaloAlto  = "Palo Alto Prisma"
+	SDWANVendorZscaler   = "Zscaler"
+	SDWANVendorGeneric   = "Generic IPsec SD-WAN"
+)
+
 // OpenVPN opcodes for DPI
 const (
 	OpenVPNControlHardResetClientV1 = 1
@@ -176,6 +207,7 @@ func (t *TunnelAnalyzer) isExcludedFromVPNDetection(ipInfo *PacketIPInfo, srcPor
 }
 
 // Analyze processes packets for tunnel/encapsulation protocols
+// Detection priority: SD-WAN vendor ports > Protocol signatures > Generic VPN patterns
 func (t *TunnelAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
 	ipInfo := ExtractIPInfo(packet)
 	if ipInfo == nil {
@@ -184,28 +216,75 @@ func (t *TunnelAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisS
 
 	timestamp := packet.Metadata().Timestamp
 
-	// Check for GRE
+	// Check for GRE (protocol 47)
 	if greLayer := packet.Layer(layers.LayerTypeGRE); greLayer != nil {
 		t.analyzeGRE(packet, greLayer.(*layers.GRE), ipInfo, timestamp)
 		return
 	}
 
-	// Check for IPsec (ESP/AH)
+	// Check for IPsec ESP (protocol 50) - could be SD-WAN or standalone IPsec
 	if espLayer := packet.Layer(layers.LayerTypeIPSecESP); espLayer != nil {
-		t.analyzeIPSec(ipInfo, "ESP", timestamp, uint64(len(packet.Data())))
+		t.analyzeIPSecWithContext(ipInfo, "ESP", timestamp, uint64(len(packet.Data())), state)
 		return
 	}
+	// Check for IPsec AH (protocol 51)
 	if ahLayer := packet.Layer(layers.LayerTypeIPSecAH); ahLayer != nil {
 		t.analyzeIPSec(ipInfo, "AH", timestamp, uint64(len(packet.Data())))
 		return
 	}
 
-	// Check UDP-based tunnels
+	// Check UDP-based tunnels with SD-WAN vendor priority
 	if udpLayer := packet.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		udp := udpLayer.(*layers.UDP)
 		srcPort := uint16(udp.SrcPort)
 		dstPort := uint16(udp.DstPort)
 		payload := udp.Payload
+
+		// ============================================================
+		// PRIORITY 1: SD-WAN Vendor-Specific Ports (Highest Confidence)
+		// ============================================================
+
+		// Cisco SD-WAN (Viptela) - UDP 12346 is the signature
+		if dstPort == CiscoSDWANDataPort || srcPort == CiscoSDWANDataPort {
+			t.analyzeSDWANTunnel(SDWANVendorCisco, "Data Plane", ipInfo, srcPort, dstPort, timestamp, uint64(len(payload)))
+			return
+		}
+		if dstPort == CiscoSDWANControlPort || srcPort == CiscoSDWANControlPort {
+			t.analyzeSDWANTunnel(SDWANVendorCisco, "Control Plane", ipInfo, srcPort, dstPort, timestamp, uint64(len(payload)))
+			return
+		}
+		if dstPort == CiscoSDWANNATPort || srcPort == CiscoSDWANNATPort {
+			t.analyzeSDWANTunnel(SDWANVendorCisco, "NAT Traversal", ipInfo, srcPort, dstPort, timestamp, uint64(len(payload)))
+			return
+		}
+
+		// VMware Velocloud - UDP 2426 is the signature
+		if dstPort == VelocloudVCMPPort || srcPort == VelocloudVCMPPort {
+			t.analyzeSDWANTunnel(SDWANVendorVelocloud, "VCMP Tunnel", ipInfo, srcPort, dstPort, timestamp, uint64(len(payload)))
+			return
+		}
+
+		// Fortinet SD-WAN - UDP 541 is the signature
+		if dstPort == FortinetSDWANPort || srcPort == FortinetSDWANPort {
+			t.analyzeSDWANTunnel(SDWANVendorFortinet, "Data/Control", ipInfo, srcPort, dstPort, timestamp, uint64(len(payload)))
+			return
+		}
+
+		// IPsec NAT-T (UDP 4500) - Aruba/Palo Alto/Zscaler SD-WAN
+		if dstPort == IPsecNATTPort || srcPort == IPsecNATTPort {
+			t.analyzeIPsecNATT(payload, ipInfo, srcPort, dstPort, timestamp, state)
+			return
+		}
+
+		// IKE (UDP 500) - IPsec key exchange
+		if dstPort == IPsecIKEPort || srcPort == IPsecIKEPort {
+			t.analyzeIKE(payload, ipInfo, srcPort, dstPort, timestamp)
+			return
+		}
+
+		// ============================================================
+		// PRIORITY 2: Standard Tunnel Protocols
+		// ============================================================
 
 		// VXLAN
 		if dstPort == VXLANPort || srcPort == VXLANPort {
@@ -231,38 +310,245 @@ func (t *TunnelAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisS
 			return
 		}
 
-		// OpenVPN - Only on standard port OR with strict DPI validation
-		// Skip if traffic is to/from known services (DNS, etc.)
-		if !t.isExcludedFromVPNDetection(ipInfo, srcPort, dstPort) {
-			if dstPort == OpenVPNPort || srcPort == OpenVPNPort {
-				t.analyzeOpenVPN(payload, ipInfo, srcPort, dstPort, timestamp)
-				return
-			}
-			// Check for OpenVPN on non-standard ports via strict DPI only
-			if t.isOpenVPNPacketStrict(payload, srcPort, dstPort) {
+		// ============================================================
+		// PRIORITY 3: VPN Detection (with strict exclusions)
+		// ============================================================
+
+		// Skip VPN detection for excluded services (DNS, NTP, etc.)
+		if t.isExcludedFromVPNDetection(ipInfo, srcPort, dstPort) {
+			return
+		}
+
+		// OpenVPN - Only on standard port 1194
+		if dstPort == OpenVPNPort || srcPort == OpenVPNPort {
+			if t.isOpenVPNPacket(payload) {
 				t.analyzeOpenVPN(payload, ipInfo, srcPort, dstPort, timestamp)
 				return
 			}
 		}
 
-		// WireGuard - Only on standard port OR with strict DPI validation
-		// Skip if traffic is to/from known services (DNS, etc.)
-		if !t.isExcludedFromVPNDetection(ipInfo, srcPort, dstPort) {
-			if dstPort == WireGuardPort || srcPort == WireGuardPort {
+		// WireGuard - Only on standard port 51820
+		if dstPort == WireGuardPort || srcPort == WireGuardPort {
+			if t.isWireGuardPacket(payload) {
 				t.analyzeWireGuard(payload, ipInfo, srcPort, dstPort, timestamp)
 				return
 			}
-			// Check for WireGuard on non-standard ports via strict DPI only
-			if t.isWireGuardPacketStrict(payload, srcPort, dstPort) {
-				t.analyzeWireGuard(payload, ipInfo, srcPort, dstPort, timestamp)
-				return
-			}
+		}
+
+		// NOTE: Removed non-standard port DPI detection to prevent false positives
+		// OpenVPN/WireGuard on non-standard ports requires explicit configuration
+	}
+
+	// Check TCP for SD-WAN control plane
+	if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp := tcpLayer.(*layers.TCP)
+		srcPort := uint16(tcp.SrcPort)
+		dstPort := uint16(tcp.DstPort)
+
+		// Cisco SD-WAN control plane (TCP 23456)
+		if dstPort == CiscoSDWANControlPort || srcPort == CiscoSDWANControlPort {
+			t.analyzeSDWANTunnel(SDWANVendorCisco, "Control Plane (TCP)", ipInfo, srcPort, dstPort, timestamp, uint64(len(tcp.Payload)))
+			return
+		}
+
+		// Fortinet SD-WAN control (TCP 541)
+		if dstPort == FortinetSDWANPort || srcPort == FortinetSDWANPort {
+			t.analyzeSDWANTunnel(SDWANVendorFortinet, "Control Plane (TCP)", ipInfo, srcPort, dstPort, timestamp, uint64(len(tcp.Payload)))
+			return
 		}
 	}
 
 	// Check for MPLS
 	if mplsLayer := packet.Layer(layers.LayerTypeMPLS); mplsLayer != nil {
 		t.analyzeMPLS(mplsLayer.(*layers.MPLS), ipInfo, timestamp, uint64(len(packet.Data())))
+	}
+}
+
+// analyzeSDWANTunnel records SD-WAN vendor-specific tunnel traffic
+func (t *TunnelAnalyzer) analyzeSDWANTunnel(vendor, tunnelFunction string, ipInfo *PacketIPInfo, srcPort, dstPort uint16, timestamp time.Time, byteCount uint64) {
+	tunnelType := fmt.Sprintf("%s %s", vendor, tunnelFunction)
+	key := fmt.Sprintf("sdwan-%s-%s-%s-%d-%d", vendor, ipInfo.SrcIP, ipInfo.DstIP, srcPort, dstPort)
+
+	if tunnel, exists := t.tunnels[key]; exists {
+		tunnel.LastSeen = timestamp
+		tunnel.PacketCount++
+		tunnel.ByteCount += byteCount
+	} else {
+		// Generate Wireshark filter for this tunnel
+		wiresharkFilter := t.generateSDWANWiresharkFilter(vendor, srcPort, dstPort)
+
+		t.tunnels[key] = &TunnelInfo{
+			Type:            tunnelType,
+			SrcIP:           ipInfo.SrcIP,
+			DstIP:           ipInfo.DstIP,
+			SrcPort:         srcPort,
+			DstPort:         dstPort,
+			FirstSeen:       timestamp,
+			LastSeen:        timestamp,
+			PacketCount:     1,
+			ByteCount:       byteCount,
+			InnerProto:      "Encrypted",
+			DetectionMethod: "Port-based",
+			Confidence:      VPNConfidenceHigh,
+			SDWANPath:       wiresharkFilter,
+		}
+	}
+}
+
+// generateSDWANWiresharkFilter generates a Wireshark filter for the SD-WAN tunnel
+func (t *TunnelAnalyzer) generateSDWANWiresharkFilter(vendor string, srcPort, dstPort uint16) string {
+	switch vendor {
+	case SDWANVendorCisco:
+		return fmt.Sprintf("udp.port == %d || udp.port == %d || tcp.port == %d", CiscoSDWANDataPort, CiscoSDWANControlPort, CiscoSDWANControlPort)
+	case SDWANVendorVelocloud:
+		return fmt.Sprintf("udp.port == %d", VelocloudVCMPPort)
+	case SDWANVendorFortinet:
+		return fmt.Sprintf("udp.port == %d || tcp.port == %d", FortinetSDWANPort, FortinetSDWANPort)
+	case SDWANVendorAruba, SDWANVendorPaloAlto, SDWANVendorZscaler, SDWANVendorGeneric:
+		return "udp.port == 4500 || udp.port == 500 || esp"
+	default:
+		return fmt.Sprintf("udp.port == %d", dstPort)
+	}
+}
+
+// analyzeIPsecNATT analyzes IPsec NAT-Traversal traffic (UDP 4500)
+// This is commonly used by Aruba, Palo Alto, and Zscaler SD-WAN
+func (t *TunnelAnalyzer) analyzeIPsecNATT(payload []byte, ipInfo *PacketIPInfo, srcPort, dstPort uint16, timestamp time.Time, state *models.AnalysisState) {
+	// IPsec NAT-T packets start with 4 zero bytes (Non-ESP marker) or ESP header
+	tunnelType := "IPsec NAT-T"
+
+	// Check if this IP has been seen with ESP traffic (indicates SD-WAN)
+	espKey := fmt.Sprintf("ipsec-ESP-%s-%s", ipInfo.SrcIP, ipInfo.DstIP)
+	espKeyReverse := fmt.Sprintf("ipsec-ESP-%s-%s", ipInfo.DstIP, ipInfo.SrcIP)
+	if _, hasESP := t.tunnels[espKey]; hasESP {
+		tunnelType = "IPsec SD-WAN NAT-T"
+	} else if _, hasESP := t.tunnels[espKeyReverse]; hasESP {
+		tunnelType = "IPsec SD-WAN NAT-T"
+	}
+
+	key := fmt.Sprintf("ipsec-natt-%s-%s", ipInfo.SrcIP, ipInfo.DstIP)
+	if tunnel, exists := t.tunnels[key]; exists {
+		tunnel.LastSeen = timestamp
+		tunnel.PacketCount++
+		tunnel.ByteCount += uint64(len(payload))
+	} else {
+		t.tunnels[key] = &TunnelInfo{
+			Type:            tunnelType,
+			SrcIP:           ipInfo.SrcIP,
+			DstIP:           ipInfo.DstIP,
+			SrcPort:         srcPort,
+			DstPort:         dstPort,
+			FirstSeen:       timestamp,
+			LastSeen:        timestamp,
+			PacketCount:     1,
+			ByteCount:       uint64(len(payload)),
+			InnerProto:      "Encrypted",
+			DetectionMethod: "Port-based",
+			Confidence:      VPNConfidenceHigh,
+			SDWANPath:       fmt.Sprintf("udp.port == 4500 && ip.addr == %s", ipInfo.DstIP),
+		}
+		// Track for correlation with ESP
+		t.trackIPsecSession(ipInfo.SrcIP, ipInfo.DstIP, "NAT-T")
+	}
+}
+
+// analyzeIKE analyzes IKE (Internet Key Exchange) traffic for IPsec
+func (t *TunnelAnalyzer) analyzeIKE(payload []byte, ipInfo *PacketIPInfo, srcPort, dstPort uint16, timestamp time.Time) {
+	key := fmt.Sprintf("ike-%s-%s", ipInfo.SrcIP, ipInfo.DstIP)
+	if tunnel, exists := t.tunnels[key]; exists {
+		tunnel.LastSeen = timestamp
+		tunnel.PacketCount++
+		tunnel.ByteCount += uint64(len(payload))
+	} else {
+		t.tunnels[key] = &TunnelInfo{
+			Type:            "IKE (IPsec Key Exchange)",
+			SrcIP:           ipInfo.SrcIP,
+			DstIP:           ipInfo.DstIP,
+			SrcPort:         srcPort,
+			DstPort:         dstPort,
+			FirstSeen:       timestamp,
+			LastSeen:        timestamp,
+			PacketCount:     1,
+			ByteCount:       uint64(len(payload)),
+			InnerProto:      "IKE",
+			DetectionMethod: "Port-based",
+			Confidence:      VPNConfidenceHigh,
+			SDWANPath:       fmt.Sprintf("udp.port == 500 && ip.addr == %s", ipInfo.DstIP),
+		}
+		// Track for correlation with ESP/NAT-T
+		t.trackIPsecSession(ipInfo.SrcIP, ipInfo.DstIP, "IKE")
+	}
+}
+
+// analyzeIPSecWithContext analyzes ESP traffic with SD-WAN context
+func (t *TunnelAnalyzer) analyzeIPSecWithContext(ipInfo *PacketIPInfo, protocol string, timestamp time.Time, byteCount uint64, state *models.AnalysisState) {
+	// Check if we have IKE or NAT-T traffic for this IP pair (indicates SD-WAN)
+	ikeKey := fmt.Sprintf("ike-%s-%s", ipInfo.SrcIP, ipInfo.DstIP)
+	ikeKeyReverse := fmt.Sprintf("ike-%s-%s", ipInfo.DstIP, ipInfo.SrcIP)
+	nattKey := fmt.Sprintf("ipsec-natt-%s-%s", ipInfo.SrcIP, ipInfo.DstIP)
+	nattKeyReverse := fmt.Sprintf("ipsec-natt-%s-%s", ipInfo.DstIP, ipInfo.SrcIP)
+
+	tunnelType := "IPsec " + protocol
+	if _, hasIKE := t.tunnels[ikeKey]; hasIKE {
+		tunnelType = "IPsec SD-WAN " + protocol
+	} else if _, hasIKE := t.tunnels[ikeKeyReverse]; hasIKE {
+		tunnelType = "IPsec SD-WAN " + protocol
+	} else if _, hasNATT := t.tunnels[nattKey]; hasNATT {
+		tunnelType = "IPsec SD-WAN " + protocol
+	} else if _, hasNATT := t.tunnels[nattKeyReverse]; hasNATT {
+		tunnelType = "IPsec SD-WAN " + protocol
+	}
+
+	key := fmt.Sprintf("ipsec-%s-%s-%s", protocol, ipInfo.SrcIP, ipInfo.DstIP)
+	if tunnel, exists := t.tunnels[key]; exists {
+		tunnel.LastSeen = timestamp
+		tunnel.PacketCount++
+		tunnel.ByteCount += byteCount
+		// Update type if we now have context
+		if tunnelType != tunnel.Type && tunnelType != "IPsec "+protocol {
+			tunnel.Type = tunnelType
+		}
+	} else {
+		t.tunnels[key] = &TunnelInfo{
+			Type:            tunnelType,
+			SrcIP:           ipInfo.SrcIP,
+			DstIP:           ipInfo.DstIP,
+			FirstSeen:       timestamp,
+			LastSeen:        timestamp,
+			PacketCount:     1,
+			ByteCount:       byteCount,
+			InnerProto:      "Encrypted",
+			DetectionMethod: "Protocol",
+			Confidence:      VPNConfidenceHigh,
+			SDWANPath:       fmt.Sprintf("esp && ip.addr == %s", ipInfo.DstIP),
+		}
+	}
+}
+
+// trackIPsecSession tracks IPsec session components for correlation
+func (t *TunnelAnalyzer) trackIPsecSession(srcIP, dstIP, component string) {
+	sessionKey := fmt.Sprintf("ipsec-session-%s-%s", srcIP, dstIP)
+	if session, exists := t.vpnSessions[sessionKey]; exists {
+		switch component {
+		case "IKE":
+			session.ControlPackets++
+		case "NAT-T":
+			session.DataPackets++
+		case "ESP":
+			session.DataPackets++
+		}
+		session.LastSeen = time.Now()
+	} else {
+		t.vpnSessions[sessionKey] = &VPNSessionTracker{
+			FirstSeen: time.Now(),
+			LastSeen:  time.Now(),
+		}
+		switch component {
+		case "IKE":
+			t.vpnSessions[sessionKey].ControlPackets = 1
+		case "NAT-T", "ESP":
+			t.vpnSessions[sessionKey].DataPackets = 1
+		}
 	}
 }
 

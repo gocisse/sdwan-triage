@@ -432,6 +432,8 @@ type TunnelFinding struct {
 	ProtocolVersion string `json:"protocol_version,omitempty"` // Protocol version if detected
 	SessionState    string `json:"session_state,omitempty"`    // "Handshake", "Established", "Data"
 	IsAuthorized    bool   `json:"is_authorized,omitempty"`    // For SD-WAN security validation
+	// SD-WAN specific fields
+	SDWANPath string `json:"sdwan_path,omitempty"` // Wireshark filter for this tunnel
 }
 
 // SDWANVendor represents a detected SD-WAN vendor

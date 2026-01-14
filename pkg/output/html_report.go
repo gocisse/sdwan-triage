@@ -526,6 +526,9 @@ type TunnelFindingView struct {
 	ProtocolVersion string
 	SessionState    string
 	IsAuthorized    bool
+	// SD-WAN specific fields
+	WiresharkFilter string // Wireshark filter for this tunnel
+	VendorName      string // SD-WAN vendor name if detected
 }
 
 type SDWANVendorView struct {
@@ -1790,6 +1793,18 @@ func convertVoIPAnalysis(v *models.VoIPAnalysis) *VoIPAnalysisView {
 func convertTunnelFindings(tunnels []models.TunnelFinding) []TunnelFindingView {
 	result := make([]TunnelFindingView, len(tunnels))
 	for i, t := range tunnels {
+		// Extract vendor name from tunnel type if it's an SD-WAN tunnel
+		vendorName := ""
+		if strings.Contains(t.Type, "Cisco SD-WAN") {
+			vendorName = "Cisco SD-WAN (Viptela)"
+		} else if strings.Contains(t.Type, "Velocloud") {
+			vendorName = "VMware Velocloud"
+		} else if strings.Contains(t.Type, "Fortinet") {
+			vendorName = "Fortinet SD-WAN"
+		} else if strings.Contains(t.Type, "IPsec SD-WAN") {
+			vendorName = "IPsec-based SD-WAN (Aruba/Palo Alto/Zscaler)"
+		}
+
 		result[i] = TunnelFindingView{
 			Type:        html.EscapeString(t.Type),
 			SrcIP:       html.EscapeString(t.SrcIP),
@@ -1808,6 +1823,9 @@ func convertTunnelFindings(tunnels []models.TunnelFinding) []TunnelFindingView {
 			ProtocolVersion: html.EscapeString(t.ProtocolVersion),
 			SessionState:    html.EscapeString(t.SessionState),
 			IsAuthorized:    t.IsAuthorized,
+			// SD-WAN specific fields
+			WiresharkFilter: html.EscapeString(t.SDWANPath),
+			VendorName:      vendorName,
 		}
 	}
 	return result

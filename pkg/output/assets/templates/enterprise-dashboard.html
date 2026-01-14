@@ -3066,6 +3066,42 @@
                                 </div>
                             </div>
                             
+                            <!-- SD-WAN Vendor Badge (if applicable) -->
+                            {{if $tunnel.VendorName}}
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; color: white;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <i class="fas fa-network-wired" style="font-size: 1.5rem;"></i>
+                                    <div>
+                                        <div style="font-size: 0.75rem; opacity: 0.9;">SD-WAN Vendor Detected</div>
+                                        <div style="font-size: 1.125rem; font-weight: 700;">{{$tunnel.VendorName}}</div>
+                                    </div>
+                                    <div style="margin-left: auto; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">
+                                        {{$tunnel.Confidence}} Confidence
+                                    </div>
+                                </div>
+                            </div>
+                            {{end}}
+                            
+                            <!-- Detection Method & Confidence -->
+                            {{if $tunnel.DetectionMethod}}
+                            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                                <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Detection Method</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$tunnel.DetectionMethod}}</span>
+                                </div>
+                                <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Confidence Level</div>
+                                    <span style="font-size: 0.875rem; font-weight: 600; {{if eq $tunnel.Confidence "High"}}color: #059669;{{else if eq $tunnel.Confidence "Medium"}}color: #d97706;{{else}}color: #dc2626;{{end}}">{{$tunnel.Confidence}}</span>
+                                </div>
+                                {{if $tunnel.SessionState}}
+                                <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Session State</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$tunnel.SessionState}}</span>
+                                </div>
+                                {{end}}
+                            </div>
+                            {{end}}
+                            
                             <!-- Tunnel Type Explanation -->
                             <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                                 <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
@@ -3073,11 +3109,16 @@
                                     About {{$tunnel.Type}} Tunnels
                                 </h4>
                                 <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
-                                    {{if eq $tunnel.Type "IPsec"}}IPsec provides encrypted VPN connectivity between sites. It's commonly used for secure site-to-site connections and remote access VPNs. Check for IKE negotiation issues if tunnel fails.
-                                    {{else if eq $tunnel.Type "GRE"}}GRE (Generic Routing Encapsulation) creates point-to-point tunnels for routing protocols. Often combined with IPsec for encryption. Watch for MTU issues causing fragmentation.
-                                    {{else if eq $tunnel.Type "VXLAN"}}VXLAN extends Layer 2 networks over Layer 3 infrastructure. Common in data centers and cloud environments. Check VTEP connectivity if issues occur.
+                                    {{if contains $tunnel.Type "Cisco SD-WAN"}}Cisco SD-WAN (Viptela) uses UDP 12346 for data plane tunnels and UDP/TCP 23456 for control plane. This is enterprise-grade SD-WAN with centralized orchestration via vManage.
+                                    {{else if contains $tunnel.Type "Velocloud"}}VMware Velocloud uses UDP 2426 for VCMP (Velocloud Multi-Path Protocol) tunnels. This provides dynamic path selection and application-aware routing.
+                                    {{else if contains $tunnel.Type "Fortinet"}}Fortinet SD-WAN uses UDP/TCP 541 for both control and data plane. It integrates with FortiGate security features for secure SD-WAN.
+                                    {{else if contains $tunnel.Type "IPsec SD-WAN"}}IPsec-based SD-WAN (Aruba/Palo Alto/Zscaler) uses ESP protocol with UDP 4500 for NAT traversal. Common in hybrid cloud deployments.
+                                    {{else if contains $tunnel.Type "IPsec"}}IPsec provides encrypted VPN connectivity between sites. It's commonly used for secure site-to-site connections and remote access VPNs.
+                                    {{else if contains $tunnel.Type "IKE"}}IKE (Internet Key Exchange) is the key negotiation protocol for IPsec. It establishes security associations before encrypted data transfer.
+                                    {{else if eq $tunnel.Type "GRE"}}GRE (Generic Routing Encapsulation) creates point-to-point tunnels for routing protocols. Often combined with IPsec for encryption.
+                                    {{else if eq $tunnel.Type "VXLAN"}}VXLAN extends Layer 2 networks over Layer 3 infrastructure. Common in data centers and cloud environments.
                                     {{else if eq $tunnel.Type "MPLS"}}MPLS provides carrier-grade traffic engineering and VPN services. Issues typically require coordination with your service provider.
-                                    {{else if eq $tunnel.Type "GTP"}}GTP (GPRS Tunneling Protocol) is used in mobile networks for user plane traffic. Common in 4G/5G infrastructure.
+                                    {{else if contains $tunnel.Type "GTP"}}GTP (GPRS Tunneling Protocol) is used in mobile networks for user plane traffic. Common in 4G/5G infrastructure.
                                     {{else if eq $tunnel.Type "L2TP"}}L2TP (Layer 2 Tunneling Protocol) is used for VPN connections, often combined with IPsec for encryption.
                                     {{else if eq $tunnel.Type "OpenVPN"}}OpenVPN is an open-source VPN solution using SSL/TLS for encryption. Check certificate validity if connection fails.
                                     {{else if eq $tunnel.Type "WireGuard"}}WireGuard is a modern, lightweight VPN protocol with excellent performance. Check peer configurations if issues occur.
