@@ -534,20 +534,26 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 
 // buildTrafficSummary creates traffic flow summary from collected data
 func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *models.TriageReport) {
-	// Aggregate traffic by flow
-	flowBytes := make(map[string]uint64)
+	// Track flow bytes with protocol information
+	type flowInfo struct {
+		bytes    uint64
+		protocol string
+	}
+	flowData := make(map[string]flowInfo)
 
+	// Add TCP flows
 	for flowKey, flowState := range state.TCPFlows {
-		flowBytes[flowKey] = flowState.TotalBytes
+		flowData[flowKey] = flowInfo{bytes: flowState.TotalBytes, protocol: "TCP"}
 	}
 
+	// Add UDP flows
 	for flowKey, flowState := range state.UDPFlows {
-		flowBytes[flowKey] = flowState.TotalBytes
+		flowData[flowKey] = flowInfo{bytes: flowState.TotalBytes, protocol: "UDP"}
 	}
 
 	// Convert to TrafficFlow slice and sort by bytes
 	var flows []models.TrafficFlow
-	for flowKey, bytes := range flowBytes {
+	for flowKey, info := range flowData {
 		// Parse flow key format: "srcIP:srcPort->dstIP:dstPort"
 		var srcIP, dstIP string
 		var srcPort, dstPort int
@@ -570,8 +576,8 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 			SrcPort:    uint16(srcPort),
 			DstIP:      dstIP,
 			DstPort:    uint16(dstPort),
-			Protocol:   "TCP", // Default, could be improved
-			TotalBytes: bytes,
+			Protocol:   info.protocol,
+			TotalBytes: info.bytes,
 		}
 		flows = append(flows, flow)
 	}

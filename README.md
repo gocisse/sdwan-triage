@@ -1,4 +1,4 @@
-# SD-WAN Triage v2.9.0
+# SD-WAN Triage v3.1.0
 
 [![GitHub release](https://img.shields.io/github/v/release/gocisse/sdwan-triage.svg)](https://github.com/gocisse/sdwan-triage/releases/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gocisse/sdwan-triage)](https://goreportcard.com/report/github.com/gocisse/sdwan-triage)
@@ -6,6 +6,23 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **Comprehensive PCAP analysis tool for SD-WAN networks with advanced security detection, performance monitoring, and interactive D3.js visualizations.**
+
+---
+
+## 🎉 What's New in v3.1.0
+
+### 🚀 SD-WAN Vendor-Specific Tunnel Detection
+- **Port-based detection** prioritized over unreliable DPI - eliminates false positives
+- **Vendor identification** for Cisco SD-WAN, VMware Velocloud, Fortinet, Aruba, Palo Alto, Zscaler
+- **Wireshark filter generation** for each detected tunnel type
+- **Confidence levels** (High/Medium/Low) for detection accuracy
+- **IPsec session correlation** tracking IKE + NAT-T + ESP flows
+
+### 🐛 Critical Bug Fixes
+- Fixed protocol classification bug where UDP traffic showed as TCP in reports
+- Eliminated false positives (e.g., Google DNS flagged as OpenVPN)
+
+[See full release notes →](releases/v3.1.0/RELEASE_NOTES.md)
 
 ---
 
@@ -18,8 +35,8 @@
 - 🔍 **Comprehensive PCAP Analysis** - Deep packet inspection with protocol-aware parsing
 - 🛡️ **Security Threat Detection** - DDoS, port scanning, malware IOCs, TLS weaknesses
 - 📊 **Interactive D3.js Reports** - Timeline, Sankey diagrams, RTT histograms, network topology
-- 🌐 **SD-WAN Focused** - Vendor detection (Cisco, VMware, Fortinet, Palo Alto, etc.)
-- 🔐 **Tunnel Analysis** - VXLAN, GRE, MPLS, IPsec, GTP, L2TP, OpenVPN, WireGuard
+- 🌐 **SD-WAN Vendor Detection** - Cisco, VMware Velocloud, Fortinet, Aruba, Palo Alto, Zscaler
+- 🔐 **Tunnel Analysis** - VXLAN, GRE, MPLS, IPsec, GTP, L2TP, OpenVPN, WireGuard with vendor-specific detection
 - 📞 **VoIP/RTP Analysis** - SIP call tracking, jitter, packet loss, quality metrics
 - 🚀 **Performance Monitoring** - TCP retransmissions, RTT analysis, bandwidth tracking
 - 🌍 **GeoIP Analysis** - IP geolocation and country-based traffic distribution
@@ -41,12 +58,12 @@ Download the latest release for your platform from the [GitHub Releases](https:/
 
 ```bash
 # Linux/macOS
-wget https://github.com/gocisse/sdwan-triage/releases/download/v2.9.0/sdwan-triage-linux-amd64
+wget https://github.com/gocisse/sdwan-triage/releases/download/v3.1.0/sdwan-triage-linux-amd64
 chmod +x sdwan-triage-linux-amd64
 mv sdwan-triage-linux-amd64 /usr/local/bin/sdwan-triage
 
 # macOS (ARM64)
-wget https://github.com/gocisse/sdwan-triage/releases/download/v2.9.0/sdwan-triage-darwin-arm64
+wget https://github.com/gocisse/sdwan-triage/releases/download/v3.1.0/sdwan-triage-darwin-arm64
 chmod +x sdwan-triage-darwin-arm64
 mv sdwan-triage-darwin-arm64 /usr/local/bin/sdwan-triage
 ```

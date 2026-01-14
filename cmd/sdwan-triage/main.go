@@ -17,7 +17,7 @@ import (
 	"github.com/google/gopacket/pcapgo"
 )
 
-const version = "2.9.0"
+const version = "3.1.0"
 
 // Global verbose flag for debug logging
 var verbose *bool
