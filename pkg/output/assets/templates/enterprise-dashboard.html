@@ -2613,115 +2613,352 @@
                 Tunnels & SD-WAN Analysis
             </h2>
             
-            <!-- Tunnel Detection Card -->
-            {{if gt .Stats.TunnelsDetected 0}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-tunnel card-title-icon"></i>
-                        Detected Tunnels ({{.Stats.TunnelsDetected}})
+            <!-- Tunnel Detection - Complete Redesign with Inline Styles -->
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-network-wired"></i>
+                        Tunnel Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{.Stats.TunnelsDetected}} detected</span>
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Encapsulation protocols for secure and optimized traffic delivery</p>
                 </div>
-                <div class="card-body">
+                
+                <!-- Educational Introduction -->
+                <div style="background: #ecfeff; border-bottom: 1px solid #a5f3fc; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #0891b2; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #0e7490; font-size: 1rem;">What are Network Tunnels?</h4>
+                            <p style="margin: 0 0 12px 0; color: #0891b2; font-size: 0.875rem; line-height: 1.6;">
+                                Tunnels encapsulate traffic inside other protocols for <strong>security</strong>, <strong>privacy</strong>, or <strong>network optimization</strong>. 
+                                Common types include <strong>IPsec</strong> (VPN encryption), <strong>GRE</strong> (routing flexibility), <strong>VXLAN</strong> (data center overlay), 
+                                and <strong>MPLS</strong> (carrier networks).
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">Healthy tunnel</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #92400e;">Performance issue</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                                    <span style="color: #dc2626;">Tunnel failure</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tunnel List -->
+                <div style="padding: 16px 24px;">
+                    {{if gt .Stats.TunnelsDetected 0}}
                     {{if .TunnelFindings}}
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Tunnel Type</th>
-                                    <th>Source IP</th>
-                                    <th>Destination IP</th>
-                                    <th>Encapsulated Protocol</th>
-                                    <th>Packet Count</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .TunnelFindings}}
-                                <tr>
-                                    <td>
-                                        <span class="status-badge info">
-                                            <span class="status-dot"></span>
-                                            {{.Type}}
-                                        </span>
-                                    </td>
-                                    <td><code>{{.OuterSrcIP}}</code></td>
-                                    <td><code>{{.OuterDstIP}}</code></td>
-                                    <td>{{.InnerProtocol}}</td>
-                                    <td>{{.Count}}</td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
-                    </div>
+                    {{range $index, $tunnel := .TunnelFindings}}
+                    {{if lt $index 15}}
+                    <details style="margin-bottom: 12px; border: 1px solid #a5f3fc; border-radius: 8px; overflow: hidden; background: #ecfeff;">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-shield-alt" style="color: #0891b2;"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$tunnel.OuterSrcIP}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$tunnel.OuterDstIP}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: #cffafe; color: #0e7490; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$tunnel.Type}}
+                                </span>
+                                <span style="background: #d1fae5; color: #047857; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$tunnel.Count}} pkts
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Tunnel Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Tunnel Type</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 700;">{{$tunnel.Type}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Outer Source</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$tunnel.OuterSrcIP}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Outer Destination</div>
+                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$tunnel.OuterDstIP}}</code>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Inner Protocol</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$tunnel.InnerProtocol}}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Tunnel Type Explanation -->
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    About {{$tunnel.Type}} Tunnels
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    {{if eq $tunnel.Type "IPsec"}}IPsec provides encrypted VPN connectivity between sites. It's commonly used for secure site-to-site connections and remote access VPNs. Check for IKE negotiation issues if tunnel fails.
+                                    {{else if eq $tunnel.Type "GRE"}}GRE (Generic Routing Encapsulation) creates point-to-point tunnels for routing protocols. Often combined with IPsec for encryption. Watch for MTU issues causing fragmentation.
+                                    {{else if eq $tunnel.Type "VXLAN"}}VXLAN extends Layer 2 networks over Layer 3 infrastructure. Common in data centers and cloud environments. Check VTEP connectivity if issues occur.
+                                    {{else if eq $tunnel.Type "MPLS"}}MPLS provides carrier-grade traffic engineering and VPN services. Issues typically require coordination with your service provider.
+                                    {{else if eq $tunnel.Type "GTP"}}GTP (GPRS Tunneling Protocol) is used in mobile networks for user plane traffic. Common in 4G/5G infrastructure.
+                                    {{else if eq $tunnel.Type "L2TP"}}L2TP (Layer 2 Tunneling Protocol) is used for VPN connections, often combined with IPsec for encryption.
+                                    {{else if eq $tunnel.Type "OpenVPN"}}OpenVPN is an open-source VPN solution using SSL/TLS for encryption. Check certificate validity if connection fails.
+                                    {{else if eq $tunnel.Type "WireGuard"}}WireGuard is a modern, lightweight VPN protocol with excellent performance. Check peer configurations if issues occur.
+                                    {{else}}This tunnel type encapsulates traffic for network optimization or security purposes.{{end}}
+                                </p>
+                            </div>
+                            
+                            <!-- Next Actions -->
+                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-tasks"></i>
+                                    Next Actions
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
+                                    <li><strong>Verify tunnel endpoints:</strong> Confirm both {{$tunnel.OuterSrcIP}} and {{$tunnel.OuterDstIP}} are expected</li>
+                                    <li><strong>Check MTU settings:</strong> Ensure tunnel overhead doesn't cause fragmentation</li>
+                                    <li><strong>Monitor packet counts:</strong> {{$tunnel.Count}} packets observed - verify this is expected volume</li>
+                                    <li><strong>Review inner protocol:</strong> Confirm {{$tunnel.InnerProtocol}} traffic should traverse this tunnel</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Wireshark Filter -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filter
+                                </h4>
+                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$tunnel.OuterSrcIP}} && ip.addr=={{$tunnel.OuterDstIP}}</code>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
+                    {{end}}
                     {{else}}
-                    <p class="text-muted">No tunnel details available.</p>
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">Tunnels detected but no detailed findings available.</p>
+                    </div>
+                    {{end}}
+                    {{else}}
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
+                        <p style="margin: 0 0 8px 0; font-size: 0.875rem; font-weight: 600;">No Tunnels Detected</p>
+                        <p style="margin: 0; font-size: 0.8125rem; color: #9ca3af;">This capture contains no encapsulated tunnel traffic (IPsec, GRE, VXLAN, etc.)</p>
+                    </div>
                     {{end}}
                 </div>
-            </div>
-            {{else}}
-            <div class="card mb-xl">
-                <div class="card-body">
-                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
-                        <i class="fas fa-info-circle" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);"></i>
-                        <p>No tunnels detected in this capture.</p>
+                
+                <!-- Tunnel Types Reference -->
+                <div style="background: #f0fdfa; border-top: 1px solid #99f6e4; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #0f766e; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-book"></i>
+                        Common Tunnel Types Reference
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                        <div style="background: #ffffff; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px;">
+                            <div style="font-weight: 600; color: #0f766e; font-size: 0.875rem;"><i class="fas fa-lock" style="color: #14b8a6;"></i> IPsec</div>
+                            <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #0d9488;">Encrypted VPN tunnels</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px;">
+                            <div style="font-weight: 600; color: #0f766e; font-size: 0.875rem;"><i class="fas fa-route" style="color: #14b8a6;"></i> GRE</div>
+                            <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #0d9488;">Routing protocol tunnels</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px;">
+                            <div style="font-weight: 600; color: #0f766e; font-size: 0.875rem;"><i class="fas fa-cloud" style="color: #14b8a6;"></i> VXLAN</div>
+                            <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #0d9488;">Data center overlay</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #99f6e4; border-radius: 8px; padding: 12px;">
+                            <div style="font-weight: 600; color: #0f766e; font-size: 0.875rem;"><i class="fas fa-broadcast-tower" style="color: #14b8a6;"></i> MPLS</div>
+                            <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: #0d9488;">Carrier network labels</p>
+                        </div>
                     </div>
                 </div>
             </div>
-            {{end}}
             
-            <!-- SD-WAN Vendors Card -->
-            {{if gt .Stats.SDWANVendors 0}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-sitemap card-title-icon"></i>
-                        SD-WAN Vendors Detected ({{.Stats.SDWANVendors}})
+            <!-- SD-WAN Vendors - Complete Redesign with Inline Styles -->
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-sitemap"></i>
+                        SD-WAN Vendor Detection
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{.Stats.SDWANVendors}} detected</span>
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Identify SD-WAN solutions and vendor-specific traffic patterns</p>
                 </div>
-                <div class="card-body">
-                    {{if .SDWANVendors}}
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Vendor</th>
-                                    <th>Detected By</th>
-                                    <th>Packet Count</th>
-                                    <th>Confidence</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .SDWANVendors}}
-                                <tr>
-                                    <td><strong>{{.Name}}</strong></td>
-                                    <td>{{.DetectedBy}}</td>
-                                    <td>{{.PacketCount}} packets</td>
-                                    <td>
-                                        <span class="status-badge {{if eq .Confidence "High"}}healthy{{else}}warning{{end}}">
-                                            <span class="status-dot"></span>
-                                            {{.Confidence}}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #f5f3ff; border-bottom: 1px solid #ddd6fe; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #7c3aed; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #5b21b6; font-size: 1rem;">Understanding SD-WAN Vendor Detection</h4>
+                            <p style="margin: 0 0 12px 0; color: #7c3aed; font-size: 0.875rem; line-height: 1.6;">
+                                SD-WAN vendors use unique signatures, ports, and protocols that can be detected in network traffic. 
+                                Identifying vendors helps understand <strong>network architecture</strong>, <strong>troubleshoot vendor-specific issues</strong>, 
+                                and ensure <strong>expected vendors are present</strong> in the environment.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">Expected vendor</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #92400e;">Unknown vendor</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 50%;"></span>
+                                    <span style="color: #1d4ed8;">High confidence</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
+                </div>
+                
+                <!-- Vendor List -->
+                <div style="padding: 16px 24px;">
+                    {{if gt .Stats.SDWANVendors 0}}
+                    {{if .SDWANVendors}}
+                    {{range $index, $vendor := .SDWANVendors}}
+                    <details style="margin-bottom: 12px; border: 1px solid #ddd6fe; border-radius: 8px; overflow: hidden; background: #faf5ff;" open>
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-building" style="color: #7c3aed;"></i>
+                                <span style="font-weight: 700; color: #1f2937; font-size: 1.1rem;">
+                                    {{$vendor.Name}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: {{if eq $vendor.Confidence "High"}}#dbeafe{{else}}#fef3c7{{end}}; color: {{if eq $vendor.Confidence "High"}}#1e40af{{else}}#92400e{{end}}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$vendor.Confidence}} Confidence
+                                </span>
+                                <span style="background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$vendor.PacketCount}} pkts
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Vendor Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Vendor Name</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 700;">{{$vendor.Name}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Detection Method</div>
+                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$vendor.DetectedBy}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Packet Count</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 600;">{{$vendor.PacketCount}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Confidence Level</div>
+                                    <span style="font-size: 1rem; color: {{if eq $vendor.Confidence "High"}}#059669{{else}}#d97706{{end}}; font-weight: 700;">{{$vendor.Confidence}}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Vendor Information -->
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    About {{$vendor.Name}}
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    {{if eq $vendor.Name "Cisco"}}Cisco SD-WAN (formerly Viptela) uses proprietary protocols and DTLS/TLS for control plane. Look for vManage, vSmart, and vEdge communications.
+                                    {{else if eq $vendor.Name "VMware"}}VMware SD-WAN (VeloCloud) uses UDP-based overlay with dynamic path selection. Check for Edge-to-Gateway communications.
+                                    {{else if eq $vendor.Name "Fortinet"}}Fortinet SD-WAN integrates with FortiGate firewalls. Uses proprietary protocols for orchestration and IPsec for data plane.
+                                    {{else if eq $vendor.Name "Palo Alto"}}Palo Alto Prisma SD-WAN uses cloud-based orchestration. Check for communications to Prisma Access cloud gateways.
+                                    {{else if eq $vendor.Name "Silver Peak"}}Silver Peak (now HPE Aruba) uses Unity EdgeConnect appliances. Look for BOOST optimization and tunnel traffic.
+                                    {{else if eq $vendor.Name "Versa"}}Versa Networks uses FlexVNF architecture. Check for Director and Analytics communications.
+                                    {{else}}This SD-WAN vendor was detected based on traffic signatures. Verify this matches your expected network architecture.{{end}}
+                                </p>
+                            </div>
+                            
+                            <!-- Next Actions -->
+                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-tasks"></i>
+                                    Next Actions
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
+                                    <li><strong>Verify expected vendor:</strong> Confirm {{$vendor.Name}} is the expected SD-WAN solution</li>
+                                    <li><strong>Check controller connectivity:</strong> Ensure management plane communications are healthy</li>
+                                    <li><strong>Review overlay status:</strong> Verify data plane tunnels are established correctly</li>
+                                    <li><strong>Monitor packet volume:</strong> {{$vendor.PacketCount}} packets detected - verify expected traffic levels</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Vendor-Specific Tips -->
+                            <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #854d0e; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-lightbulb"></i>
+                                    Troubleshooting Tips
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #78350f; line-height: 1.8;">
+                                    <li>Check vendor-specific management console for alerts</li>
+                                    <li>Verify licensing and subscription status</li>
+                                    <li>Review overlay tunnel health and failover status</li>
+                                    <li>Check for firmware/software version compatibility</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
                     {{else}}
-                    <p class="text-muted">No SD-WAN vendor details available.</p>
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">SD-WAN vendors detected but no detailed information available.</p>
+                    </div>
+                    {{end}}
+                    {{else}}
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
+                        <p style="margin: 0 0 8px 0; font-size: 0.875rem; font-weight: 600;">No SD-WAN Vendors Detected</p>
+                        <p style="margin: 0; font-size: 0.8125rem; color: #9ca3af;">No vendor-specific signatures found in this capture. This may indicate traditional WAN or unrecognized SD-WAN solution.</p>
+                    </div>
                     {{end}}
                 </div>
-            </div>
-            {{else}}
-            <div class="card mb-xl">
-                <div class="card-body">
-                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
-                        <i class="fas fa-info-circle" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);"></i>
-                        <p>No SD-WAN vendor signatures detected.</p>
+                
+                <!-- Supported Vendors Reference -->
+                <div style="background: #faf5ff; border-top: 1px solid #e9d5ff; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #6b21a8; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-fingerprint"></i>
+                        Detectable SD-WAN Vendors
+                    </h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Cisco</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">VMware</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Fortinet</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Palo Alto</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Silver Peak</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Versa</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Citrix</span>
+                        <span style="background: #ffffff; border: 1px solid #e9d5ff; border-radius: 20px; padding: 6px 14px; font-size: 0.8125rem; color: #7c3aed;">Aryaka</span>
                     </div>
                 </div>
             </div>
-            {{end}}
             
             <!-- VoIP Analysis Card -->
             {{if gt .Stats.VoIPCalls 0}}
@@ -2789,39 +3026,162 @@
             </div>
             {{end}}
             
-            <!-- GeoIP Summary Card -->
-            {{if .GeoLocations}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-globe-americas card-title-icon"></i>
+            <!-- Geographic Distribution - Complete Redesign with Inline Styles -->
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-globe-americas"></i>
                         Geographic Distribution
+                        {{if .GeoLocations}}<span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .GeoLocations}} countries</span>{{end}}
                     </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Analyze traffic origins and destinations by geographic location</p>
                 </div>
-                <div class="card-body">
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Country</th>
-                                    <th>IP Count</th>
-                                    <th colspan="2">Details</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .GeoLocations}}
-                                <tr>
-                                    <td><strong>{{.Country}}</strong></td>
-                                    <td>{{.Count}}</td>
-                                    <td colspan="2">-</td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #ecfdf5; border-bottom: 1px solid #a7f3d0; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #059669; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #047857; font-size: 1rem;">Understanding Geographic Distribution</h4>
+                            <p style="margin: 0 0 12px 0; color: #059669; font-size: 0.875rem; line-height: 1.6;">
+                                Geographic analysis reveals where network traffic originates and terminates. This helps identify 
+                                <strong>expected business traffic</strong>, <strong>potential security threats</strong>, and 
+                                <strong>compliance concerns</strong> related to data sovereignty.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
+                                    <span style="color: #166534;">Expected region</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
+                                    <span style="color: #92400e;">Review recommended</span>
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                                    <span style="color: #dc2626;">Security concern</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Geographic List -->
+                <div style="padding: 16px 24px;">
+                    {{if .GeoLocations}}
+                    {{range $index, $geo := .GeoLocations}}
+                    {{if lt $index 15}}
+                    <details style="margin-bottom: 12px; border: 1px solid #a7f3d0; border-radius: 8px; overflow: hidden; background: #f0fdf4;">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-map-marker-alt" style="color: #059669;"></i>
+                                <span style="font-weight: 700; color: #1f2937; font-size: 1rem;">
+                                    {{$geo.Country}}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                    {{$geo.Count}} IPs
+                                </span>
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Location Details -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Country/Region</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 700;">{{$geo.Country}}</span>
+                                </div>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Unique IP Addresses</div>
+                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 600;">{{$geo.Count}}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- What This Means -->
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    What This Means
+                                </h4>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                    Traffic detected from/to {{$geo.Country}}. Verify this aligns with your expected business operations and geographic footprint. 
+                                    Consider data sovereignty requirements and compliance regulations that may apply to traffic crossing international boundaries.
+                                </p>
+                            </div>
+                            
+                            <!-- Next Actions -->
+                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-tasks"></i>
+                                    Next Actions
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
+                                    <li><strong>Verify business need:</strong> Confirm traffic to/from {{$geo.Country}} is expected</li>
+                                    <li><strong>Check applications:</strong> Identify which applications communicate with this region</li>
+                                    <li><strong>Review compliance:</strong> Ensure data handling meets regulatory requirements</li>
+                                    <li><strong>Monitor volume:</strong> {{$geo.Count}} unique IPs detected - verify this is normal</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Security Considerations -->
+                            <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #854d0e; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-shield-alt"></i>
+                                    Security Considerations
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #78350f; line-height: 1.8;">
+                                    <li>Verify traffic is from legitimate business partners or services</li>
+                                    <li>Check for unexpected data transfers to unfamiliar regions</li>
+                                    <li>Review firewall logs for any blocked attempts from this region</li>
+                                    <li>Consider geo-blocking if traffic is unauthorized</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </details>
+                    {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .GeoLocations) 15}}
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
+                        <i class="fas fa-info-circle"></i> Showing top 15 of {{len .GeoLocations}} geographic locations.
+                    </div>
+                    {{end}}
+                    {{else}}
+                    <div style="text-align: center; padding: 40px; color: #6b7280;">
+                        <i class="fas fa-globe" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
+                        <p style="margin: 0 0 8px 0; font-size: 0.875rem; font-weight: 600;">No Geographic Data Available</p>
+                        <p style="margin: 0; font-size: 0.8125rem; color: #9ca3af;">GeoIP lookup did not return location data for IPs in this capture.</p>
+                    </div>
+                    {{end}}
+                </div>
+                
+                <!-- Geographic Best Practices -->
+                <div style="background: #ecfdf5; border-top: 1px solid #a7f3d0; padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.9375rem; color: #047857; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-shield-alt"></i>
+                        Geographic Security Best Practices
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                        <div style="background: #ffffff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #047857; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-ban" style="color: #10b981;"></i> Geo-Blocking
+                            </div>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #059669;">Block traffic from regions with no business need to reduce attack surface.</p>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 14px;">
+                            <div style="font-weight: 600; color: #047857; font-size: 0.875rem; margin-bottom: 8px;">
+                                <i class="fas fa-eye" style="color: #10b981;"></i> Monitor Anomalies
+                            </div>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #059669;">Alert on traffic to new or unexpected geographic regions.</p>
+                        </div>
                     </div>
                 </div>
             </div>
-            {{end}}
         </section>
         
         <!-- ====================================================================
