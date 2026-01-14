@@ -876,214 +876,146 @@
                 </div>
             </div>
             
-            <!-- TCP Handshake Visualization with Expandable Flow Details -->
+            <!-- TCP Handshake Analysis (v2.7.0 Style) -->
             {{if .TCPHandshakeFlows}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-exchange-alt card-title-icon"></i>
-                        TCP Handshake Analysis ({{len .TCPHandshakeFlows}} flows)
-                    </h3>
-                </div>
-                <div class="card-body" style="padding: 0;">
-                    <!-- Introduction and Legend -->
-                    <div style="padding: 20px; background: var(--color-gray-50); border-bottom: 1px solid var(--color-gray-200);">
-                        <p style="color: var(--color-text-secondary); font-size: 0.875rem; margin-bottom: 16px;">
-                            TCP handshake events grouped by flow for correlation analysis. Click on each flow to expand details and see the <strong>Handshake Explanation</strong> with Wireshark filters.
-                        </p>
-                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--color-text-secondary);">
-                                <span style="width: 16px; height: 16px; border-radius: 3px; background: #fee2e2; border: 2px solid #ef4444;"></span>
-                                SYN (Connection Request)
-                            </span>
-                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--color-text-secondary);">
-                                <span style="width: 16px; height: 16px; border-radius: 3px; background: #dbeafe; border: 2px solid #3b82f6;"></span>
-                                SYN-ACK (Server Response)
-                            </span>
-                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--color-text-secondary);">
-                                <span style="width: 16px; height: 16px; border-radius: 3px; background: #d1fae5; border: 2px solid #10b981;"></span>
-                                Complete (Connection Established)
-                            </span>
-                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--color-text-secondary);">
-                                <span style="width: 16px; height: 16px; border-radius: 3px; background: #fef3c7; border: 2px solid #f59e0b;"></span>
-                                Failed (Connection Failed)
-                            </span>
+            <details open>
+                <summary><i class="fas fa-exchange-alt"></i> TCP Handshake Analysis ({{len .TCPHandshakeFlows}} flows)</summary>
+                <div class="handshake-analysis-container">
+                    <div class="handshake-intro">
+                        <p>TCP handshake events grouped by flow for correlation analysis. Click on each flow to expand/collapse details.</p>
+                        <div class="handshake-legend">
+                            <span class="legend-item"><span class="legend-color legend-syn"></span> SYN (Connection Request)</span>
+                            <span class="legend-item"><span class="legend-color legend-synack"></span> SYN-ACK (Server Response)</span>
+                            <span class="legend-item"><span class="legend-color legend-complete"></span> Handshake Complete</span>
                         </div>
                     </div>
-
-                    <!-- Expandable Flow Details -->
-                    <div style="padding: 16px;">
-                        {{range $index, $flow := .TCPHandshakeFlows}}
-                        {{if lt $index 50}}
-                        <details style="margin-bottom: 12px; border: 1px solid var(--color-gray-200); border-radius: 8px; overflow: hidden;">
-                            <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--color-gray-50); cursor: pointer; font-weight: 500; font-size: 0.875rem; list-style: none;">
-                                <span style="display: flex; align-items: center; gap: 8px; color: var(--color-text);">
-                                    <i class="fas fa-stream"></i>
-                                    {{$flow.SrcIP}}:{{$flow.SrcPort}} → {{$flow.DstIP}}:{{$flow.DstPort}}
-                                    {{if $flow.IsIPv6}}<span style="background: #e7f3ff; color: #0066cc; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 8px;">IPv6</span>{{end}}
-                                </span>
-                                {{if eq $flow.StateColor "success"}}
-                                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: rgba(16, 185, 129, 0.1); color: #10b981;">
-                                    <i class="fas fa-check-circle"></i> Complete
-                                </span>
-                                {{else if eq $flow.StateColor "danger"}}
-                                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: rgba(239, 68, 68, 0.1); color: #ef4444;">
-                                    <i class="fas fa-times-circle"></i> Failed
-                                </span>
-                                {{else if eq $flow.StateColor "info"}}
-                                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
-                                    <i class="fas fa-arrow-right"></i> SYN Sent
-                                </span>
-                                {{else if eq $flow.StateColor "warning"}}
-                                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-                                    <i class="fas fa-arrow-left"></i> SYN-ACK
-                                </span>
-                                {{else}}
-                                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: var(--color-gray-100); color: var(--color-text-secondary);">
-                                    {{$flow.State}}
-                                </span>
-                                {{end}}
-                            </summary>
-                            <div style="padding: 20px; background: white;">
-                                <!-- Handshake Events Timeline -->
-                                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
-                                    {{if eq $flow.StateColor "success"}}
-                                    <!-- Complete handshake: SYN → SYN-ACK → ACK -->
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #fee2e2; border-left: 4px solid #ef4444; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-arrow-right"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">SYN</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Client initiates connection</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #dbeafe; border-left: 4px solid #3b82f6; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-arrow-left"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">SYN-ACK</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Server acknowledges</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #d1fae5; border-left: 4px solid #10b981; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-check"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">ACK</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Connection established</span>
-                                        {{if ne $flow.TotalHandshakeMs 0.0}}
-                                        <span style="color: #10b981; font-weight: 600; font-size: 0.8125rem;">{{printf "%.2f" $flow.TotalHandshakeMs}} ms</span>
-                                        {{end}}
-                                    </div>
-                                    {{else if eq $flow.StateColor "danger"}}
-                                    <!-- Failed handshake -->
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #fee2e2; border-left: 4px solid #ef4444; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-arrow-right"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">SYN</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Client initiates connection</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-times"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">FAILED</span>
-                                        <span style="color: #ef4444; font-size: 0.8125rem; flex: 1;">{{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}Connection failed{{end}}</span>
-                                    </div>
-                                    {{else if eq $flow.StateColor "info"}}
-                                    <!-- SYN only -->
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #fee2e2; border-left: 4px solid #ef4444; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-arrow-right"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">SYN</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Client initiates connection (waiting for response)</span>
-                                    </div>
-                                    {{else if eq $flow.StateColor "warning"}}
-                                    <!-- SYN-ACK received -->
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #fee2e2; border-left: 4px solid #ef4444; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-arrow-right"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">SYN</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Client initiates connection</span>
-                                    </div>
-                                    <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: #dbeafe; border-left: 4px solid #3b82f6; font-size: 0.875rem;">
-                                        <span style="font-size: 1rem;"><i class="fas fa-arrow-left"></i></span>
-                                        <span style="font-weight: 600; min-width: 80px;">SYN-ACK</span>
-                                        <span style="color: var(--color-text-secondary); font-size: 0.8125rem; flex: 1;">Server acknowledges (waiting for client ACK)</span>
-                                    </div>
-                                    {{end}}
+                    
+                    {{range $index, $flow := .TCPHandshakeFlows}}
+                    {{if lt $index 50}}
+                    <details class="handshake-flow-details">
+                        <summary class="handshake-flow-summary">
+                            <span class="flow-id"><i class="fas fa-stream"></i> {{$flow.SrcIP}}:{{$flow.SrcPort}} &rarr; {{$flow.DstIP}}:{{$flow.DstPort}}{{if $flow.IsIPv6}} <span class="badge badge-primary">IPv6</span>{{end}}</span>
+                            {{if eq $flow.StateColor "success"}}
+                            <span class="flow-status status-complete"><i class="fas fa-check-circle"></i> Complete</span>
+                            {{else if eq $flow.StateColor "danger"}}
+                            <span class="flow-status status-failed"><i class="fas fa-times-circle"></i> Failed</span>
+                            {{else}}
+                            <span class="flow-status status-pending"><i class="fas fa-clock"></i> {{$flow.State}}</span>
+                            {{end}}
+                        </summary>
+                        <div class="handshake-flow-content">
+                            <div class="handshake-events">
+                            {{if eq $flow.StateColor "success"}}
+                                <div class="event event-syn">
+                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
+                                    <span class="event-type">SYN</span>
+                                    <span class="event-time">Client initiates connection</span>
+                                    <span class="event-desc"></span>
                                 </div>
-
-                                <!-- Handshake Explanation with Wireshark Filters -->
-                                <div style="background: var(--color-gray-50); border-radius: 8px; padding: 16px;">
-                                    <h4 style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.9375rem; color: var(--color-text);">
-                                        <i class="fas fa-info-circle" style="color: var(--color-primary);"></i>
-                                        Handshake Explanation
-                                    </h4>
-                                    {{if eq $flow.StateColor "success"}}
-                                    <p style="margin-bottom: 8px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiates connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.
-                                    </p>
-                                    <p style="margin-bottom: 8px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>SYN-ACK:</strong> Server acknowledges and agrees to establish connection.
-                                    </p>
-                                    <p style="margin-bottom: 12px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>ACK:</strong> Client confirms. Connection is now established.
-                                    </p>
-                                    {{else if eq $flow.StateColor "danger"}}
-                                    <p style="margin-bottom: 8px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>SYN:</strong> Client ({{$flow.SrcIP}}) attempted to connect to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.
-                                    </p>
-                                    <div style="padding: 12px; background: rgba(239, 68, 68, 0.1); border-left: 3px solid #ef4444; border-radius: 4px; margin-bottom: 12px;">
-                                        <p style="margin: 0; font-size: 0.875rem; color: #ef4444;">
-                                            <strong>Failure:</strong> {{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}The handshake did not complete successfully.{{end}}
-                                        </p>
+                                <div class="event event-synack">
+                                    <span class="event-icon"><i class="fas fa-arrow-left"></i></span>
+                                    <span class="event-type">SYN-ACK</span>
+                                    <span class="event-time">Server acknowledges</span>
+                                    <span class="event-desc"></span>
+                                </div>
+                                <div class="event event-complete">
+                                    <span class="event-icon"><i class="fas fa-check"></i></span>
+                                    <span class="event-type">ACK</span>
+                                    <span class="event-time">Connection established</span>
+                                    <span class="event-desc">{{if ne $flow.TotalHandshakeMs 0.0}}{{printf "%.2f" $flow.TotalHandshakeMs}} ms{{end}}</span>
+                                </div>
+                            {{else if eq $flow.StateColor "danger"}}
+                                <div class="event event-syn">
+                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
+                                    <span class="event-type">SYN</span>
+                                    <span class="event-time">Client initiates connection</span>
+                                    <span class="event-desc"></span>
+                                </div>
+                                <div class="event event-synack" style="background: #fef3c7; border-left-color: #f59e0b;">
+                                    <span class="event-icon"><i class="fas fa-times"></i></span>
+                                    <span class="event-type">FAILED</span>
+                                    <span class="event-time" style="color: #ef4444;">{{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}Connection failed{{end}}</span>
+                                    <span class="event-desc"></span>
+                                </div>
+                            {{else if eq $flow.StateColor "info"}}
+                                <div class="event event-syn">
+                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
+                                    <span class="event-type">SYN</span>
+                                    <span class="event-time">Client initiates connection (waiting for response)</span>
+                                    <span class="event-desc"></span>
+                                </div>
+                            {{else if eq $flow.StateColor "warning"}}
+                                <div class="event event-syn">
+                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
+                                    <span class="event-type">SYN</span>
+                                    <span class="event-time">Client initiates connection</span>
+                                    <span class="event-desc"></span>
+                                </div>
+                                <div class="event event-synack">
+                                    <span class="event-icon"><i class="fas fa-arrow-left"></i></span>
+                                    <span class="event-type">SYN-ACK</span>
+                                    <span class="event-time">Server acknowledges (waiting for client ACK)</span>
+                                    <span class="event-desc"></span>
+                                </div>
+                            {{end}}
+                            </div>
+                            <div class="handshake-explanation">
+                                <h4><i class="fas fa-info-circle"></i> Handshake Explanation</h4>
+                                {{if eq $flow.StateColor "success"}}
+                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiates connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
+                                <p><strong>SYN-ACK:</strong> Server acknowledges and agrees to establish connection.</p>
+                                <p><strong>ACK:</strong> Client confirms. Connection is now established.</p>
+                                {{else if eq $flow.StateColor "danger"}}
+                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) attempted to connect to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
+                                <div class="failure-note">
+                                    <strong>Failure:</strong> {{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}The handshake did not complete successfully.{{end}}
+                                </div>
+                                <p><strong>Troubleshooting:</strong> Check if the server is reachable, verify firewall rules, and ensure the service is running on port {{$flow.DstPort}}.</p>
+                                {{else if eq $flow.StateColor "info"}}
+                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiated connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
+                                <div class="pending-note">
+                                    <strong>Pending:</strong> Waiting for server SYN-ACK response. This may indicate network latency or server unavailability.
+                                </div>
+                                {{else if eq $flow.StateColor "warning"}}
+                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiated connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
+                                <p><strong>SYN-ACK:</strong> Server acknowledged the connection request.</p>
+                                <div class="pending-note">
+                                    <strong>Pending:</strong> Waiting for client ACK to complete the handshake.
+                                </div>
+                                {{end}}
+                                
+                                <!-- Wireshark Filters inside Handshake Explanation -->
+                                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+                                    <h5 style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.875rem; color: var(--text-primary);">
+                                        <i class="fas fa-filter" style="color: var(--primary);"></i>
+                                        Wireshark Filters (Copy & Paste)
+                                    </h5>
+                                    <div style="margin-bottom: 10px;">
+                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                            Directional Filter (Source → Destination):
+                                        </label>
+                                        <code style="display: block; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace; color: var(--text-primary);">{{$flow.WiresharkFilter}}</code>
                                     </div>
-                                    <p style="margin-bottom: 12px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>Troubleshooting Tips:</strong> Check if the server is reachable, verify firewall rules, and ensure the service is running on port {{$flow.DstPort}}.
-                                    </p>
-                                    {{else if eq $flow.StateColor "info"}}
-                                    <p style="margin-bottom: 8px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiated connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.
-                                    </p>
-                                    <div style="padding: 12px; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; border-radius: 4px; margin-bottom: 12px;">
-                                        <p style="margin: 0; font-size: 0.875rem; color: #f59e0b;">
-                                            <strong>Pending:</strong> Waiting for server SYN-ACK response. This may indicate network latency or server unavailability.
-                                        </p>
-                                    </div>
-                                    {{else if eq $flow.StateColor "warning"}}
-                                    <p style="margin-bottom: 8px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiated connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.
-                                    </p>
-                                    <p style="margin-bottom: 8px; font-size: 0.875rem; color: var(--color-text-secondary); line-height: 1.6;">
-                                        <strong>SYN-ACK:</strong> Server acknowledged the connection request.
-                                    </p>
-                                    <div style="padding: 12px; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; border-radius: 4px; margin-bottom: 12px;">
-                                        <p style="margin: 0; font-size: 0.875rem; color: #f59e0b;">
-                                            <strong>Pending:</strong> Waiting for client ACK to complete the handshake.
-                                        </p>
-                                    </div>
-                                    {{end}}
-
-                                    <!-- Wireshark Filters Section -->
-                                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-gray-200);">
-                                        <h5 style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.875rem; color: var(--color-text);">
-                                            <i class="fas fa-filter" style="color: var(--color-primary);"></i>
-                                            Wireshark Filters (Copy & Paste)
-                                        </h5>
-                                        <div style="margin-bottom: 10px;">
-                                            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-                                                Directional Filter (Source → Destination):
-                                            </label>
-                                            <code style="display: block; padding: 10px 12px; background: white; border: 1px solid var(--color-gray-300); border-radius: 6px; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace; color: var(--color-text);">{{$flow.WiresharkFilter}}</code>
-                                        </div>
-                                        <div>
-                                            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-                                                Bidirectional Filter (Both Directions):
-                                            </label>
-                                            <code style="display: block; padding: 10px 12px; background: white; border: 1px solid var(--color-gray-300); border-radius: 6px; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace; color: var(--color-text);">{{$flow.WiresharkFilterBidi}}</code>
-                                        </div>
+                                    <div>
+                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                            Bidirectional Filter (Both Directions):
+                                        </label>
+                                        <code style="display: block; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace; color: var(--text-primary);">{{$flow.WiresharkFilterBidi}}</code>
                                     </div>
                                 </div>
                             </div>
-                        </details>
-                        {{end}}
-                        {{end}}
-                        {{if gt (len .TCPHandshakeFlows) 50}}
-                        <p style="text-align: center; padding: 16px; color: var(--color-text-secondary); font-size: 0.875rem;">
-                            <i class="fas fa-info-circle"></i> Showing first 50 of {{len .TCPHandshakeFlows}} TCP handshake flows.
-                        </p>
-                        {{end}}
-                    </div>
+                        </div>
+                    </details>
+                    {{end}}
+                    {{end}}
+                    
+                    {{if gt (len .TCPHandshakeFlows) 50}}
+                    <p style="text-align: center; padding: 16px; color: var(--text-secondary); font-size: 0.875rem;">
+                        <i class="fas fa-info-circle"></i> Showing first 50 of {{len .TCPHandshakeFlows}} TCP handshake flows.
+                    </p>
+                    {{end}}
                 </div>
-            </div>
+            </details>
             {{end}}
             
             <!-- Detailed TCP Connection Flows -->
