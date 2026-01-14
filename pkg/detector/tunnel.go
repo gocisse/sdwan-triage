@@ -50,6 +50,57 @@ const (
 	VPNConfidenceLow    = "Low"
 )
 
+// Common ports to exclude from VPN detection (false positive prevention)
+const (
+	DNSPort    = 53
+	DNSOverTLS = 853
+	HTTPSPort  = 443
+	HTTPPort   = 80
+	NTPPort    = 123
+	SNMPPort   = 161
+	SyslogPort = 514
+)
+
+// Known DNS server IPs to whitelist (prevent false positives)
+var knownDNSServers = map[string]bool{
+	// Google DNS
+	"8.8.8.8":              true,
+	"8.8.4.4":              true,
+	"2001:4860:4860::8888": true,
+	"2001:4860:4860::8844": true,
+	// Cloudflare DNS
+	"1.1.1.1":              true,
+	"1.0.0.1":              true,
+	"2606:4700:4700::1111": true,
+	"2606:4700:4700::1001": true,
+	// Quad9 DNS
+	"9.9.9.9":         true,
+	"149.112.112.112": true,
+	// OpenDNS
+	"208.67.222.222": true,
+	"208.67.220.220": true,
+}
+
+// Ports that should never be classified as VPN (unless on VPN-specific port)
+var excludedPorts = map[uint16]bool{
+	DNSPort:    true,
+	DNSOverTLS: true,
+	HTTPPort:   true,
+	NTPPort:    true,
+	SNMPPort:   true,
+	SyslogPort: true,
+}
+
+// VPNSessionTracker tracks VPN session state for multi-packet validation
+type VPNSessionTracker struct {
+	HandshakePackets int
+	DataPackets      int
+	ControlPackets   int
+	FirstSeen        time.Time
+	LastSeen         time.Time
+	ValidSequence    bool // True if we've seen a valid handshake sequence
+}
+
 // VPNSessionInfo tracks VPN session details from DPI
 type VPNSessionInfo struct {
 	Protocol        string // "OpenVPN" or "WireGuard"
@@ -65,7 +116,8 @@ type VPNSessionInfo struct {
 
 // TunnelAnalyzer handles encapsulation protocol detection
 type TunnelAnalyzer struct {
-	tunnels map[string]*TunnelInfo
+	tunnels     map[string]*TunnelInfo
+	vpnSessions map[string]*VPNSessionTracker // Track VPN sessions for multi-packet validation
 }
 
 // TunnelInfo represents detected tunnel information
@@ -94,8 +146,33 @@ type TunnelInfo struct {
 // NewTunnelAnalyzer creates a new tunnel analyzer
 func NewTunnelAnalyzer() *TunnelAnalyzer {
 	return &TunnelAnalyzer{
-		tunnels: make(map[string]*TunnelInfo),
+		tunnels:     make(map[string]*TunnelInfo),
+		vpnSessions: make(map[string]*VPNSessionTracker),
 	}
+}
+
+// isExcludedFromVPNDetection checks if traffic should be excluded from VPN detection
+func (t *TunnelAnalyzer) isExcludedFromVPNDetection(ipInfo *PacketIPInfo, srcPort, dstPort uint16) bool {
+	// Check if either endpoint is a known DNS server
+	if knownDNSServers[ipInfo.SrcIP] || knownDNSServers[ipInfo.DstIP] {
+		return true
+	}
+
+	// Check if using excluded ports (DNS, NTP, etc.) - unless on VPN-specific port
+	if srcPort != OpenVPNPort && dstPort != OpenVPNPort &&
+		srcPort != WireGuardPort && dstPort != WireGuardPort {
+		if excludedPorts[srcPort] || excludedPorts[dstPort] {
+			return true
+		}
+	}
+
+	// Exclude HTTPS traffic unless on VPN-specific port
+	if (srcPort == HTTPSPort || dstPort == HTTPSPort) &&
+		srcPort != OpenVPNPort && dstPort != OpenVPNPort {
+		return true
+	}
+
+	return false
 }
 
 // Analyze processes packets for tunnel/encapsulation protocols
@@ -154,26 +231,32 @@ func (t *TunnelAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisS
 			return
 		}
 
-		// OpenVPN - Try DPI first, fall back to port-based
-		if dstPort == OpenVPNPort || srcPort == OpenVPNPort {
-			t.analyzeOpenVPN(payload, ipInfo, srcPort, dstPort, timestamp)
-			return
-		}
-		// Also check for OpenVPN on non-standard ports via DPI
-		if t.isOpenVPNPacket(payload) {
-			t.analyzeOpenVPN(payload, ipInfo, srcPort, dstPort, timestamp)
-			return
+		// OpenVPN - Only on standard port OR with strict DPI validation
+		// Skip if traffic is to/from known services (DNS, etc.)
+		if !t.isExcludedFromVPNDetection(ipInfo, srcPort, dstPort) {
+			if dstPort == OpenVPNPort || srcPort == OpenVPNPort {
+				t.analyzeOpenVPN(payload, ipInfo, srcPort, dstPort, timestamp)
+				return
+			}
+			// Check for OpenVPN on non-standard ports via strict DPI only
+			if t.isOpenVPNPacketStrict(payload, srcPort, dstPort) {
+				t.analyzeOpenVPN(payload, ipInfo, srcPort, dstPort, timestamp)
+				return
+			}
 		}
 
-		// WireGuard - Try DPI first, fall back to port-based
-		if dstPort == WireGuardPort || srcPort == WireGuardPort {
-			t.analyzeWireGuard(payload, ipInfo, srcPort, dstPort, timestamp)
-			return
-		}
-		// Also check for WireGuard on non-standard ports via DPI
-		if t.isWireGuardPacket(payload) {
-			t.analyzeWireGuard(payload, ipInfo, srcPort, dstPort, timestamp)
-			return
+		// WireGuard - Only on standard port OR with strict DPI validation
+		// Skip if traffic is to/from known services (DNS, etc.)
+		if !t.isExcludedFromVPNDetection(ipInfo, srcPort, dstPort) {
+			if dstPort == WireGuardPort || srcPort == WireGuardPort {
+				t.analyzeWireGuard(payload, ipInfo, srcPort, dstPort, timestamp)
+				return
+			}
+			// Check for WireGuard on non-standard ports via strict DPI only
+			if t.isWireGuardPacketStrict(payload, srcPort, dstPort) {
+				t.analyzeWireGuard(payload, ipInfo, srcPort, dstPort, timestamp)
+				return
+			}
 		}
 	}
 
@@ -376,41 +459,122 @@ func (t *TunnelAnalyzer) GetTunnelStats() map[string]int {
 }
 
 // ============================================================================
-// OpenVPN Deep Packet Inspection
+// OpenVPN Deep Packet Inspection (Strict Validation)
 // ============================================================================
 
-// isOpenVPNPacket performs DPI to detect OpenVPN traffic on non-standard ports
-func (t *TunnelAnalyzer) isOpenVPNPacket(payload []byte) bool {
-	if len(payload) < 2 {
+// isOpenVPNPacketStrict performs strict DPI validation for OpenVPN on non-standard ports
+// This requires multiple validation checks to prevent false positives
+func (t *TunnelAnalyzer) isOpenVPNPacketStrict(payload []byte, srcPort, dstPort uint16) bool {
+	// Minimum OpenVPN packet size is much larger than simple checks
+	// Control packets: 1 (opcode) + 8 (session_id) + 1 (packet_id_array_len) + 4 (packet_id) = 14 bytes minimum
+	// Data packets: 1 (opcode) + 4 (peer_id for v2) + encrypted payload
+	if len(payload) < 14 {
 		return false
 	}
 
-	// OpenVPN packet structure:
-	// - First byte contains opcode (high 5 bits) and key_id (low 3 bits)
-	// - For P_CONTROL_HARD_RESET_CLIENT_V2 (opcode 7), packet starts with 0x38
-	// - For P_CONTROL_HARD_RESET_SERVER_V2 (opcode 8), packet starts with 0x40
-	// - For P_DATA_V1 (opcode 6), packet starts with 0x30
-	// - For P_DATA_V2 (opcode 9), packet starts with 0x48
+	opcode := (payload[0] >> 3) & 0x1F
+	keyID := payload[0] & 0x07
+
+	// Key ID should typically be 0-7, but most commonly 0
+	if keyID > 7 {
+		return false
+	}
+
+	// Only accept handshake packets for non-standard port detection
+	// This prevents false positives from random data packets
+	switch opcode {
+	case OpenVPNControlHardResetClientV2:
+		// P_CONTROL_HARD_RESET_CLIENT_V2 (opcode 7)
+		// Expected packet structure: opcode(1) + session_id(8) + packet_id_array_len(1) + packet_id(4) + ...
+		// Minimum size ~42 bytes for a valid handshake init
+		if len(payload) < 42 {
+			return false
+		}
+		// Session ID should not be all zeros or all ones (unlikely for real traffic)
+		sessionID := payload[1:9]
+		allZeros := true
+		allOnes := true
+		for _, b := range sessionID {
+			if b != 0x00 {
+				allZeros = false
+			}
+			if b != 0xFF {
+				allOnes = false
+			}
+		}
+		if allZeros || allOnes {
+			return false
+		}
+		// Packet ID array length should be 0 for initial handshake
+		if payload[9] != 0 {
+			return false
+		}
+		return true
+
+	case OpenVPNControlHardResetServerV2:
+		// P_CONTROL_HARD_RESET_SERVER_V2 (opcode 8)
+		// Similar validation to client
+		if len(payload) < 42 {
+			return false
+		}
+		sessionID := payload[1:9]
+		allZeros := true
+		for _, b := range sessionID {
+			if b != 0x00 {
+				allZeros = false
+				break
+			}
+		}
+		if allZeros {
+			return false
+		}
+		return true
+
+	default:
+		// For non-standard ports, only accept handshake packets
+		// Data packets on non-standard ports are too prone to false positives
+		return false
+	}
+}
+
+// isOpenVPNPacket performs basic DPI check (used for standard port detection)
+func (t *TunnelAnalyzer) isOpenVPNPacket(payload []byte) bool {
+	if len(payload) < 10 {
+		return false
+	}
 
 	opcode := (payload[0] >> 3) & 0x1F
+	keyID := payload[0] & 0x07
+
+	if keyID > 7 {
+		return false
+	}
 
 	// Valid OpenVPN opcodes are 1-9
 	if opcode >= 1 && opcode <= 9 {
-		// Additional validation based on packet structure
 		switch opcode {
 		case OpenVPNControlHardResetClientV2, OpenVPNControlHardResetServerV2:
-			// Control packets have session ID (8 bytes) after opcode
-			if len(payload) >= 9 {
+			// Control packets need session ID validation
+			if len(payload) >= 14 {
+				// Check session ID is not all zeros
+				sessionID := payload[1:9]
+				for _, b := range sessionID {
+					if b != 0x00 {
+						return true
+					}
+				}
+			}
+		case OpenVPNControlHardResetClientV1, OpenVPNControlHardResetServerV1:
+			if len(payload) >= 14 {
+				return true
+			}
+		case OpenVPNControlV1, OpenVPNAckV1, OpenVPNControlSoftResetV1:
+			if len(payload) >= 14 {
 				return true
 			}
 		case OpenVPNDataV1, OpenVPNDataV2:
-			// Data packets - check for reasonable encrypted payload size
-			if len(payload) >= 20 {
-				return true
-			}
-		case OpenVPNControlV1, OpenVPNAckV1:
-			// Control/ACK packets
-			if len(payload) >= 9 {
+			// Data packets need minimum encrypted payload
+			if len(payload) >= 28 {
 				return true
 			}
 		}
@@ -533,12 +697,68 @@ func (t *TunnelAnalyzer) analyzeOpenVPN(payload []byte, ipInfo *PacketIPInfo, sr
 }
 
 // ============================================================================
-// WireGuard Deep Packet Inspection
+// WireGuard Deep Packet Inspection (Strict Validation)
 // ============================================================================
 
-// isWireGuardPacket performs DPI to detect WireGuard traffic on non-standard ports
+// isWireGuardPacketStrict performs strict DPI validation for WireGuard on non-standard ports
+// Only accepts handshake packets to prevent false positives
+func (t *TunnelAnalyzer) isWireGuardPacketStrict(payload []byte, srcPort, dstPort uint16) bool {
+	if len(payload) < 32 {
+		return false
+	}
+
+	// WireGuard message type is first 4 bytes (little-endian)
+	msgType := uint32(payload[0]) | uint32(payload[1])<<8 | uint32(payload[2])<<16 | uint32(payload[3])<<24
+
+	// For non-standard ports, only accept handshake packets with exact sizes
+	// This prevents false positives from random data
+	switch msgType {
+	case WireGuardHandshakeInitiation:
+		// Handshake initiation MUST be exactly 148 bytes
+		if len(payload) != 148 {
+			return false
+		}
+		// Additional validation: sender index should not be 0
+		senderIndex := uint32(payload[4]) | uint32(payload[5])<<8 | uint32(payload[6])<<16 | uint32(payload[7])<<24
+		if senderIndex == 0 {
+			return false
+		}
+		// Check that reserved bytes (bytes 116-147) contain the MAC values
+		// MACs should not be all zeros in a valid handshake
+		mac1AllZeros := true
+		for i := 116; i < 132; i++ {
+			if payload[i] != 0 {
+				mac1AllZeros = false
+				break
+			}
+		}
+		if mac1AllZeros {
+			return false
+		}
+		return true
+
+	case WireGuardHandshakeResponse:
+		// Handshake response MUST be exactly 92 bytes
+		if len(payload) != 92 {
+			return false
+		}
+		// Validate sender index is not 0
+		senderIndex := uint32(payload[4]) | uint32(payload[5])<<8 | uint32(payload[6])<<16 | uint32(payload[7])<<24
+		if senderIndex == 0 {
+			return false
+		}
+		return true
+
+	default:
+		// For non-standard ports, don't accept transport data or cookie packets
+		// They're too prone to false positives
+		return false
+	}
+}
+
+// isWireGuardPacket performs basic DPI check (used for standard port detection)
 func (t *TunnelAnalyzer) isWireGuardPacket(payload []byte) bool {
-	if len(payload) < 4 {
+	if len(payload) < 32 {
 		return false
 	}
 
@@ -563,7 +783,17 @@ func (t *TunnelAnalyzer) isWireGuardPacket(payload []byte) bool {
 		return len(payload) == 64
 	case WireGuardTransportData:
 		// Transport data is at least 32 bytes (16 header + 16 auth tag minimum)
-		return len(payload) >= 32
+		// Additional check: counter should be reasonable (not all zeros or all ones)
+		if len(payload) >= 32 {
+			counter := uint64(payload[8]) | uint64(payload[9])<<8 | uint64(payload[10])<<16 |
+				uint64(payload[11])<<24 | uint64(payload[12])<<32 | uint64(payload[13])<<40 |
+				uint64(payload[14])<<48 | uint64(payload[15])<<56
+			// Counter of 0 is valid for first packet, but very high values are suspicious
+			if counter > 0xFFFFFFFF {
+				return false
+			}
+			return true
+		}
 	}
 
 	return false

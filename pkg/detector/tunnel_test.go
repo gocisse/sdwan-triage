@@ -10,8 +10,18 @@ func TestIsOpenVPNPacket_ValidControlPacket(t *testing.T) {
 
 	// OpenVPN Control Hard Reset Client V2 (opcode 7, key_id 0)
 	// Opcode is in high 5 bits: 7 << 3 = 0x38
+	// Need valid session ID (not all zeros) and proper length
 	payload := make([]byte, 50)
 	payload[0] = 0x38 // opcode 7, key_id 0
+	// Set non-zero session ID (bytes 1-8)
+	payload[1] = 0x12
+	payload[2] = 0x34
+	payload[3] = 0x56
+	payload[4] = 0x78
+	payload[5] = 0x9a
+	payload[6] = 0xbc
+	payload[7] = 0xde
+	payload[8] = 0xf0
 
 	if !analyzer.isOpenVPNPacket(payload) {
 		t.Error("Expected valid OpenVPN control packet to be detected")
@@ -23,6 +33,7 @@ func TestIsOpenVPNPacket_ValidDataPacket(t *testing.T) {
 
 	// OpenVPN Data V2 (opcode 9, key_id 0)
 	// Opcode is in high 5 bits: 9 << 3 = 0x48
+	// Data packets need minimum 28 bytes
 	payload := make([]byte, 100)
 	payload[0] = 0x48 // opcode 9, key_id 0
 
@@ -50,6 +61,123 @@ func TestIsOpenVPNPacket_TooShort(t *testing.T) {
 
 	if analyzer.isOpenVPNPacket(payload) {
 		t.Error("Expected short packet to not be detected as OpenVPN")
+	}
+}
+
+func TestIsOpenVPNPacket_AllZeroSessionID(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// OpenVPN packet with all-zero session ID should be rejected
+	payload := make([]byte, 50)
+	payload[0] = 0x38 // opcode 7, key_id 0
+	// Session ID bytes 1-8 are all zeros (default)
+
+	if analyzer.isOpenVPNPacket(payload) {
+		t.Error("Expected packet with all-zero session ID to be rejected")
+	}
+}
+
+func TestIsOpenVPNPacketStrict_ValidHandshake(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Valid OpenVPN handshake init packet (opcode 7)
+	// Must be at least 42 bytes with valid session ID
+	payload := make([]byte, 50)
+	payload[0] = 0x38 // opcode 7, key_id 0
+	// Set non-zero session ID
+	payload[1] = 0x12
+	payload[2] = 0x34
+	payload[3] = 0x56
+	payload[4] = 0x78
+	payload[5] = 0x9a
+	payload[6] = 0xbc
+	payload[7] = 0xde
+	payload[8] = 0xf0
+	// Packet ID array length = 0 for initial handshake
+	payload[9] = 0x00
+
+	if !analyzer.isOpenVPNPacketStrict(payload, 8080, 8080) {
+		t.Error("Expected valid OpenVPN handshake to be detected by strict check")
+	}
+}
+
+func TestIsOpenVPNPacketStrict_RejectsDataPackets(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Data packets should be rejected by strict check on non-standard ports
+	payload := make([]byte, 100)
+	payload[0] = 0x48 // opcode 9 (data v2), key_id 0
+
+	if analyzer.isOpenVPNPacketStrict(payload, 8080, 8080) {
+		t.Error("Expected data packet to be rejected by strict check on non-standard port")
+	}
+}
+
+func TestIsOpenVPNPacketStrict_RejectsTooShort(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Packet too short for strict validation
+	payload := make([]byte, 30)
+	payload[0] = 0x38
+
+	if analyzer.isOpenVPNPacketStrict(payload, 8080, 8080) {
+		t.Error("Expected short packet to be rejected by strict check")
+	}
+}
+
+func TestIsExcludedFromVPNDetection_GoogleDNS(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Traffic to Google DNS should be excluded
+	ipInfo := &PacketIPInfo{SrcIP: "192.168.1.1", DstIP: "8.8.8.8"}
+	if !analyzer.isExcludedFromVPNDetection(ipInfo, 12345, 53) {
+		t.Error("Expected Google DNS traffic to be excluded from VPN detection")
+	}
+
+	// Traffic from Google DNS should be excluded
+	ipInfo2 := &PacketIPInfo{SrcIP: "8.8.4.4", DstIP: "192.168.1.1"}
+	if !analyzer.isExcludedFromVPNDetection(ipInfo2, 53, 12345) {
+		t.Error("Expected traffic from Google DNS to be excluded from VPN detection")
+	}
+}
+
+func TestIsExcludedFromVPNDetection_CloudflareDNS(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Traffic to Cloudflare DNS should be excluded
+	ipInfo := &PacketIPInfo{SrcIP: "192.168.1.1", DstIP: "1.1.1.1"}
+	if !analyzer.isExcludedFromVPNDetection(ipInfo, 12345, 53) {
+		t.Error("Expected Cloudflare DNS traffic to be excluded from VPN detection")
+	}
+}
+
+func TestIsExcludedFromVPNDetection_DNSPort(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Traffic on DNS port should be excluded (unless VPN port)
+	ipInfo := &PacketIPInfo{SrcIP: "192.168.1.1", DstIP: "10.0.0.1"}
+	if !analyzer.isExcludedFromVPNDetection(ipInfo, 12345, 53) {
+		t.Error("Expected DNS port traffic to be excluded from VPN detection")
+	}
+}
+
+func TestIsExcludedFromVPNDetection_VPNPort(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Traffic on VPN port should NOT be excluded
+	ipInfo := &PacketIPInfo{SrcIP: "192.168.1.1", DstIP: "10.0.0.1"}
+	if analyzer.isExcludedFromVPNDetection(ipInfo, 12345, 1194) {
+		t.Error("Expected OpenVPN port traffic to NOT be excluded from VPN detection")
+	}
+}
+
+func TestIsExcludedFromVPNDetection_NormalTraffic(t *testing.T) {
+	analyzer := NewTunnelAnalyzer()
+
+	// Normal traffic on non-excluded ports should NOT be excluded
+	ipInfo := &PacketIPInfo{SrcIP: "192.168.1.1", DstIP: "10.0.0.1"}
+	if analyzer.isExcludedFromVPNDetection(ipInfo, 12345, 8080) {
+		t.Error("Expected normal traffic to NOT be excluded from VPN detection")
 	}
 }
 
