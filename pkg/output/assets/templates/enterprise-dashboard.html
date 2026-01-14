@@ -876,133 +876,345 @@
                 </div>
             </div>
             
-            <!-- TCP Handshake Analysis (v2.7.0 Style) -->
+            <!-- TCP Handshake Analysis - Complete Redesign with Inline Styles -->
             {{if .TCPHandshakeFlows}}
-            <details open>
-                <summary><i class="fas fa-exchange-alt"></i> TCP Handshake Analysis ({{len .TCPHandshakeFlows}} flows)</summary>
-                <div class="handshake-analysis-container">
-                    <div class="handshake-intro">
-                        <p>TCP handshake events grouped by flow for correlation analysis. Click on each flow to expand/collapse details.</p>
-                        <div class="handshake-legend">
-                            <span class="legend-item"><span class="legend-color legend-syn"></span> <i class="fas fa-arrow-right" style="color: #3b82f6;"></i> SYN (Client initiated)</span>
-                            <span class="legend-item"><span class="legend-color legend-synack"></span> <i class="fas fa-arrow-left" style="color: #f97316;"></i> SYN-ACK (Server responded)</span>
-                            <span class="legend-item"><span class="legend-color legend-complete"></span> <i class="fas fa-check" style="color: #10b981;"></i> Complete (Successful)</span>
-                            <span class="legend-item"><span class="legend-color legend-failed"></span> <i class="fas fa-times" style="color: #ef4444;"></i> Failed (Handshake failed)</span>
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-exchange-alt"></i>
+                        TCP Handshake Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .TCPHandshakeFlows}} flows</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Three-way handshake analysis showing connection establishment between clients and servers</p>
+                </div>
+                
+                <!-- Educational Introduction for Junior Engineers -->
+                <div style="background: #f0f9ff; border-bottom: 1px solid #bae6fd; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #0ea5e9; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #0c4a6e; font-size: 1rem;">What is a TCP Handshake?</h4>
+                            <p style="margin: 0 0 12px 0; color: #475569; font-size: 0.875rem; line-height: 1.6;">
+                                Before two computers can exchange data over TCP, they must establish a connection using a <strong>three-way handshake</strong>. 
+                                This ensures both sides are ready to communicate and agree on initial sequence numbers.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.8125rem; color: #64748b;">
+                                <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;">Step 1: SYN</span>
+                                <span>→</span>
+                                <span style="background: #ffedd5; color: #c2410c; padding: 2px 8px; border-radius: 4px;">Step 2: SYN-ACK</span>
+                                <span>→</span>
+                                <span style="background: #d1fae5; color: #047857; padding: 2px 8px; border-radius: 4px;">Step 3: ACK</span>
+                                <span>→</span>
+                                <span style="background: #f0fdf4; color: #166534; padding: 2px 8px; border-radius: 4px; border: 1px solid #86efac;">Connection Ready!</span>
+                            </div>
                         </div>
                     </div>
-                    
+                </div>
+                
+                <!-- Color-Coded Legend -->
+                <div style="background: #fafafa; border-bottom: 1px solid #e5e7eb; padding: 16px 24px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center;">
+                        <span style="font-weight: 600; color: #374151; font-size: 0.875rem;">Legend:</span>
+                        <!-- SYN - Blue -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-arrow-right" style="color: #3b82f6; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #1e40af; font-weight: 500;">SYN</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">Client initiates</span>
+                        </div>
+                        <!-- SYN-ACK - Orange -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #ffedd5; border: 3px solid #f97316; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-arrow-left" style="color: #f97316; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #c2410c; font-weight: 500;">SYN-ACK</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">Server responds</span>
+                        </div>
+                        <!-- Complete - Green -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #d1fae5; border: 3px solid #10b981; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-check" style="color: #10b981; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #047857; font-weight: 500;">Complete</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">Handshake successful</span>
+                        </div>
+                        <!-- Failed - Red -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #fee2e2; border: 3px solid #ef4444; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-times" style="color: #ef4444; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #b91c1c; font-weight: 500;">Failed</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">Handshake failed</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Flow List -->
+                <div style="padding: 16px 24px;">
                     {{range $index, $flow := .TCPHandshakeFlows}}
                     {{if lt $index 50}}
-                    <details class="handshake-flow-details">
-                        <summary class="handshake-flow-summary">
-                            <span class="flow-id"><i class="fas fa-stream"></i> {{$flow.SrcIP}}:{{$flow.SrcPort}} &rarr; {{$flow.DstIP}}:{{$flow.DstPort}}{{if $flow.IsIPv6}} <span class="badge badge-primary">IPv6</span>{{end}}</span>
-                            {{if eq $flow.StateColor "success"}}
-                            <span class="flow-status status-complete"><i class="fas fa-check-circle"></i> Complete</span>
-                            {{else if eq $flow.StateColor "danger"}}
-                            <span class="flow-status status-failed"><i class="fas fa-times-circle"></i> Failed</span>
-                            {{else}}
-                            <span class="flow-status status-pending"><i class="fas fa-clock"></i> {{$flow.State}}</span>
-                            {{end}}
-                        </summary>
-                        <div class="handshake-flow-content">
-                            <div class="handshake-events">
-                            {{if eq $flow.StateColor "success"}}
-                                <div class="event event-syn">
-                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
-                                    <span class="event-type">SYN</span>
-                                    <span class="event-time">Client initiates connection</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                                <div class="event event-synack">
-                                    <span class="event-icon"><i class="fas fa-arrow-left"></i></span>
-                                    <span class="event-type">SYN-ACK</span>
-                                    <span class="event-time">Server acknowledges</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                                <div class="event event-complete">
-                                    <span class="event-icon"><i class="fas fa-check"></i></span>
-                                    <span class="event-type">ACK</span>
-                                    <span class="event-time">Connection established</span>
-                                    <span class="event-desc">{{if ne $flow.TotalHandshakeMs 0.0}}{{printf "%.2f" $flow.TotalHandshakeMs}} ms{{end}}</span>
-                                </div>
-                            {{else if eq $flow.StateColor "danger"}}
-                                <div class="event event-syn">
-                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
-                                    <span class="event-type">SYN</span>
-                                    <span class="event-time">Client initiates connection</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                                <div class="event event-failed">
-                                    <span class="event-icon"><i class="fas fa-times"></i></span>
-                                    <span class="event-type">FAILED</span>
-                                    <span class="event-time">{{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}Connection failed{{end}}</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                            {{else if eq $flow.StateColor "info"}}
-                                <div class="event event-syn">
-                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
-                                    <span class="event-type">SYN</span>
-                                    <span class="event-time">Client initiates connection (waiting for response)</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                            {{else if eq $flow.StateColor "warning"}}
-                                <div class="event event-syn">
-                                    <span class="event-icon"><i class="fas fa-arrow-right"></i></span>
-                                    <span class="event-type">SYN</span>
-                                    <span class="event-time">Client initiates connection</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                                <div class="event event-synack">
-                                    <span class="event-icon"><i class="fas fa-arrow-left"></i></span>
-                                    <span class="event-type">SYN-ACK</span>
-                                    <span class="event-time">Server acknowledges (waiting for client ACK)</span>
-                                    <span class="event-desc"></span>
-                                </div>
-                            {{end}}
+                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if eq $flow.StateColor "danger"}}border-color: #fca5a5; background: #fef2f2;{{else if eq $flow.StateColor "success"}}border-color: #86efac;{{end}}">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if eq $flow.StateColor "success"}}#f0fdf4{{else if eq $flow.StateColor "danger"}}#fef2f2{{else if eq $flow.StateColor "warning"}}#fffbeb{{else}}#f8fafc{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-network-wired" style="color: {{if eq $flow.StateColor "success"}}#10b981{{else if eq $flow.StateColor "danger"}}#ef4444{{else if eq $flow.StateColor "warning"}}#f59e0b{{else}}#3b82f6{{end}};"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.SrcIP}}:{{$flow.SrcPort}}
+                                </span>
+                                <span style="color: #9ca3af; font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$flow.DstIP}}:{{$flow.DstPort}}
+                                </span>
+                                {{if $flow.IsIPv6}}<span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 0.6875rem; font-weight: 600;">IPv6</span>{{end}}
                             </div>
-                            <div class="handshake-explanation">
-                                <h4><i class="fas fa-info-circle"></i> Handshake Explanation</h4>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                {{if ne $flow.TotalHandshakeMs 0.0}}
+                                <span style="color: #6b7280; font-size: 0.75rem;">{{printf "%.2f" $flow.TotalHandshakeMs}} ms</span>
+                                {{end}}
                                 {{if eq $flow.StateColor "success"}}
-                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiates connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
-                                <p><strong>SYN-ACK:</strong> Server acknowledges and agrees to establish connection.</p>
-                                <p><strong>ACK:</strong> Client confirms. Connection is now established.</p>
+                                <span style="background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-check-circle"></i> Complete
+                                </span>
                                 {{else if eq $flow.StateColor "danger"}}
-                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) attempted to connect to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
-                                <div class="failure-note">
-                                    <strong>Failure:</strong> {{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}The handshake did not complete successfully.{{end}}
-                                </div>
-                                <p><strong>Troubleshooting:</strong> Check if the server is reachable, verify firewall rules, and ensure the service is running on port {{$flow.DstPort}}.</p>
-                                {{else if eq $flow.StateColor "info"}}
-                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiated connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
-                                <div class="pending-note">
-                                    <strong>Pending:</strong> Waiting for server SYN-ACK response. This may indicate network latency or server unavailability.
-                                </div>
+                                <span style="background: #fee2e2; color: #b91c1c; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-times-circle"></i> Failed
+                                </span>
                                 {{else if eq $flow.StateColor "warning"}}
-                                <p><strong>SYN:</strong> Client ({{$flow.SrcIP}}) initiated connection to server ({{$flow.DstIP}}) on port {{$flow.DstPort}}.</p>
-                                <p><strong>SYN-ACK:</strong> Server acknowledged the connection request.</p>
-                                <div class="pending-note">
-                                    <strong>Pending:</strong> Waiting for client ACK to complete the handshake.
+                                <span style="background: #fef3c7; color: #b45309; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-clock"></i> Pending
+                                </span>
+                                {{else}}
+                                <span style="background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-hourglass-half"></i> {{$flow.State}}
+                                </span>
+                                {{end}}
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- Visual Flow Timeline -->
+                            <div style="margin-bottom: 20px;">
+                                <h4 style="margin: 0 0 16px 0; font-size: 0.9375rem; color: #374151; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-stream" style="color: #6366f1;"></i>
+                                    Handshake Timeline
+                                </h4>
+                                
+                                {{if eq $flow.StateColor "success"}}
+                                <!-- Successful Handshake - All 3 Steps -->
+                                <div style="display: flex; flex-direction: column; gap: 0;">
+                                    <!-- Step 1: SYN -->
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-right" style="color: #3b82f6;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: linear-gradient(to bottom, #3b82f6, #f97316); min-height: 20px;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #1e40af; font-size: 0.875rem;">1. SYN</span>
+                                                <span style="font-size: 0.75rem; color: #3b82f6; background: white; padding: 2px 8px; border-radius: 4px;">Client → Server</span>
+                                            </div>
+                                            <p style="margin: 0; color: #1e40af; font-size: 0.8125rem;">Client requests connection to server</p>
+                                        </div>
+                                    </div>
+                                    <!-- Step 2: SYN-ACK -->
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #ffedd5; border: 3px solid #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-left" style="color: #f97316;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: linear-gradient(to bottom, #f97316, #10b981); min-height: 20px;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #ffedd5; border-left: 4px solid #f97316; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #c2410c; font-size: 0.875rem;">2. SYN-ACK</span>
+                                                <span style="font-size: 0.75rem; color: #ea580c; background: white; padding: 2px 8px; border-radius: 4px;">Server → Client</span>
+                                            </div>
+                                            <p style="margin: 0; color: #c2410c; font-size: 0.8125rem;">Server acknowledges and accepts connection</p>
+                                        </div>
+                                    </div>
+                                    <!-- Step 3: ACK (Complete) -->
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #d1fae5; border: 3px solid #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-check" style="color: #10b981;"></i>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; background: #d1fae5; border-left: 4px solid #10b981; border-radius: 0 8px 8px 0; padding: 12px 16px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #047857; font-size: 0.875rem;">3. ACK (Complete)</span>
+                                                <span style="font-size: 0.75rem; color: #059669; background: white; padding: 2px 8px; border-radius: 4px;">Client → Server</span>
+                                            </div>
+                                            <p style="margin: 0; color: #047857; font-size: 0.8125rem;">Client confirms. Connection established! {{if ne $flow.TotalHandshakeMs 0.0}}<strong>({{printf "%.2f" $flow.TotalHandshakeMs}} ms total)</strong>{{end}}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {{else if eq $flow.StateColor "danger"}}
+                                <!-- Failed Handshake -->
+                                <div style="display: flex; flex-direction: column; gap: 0;">
+                                    <!-- Step 1: SYN -->
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-right" style="color: #3b82f6;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: linear-gradient(to bottom, #3b82f6, #ef4444); min-height: 20px;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #1e40af; font-size: 0.875rem;">1. SYN</span>
+                                                <span style="font-size: 0.75rem; color: #3b82f6; background: white; padding: 2px 8px; border-radius: 4px;">Client → Server</span>
+                                            </div>
+                                            <p style="margin: 0; color: #1e40af; font-size: 0.8125rem;">Client attempted to connect</p>
+                                        </div>
+                                    </div>
+                                    <!-- Failed Step -->
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #fee2e2; border: 3px solid #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-times" style="color: #ef4444;"></i>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; background: #fee2e2; border-left: 4px solid #ef4444; border-radius: 0 8px 8px 0; padding: 12px 16px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #b91c1c; font-size: 0.875rem;">FAILED</span>
+                                                <span style="font-size: 0.75rem; color: #dc2626; background: white; padding: 2px 8px; border-radius: 4px;">Connection Failed</span>
+                                            </div>
+                                            <p style="margin: 0; color: #b91c1c; font-size: 0.8125rem;">{{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}Handshake did not complete{{end}}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {{else if eq $flow.StateColor "warning"}}
+                                <!-- Pending (SYN-ACK received, waiting for ACK) -->
+                                <div style="display: flex; flex-direction: column; gap: 0;">
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-right" style="color: #3b82f6;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: linear-gradient(to bottom, #3b82f6, #f97316); min-height: 20px;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <span style="font-weight: 700; color: #1e40af; font-size: 0.875rem;">1. SYN</span>
+                                            <p style="margin: 4px 0 0 0; color: #1e40af; font-size: 0.8125rem;">Client initiated connection</p>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #ffedd5; border: 3px solid #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-left" style="color: #f97316;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: #d1d5db; min-height: 20px; border-left: 2px dashed #9ca3af;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #ffedd5; border-left: 4px solid #f97316; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <span style="font-weight: 700; color: #c2410c; font-size: 0.875rem;">2. SYN-ACK</span>
+                                            <p style="margin: 4px 0 0 0; color: #c2410c; font-size: 0.8125rem;">Server acknowledged</p>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #f3f4f6; border: 3px dashed #9ca3af; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-clock" style="color: #9ca3af;"></i>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 12px 16px;">
+                                            <span style="font-weight: 700; color: #b45309; font-size: 0.875rem;">3. ACK (Waiting...)</span>
+                                            <p style="margin: 4px 0 0 0; color: #b45309; font-size: 0.8125rem;">Waiting for client to complete handshake</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {{else}}
+                                <!-- SYN Sent (waiting for SYN-ACK) -->
+                                <div style="display: flex; flex-direction: column; gap: 0;">
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-right" style="color: #3b82f6;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: #d1d5db; min-height: 20px; border-left: 2px dashed #9ca3af;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <span style="font-weight: 700; color: #1e40af; font-size: 0.875rem;">1. SYN</span>
+                                            <p style="margin: 4px 0 0 0; color: #1e40af; font-size: 0.8125rem;">Client initiated connection</p>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #f3f4f6; border: 3px dashed #9ca3af; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-clock" style="color: #9ca3af;"></i>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 12px 16px;">
+                                            <span style="font-weight: 700; color: #b45309; font-size: 0.875rem;">2. SYN-ACK (Waiting...)</span>
+                                            <p style="margin: 4px 0 0 0; color: #b45309; font-size: 0.8125rem;">Waiting for server response</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 {{end}}
-                                
-                                <!-- Wireshark Filters inside Handshake Explanation -->
-                                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
-                                    <h5 style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 0.875rem; color: var(--text-primary);">
-                                        <i class="fas fa-filter" style="color: var(--primary);"></i>
-                                        Wireshark Filters (Copy & Paste)
-                                    </h5>
-                                    <div style="margin-bottom: 10px;">
-                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-                                            Directional Filter (Source → Destination):
-                                        </label>
-                                        <code style="display: block; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace; color: var(--text-primary);">{{$flow.WiresharkFilter}}</code>
-                                    </div>
-                                    <div>
-                                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-                                            Bidirectional Filter (Both Directions):
-                                        </label>
-                                        <code style="display: block; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; word-break: break-all; font-family: 'Courier New', monospace; color: var(--text-primary);">{{$flow.WiresharkFilterBidi}}</code>
-                                    </div>
+                            </div>
+                            
+                            <!-- Explanation Section -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #475569; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-lightbulb" style="color: #eab308;"></i>
+                                    What This Means
+                                </h4>
+                                {{if eq $flow.StateColor "success"}}
+                                <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #64748b; line-height: 1.6;">
+                                    <strong style="color: #047857;">✓ Successful Connection:</strong> The client at <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{$flow.SrcIP}}</code> 
+                                    successfully established a TCP connection to the server at <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{$flow.DstIP}}:{{$flow.DstPort}}</code>.
+                                </p>
+                                <p style="margin: 0; font-size: 0.8125rem; color: #64748b; line-height: 1.6;">
+                                    The three-way handshake completed normally, and data transfer can now occur over this connection.
+                                </p>
+                                {{else if eq $flow.StateColor "danger"}}
+                                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+                                    <p style="margin: 0; font-size: 0.8125rem; color: #b91c1c; font-weight: 500;">
+                                        <i class="fas fa-exclamation-triangle"></i> <strong>Connection Failed:</strong> {{if $flow.FailureReason}}{{$flow.FailureReason}}{{else}}The handshake did not complete.{{end}}
+                                    </p>
+                                </div>
+                                <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #64748b; line-height: 1.6;">
+                                    <strong>Troubleshooting Steps:</strong>
+                                </p>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #64748b; line-height: 1.8;">
+                                    <li>Verify the server at <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{$flow.DstIP}}</code> is reachable</li>
+                                    <li>Check if port <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{$flow.DstPort}}</code> is open and the service is running</li>
+                                    <li>Review firewall rules that may be blocking the connection</li>
+                                    <li>Check for network connectivity issues between client and server</li>
+                                </ul>
+                                {{else}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #64748b; line-height: 1.6;">
+                                    <strong style="color: #b45309;">⏳ Incomplete Handshake:</strong> The connection attempt is still in progress or was captured mid-handshake. 
+                                    This may indicate network latency or the capture ended before the handshake completed.
+                                </p>
+                                {{end}}
+                            </div>
+                            
+                            <!-- Wireshark Filters -->
+                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-filter"></i>
+                                    Wireshark Filters
+                                    <span style="font-size: 0.6875rem; color: #a78bfa; font-weight: 400;">(Copy & paste into Wireshark)</span>
+                                </h4>
+                                <div style="margin-bottom: 12px;">
+                                    <label style="display: block; font-size: 0.6875rem; font-weight: 600; color: #8b5cf6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                        This Flow Only:
+                                    </label>
+                                    <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">{{$flow.WiresharkFilter}}</code>
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 0.6875rem; font-weight: 600; color: #8b5cf6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                        Both Directions:
+                                    </label>
+                                    <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">{{$flow.WiresharkFilterBidi}}</code>
                                 </div>
                             </div>
                         </div>
@@ -1011,12 +1223,12 @@
                     {{end}}
                     
                     {{if gt (len .TCPHandshakeFlows) 50}}
-                    <p style="text-align: center; padding: 16px; color: var(--text-secondary); font-size: 0.875rem;">
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
                         <i class="fas fa-info-circle"></i> Showing first 50 of {{len .TCPHandshakeFlows}} TCP handshake flows.
-                    </p>
+                    </div>
                     {{end}}
                 </div>
-            </details>
+            </div>
             {{end}}
             
             
@@ -1292,82 +1504,206 @@
                 </div>
             </div>
             
-            <!-- DNS Request/Response Analysis (v2.7.0 Style) -->
+            <!-- DNS Request/Response Analysis - Complete Redesign with Inline Styles -->
             {{if .DNSDetails}}
-            <details open>
-                <summary><i class="fas fa-globe"></i> DNS Request/Response Analysis ({{len .DNSDetails}})</summary>
-                <div class="dns-analysis-container">
-                    <div class="dns-intro">
-                        <p>DNS queries and responses correlated with response times. Click on each query to expand details.</p>
-                        <div class="dns-legend">
-                            <span class="legend-item"><span class="legend-color legend-dns-query"></span> Query (Request)</span>
-                            <span class="legend-item"><span class="legend-color legend-dns-response"></span> Response</span>
-                            <span class="legend-item"><span class="legend-color legend-dns-error"></span> Error/No Response</span>
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-globe"></i>
+                        DNS Request/Response Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .DNSDetails}} queries</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Domain Name System queries and responses with timing analysis</p>
+                </div>
+                
+                <!-- Educational Introduction -->
+                <div style="background: #ecfdf5; border-bottom: 1px solid #a7f3d0; padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #10b981; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #065f46; font-size: 1rem;">What is DNS?</h4>
+                            <p style="margin: 0 0 12px 0; color: #047857; font-size: 0.875rem; line-height: 1.6;">
+                                DNS (Domain Name System) translates human-readable domain names (like <code style="background: #d1fae5; padding: 2px 6px; border-radius: 4px;">google.com</code>) 
+                                into IP addresses that computers use to communicate. Every website visit starts with a DNS query.
+                            </p>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.8125rem; color: #064e3b;">
+                                <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px;">Query</span>
+                                <span>→</span>
+                                <span style="background: #d1fae5; color: #047857; padding: 2px 8px; border-radius: 4px;">Response</span>
+                                <span>→</span>
+                                <span style="background: #f0fdf4; color: #166534; padding: 2px 8px; border-radius: 4px; border: 1px solid #86efac;">IP Address Resolved!</span>
+                            </div>
                         </div>
                     </div>
-                    
+                </div>
+                
+                <!-- Color-Coded Legend -->
+                <div style="background: #fafafa; border-bottom: 1px solid #e5e7eb; padding: 16px 24px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center;">
+                        <span style="font-weight: 600; color: #374151; font-size: 0.875rem;">Legend:</span>
+                        <!-- Query - Blue -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-arrow-right" style="color: #3b82f6; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #1e40af; font-weight: 500;">Query</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">Client request</span>
+                        </div>
+                        <!-- Response - Green -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #d1fae5; border: 3px solid #10b981; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-arrow-left" style="color: #10b981; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #047857; font-weight: 500;">Response</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">Server answer</span>
+                        </div>
+                        <!-- Error - Red -->
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 24px; height: 24px; background: #fee2e2; border: 3px solid #ef4444; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-times" style="color: #ef4444; font-size: 10px;"></i>
+                            </div>
+                            <span style="font-size: 0.8125rem; color: #b91c1c; font-weight: 500;">Error/Timeout</span>
+                            <span style="font-size: 0.75rem; color: #64748b;">No response</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- DNS Query List -->
+                <div style="padding: 16px 24px;">
                     {{range $index, $dns := .DNSDetails}}
                     {{if lt $index 50}}
-                    <details class="dns-flow-details {{if $dns.IsAnomalous}}dns-anomalous{{end}}">
-                        <summary class="dns-flow-summary">
-                            <span class="dns-query-name"><i class="fas fa-search"></i> {{$dns.QueryName}}</span>
-                            <span class="dns-meta">
-                                <span class="dns-type badge">{{$dns.QueryType}}</span>
-                                {{if $dns.HasResponse}}
-                                <span class="dns-status badge badge-success"><i class="fas fa-check-circle"></i> {{$dns.ResponseCodeName}}</span>
-                                {{else}}
-                                <span class="dns-status badge badge-danger"><i class="fas fa-times-circle"></i> No Response</span>
-                                {{end}}
-                                {{if $dns.HasResponse}}<span class="dns-response-time">{{$dns.ResponseTimeMs}}</span>{{end}}
-                            </span>
-                        </summary>
-                        <div class="dns-flow-content">
-                            <div class="dns-events">
-                                <div class="dns-event dns-event-query">
-                                    <span class="dns-event-icon"><i class="fas fa-arrow-right"></i></span>
-                                    <span class="dns-event-type">QUERY</span>
-                                    <span class="dns-event-time">{{$dns.SourceIP}} → DNS Server</span>
-                                    <span class="dns-event-detail">Type: {{$dns.QueryType}}</span>
-                                </div>
-                                {{if $dns.HasResponse}}
-                                <div class="dns-event dns-event-response">
-                                    <span class="dns-event-icon"><i class="fas fa-arrow-left"></i></span>
-                                    <span class="dns-event-type">RESPONSE</span>
-                                    <span class="dns-event-time">{{$dns.ResponseTimeMs}}</span>
-                                    <span class="dns-event-detail">Code: {{$dns.ResponseCode}} ({{$dns.ResponseCodeName}})</span>
-                                </div>
-                                {{else}}
-                                <div class="dns-event dns-event-error">
-                                    <span class="dns-event-icon"><i class="fas fa-times"></i></span>
-                                    <span class="dns-event-type">NO RESPONSE</span>
-                                    <span class="dns-event-time">Timeout</span>
-                                    <span class="dns-event-detail">DNS query did not receive a response</span>
-                                </div>
-                                {{end}}
+                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if $dns.IsAnomalous}}border-color: #fca5a5; background: #fef2f2;{{else if $dns.HasResponse}}border-color: #86efac;{{else}}border-color: #fca5a5;{{end}}">
+                        <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if $dns.IsAnomalous}}#fef2f2{{else if $dns.HasResponse}}#f0fdf4{{else}}#fef2f2{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <i class="fas fa-globe" style="color: {{if $dns.HasResponse}}#10b981{{else}}#ef4444{{end}};"></i>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                    {{$dns.QueryName}}
+                                </span>
+                                <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 0.6875rem; font-weight: 600;">{{$dns.QueryType}}</span>
                             </div>
-                            
-                            {{if $dns.AnswerIPs}}
-                            <div class="dns-answers">
-                                <h4><i class="fas fa-reply"></i> DNS Answers</h4>
-                                <div class="dns-answer-row">
-                                    <span class="dns-answer-label">IP Addresses:</span>
-                                    <span class="dns-answer-value"><code>{{$dns.AnswerIPs}}</code></span>
-                                </div>
-                            </div>
-                            {{end}}
-                            
-                            <div class="dns-explanation">
-                                <h4><i class="fas fa-info-circle"></i> DNS Resolution Details</h4>
-                                <p><strong>Client:</strong> {{$dns.SourceIP}} queried for {{$dns.QueryName}}</p>
-                                <p><strong>Query Type:</strong> {{$dns.QueryType}} - 
-                                    {{if eq $dns.QueryType "A"}}IPv4 address lookup{{else if eq $dns.QueryType "AAAA"}}IPv6 address lookup{{else if eq $dns.QueryType "CNAME"}}Canonical name lookup{{else if eq $dns.QueryType "MX"}}Mail exchange lookup{{else if eq $dns.QueryType "TXT"}}Text record lookup{{else if eq $dns.QueryType "PTR"}}Reverse DNS lookup{{else}}DNS record lookup{{end}}
-                                </p>
+                            <div style="display: flex; align-items: center; gap: 8px;">
                                 {{if $dns.HasResponse}}
-                                <p><strong>Response Time:</strong> {{$dns.ResponseTimeMs}}</p>
+                                <span style="color: #6b7280; font-size: 0.75rem;">{{$dns.ResponseTimeMs}}</span>
+                                <span style="background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-check-circle"></i> {{$dns.ResponseCodeName}}
+                                </span>
+                                {{else}}
+                                <span style="background: #fee2e2; color: #b91c1c; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <i class="fas fa-times-circle"></i> No Response
+                                </span>
                                 {{end}}
                                 {{if $dns.IsAnomalous}}
-                                <div class="dns-anomaly-note">
-                                    <strong>⚠ Anomaly Detected:</strong> This DNS query shows unusual behavior that may indicate DNS tunneling, data exfiltration, or misconfiguration.
+                                <span style="background: #fef3c7; color: #b45309; padding: 4px 8px; border-radius: 4px; font-size: 0.6875rem; font-weight: 600;">
+                                    <i class="fas fa-exclamation-triangle"></i> Anomaly
+                                </span>
+                                {{end}}
+                            </div>
+                        </summary>
+                        
+                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                            <!-- DNS Flow Timeline -->
+                            <div style="margin-bottom: 20px;">
+                                <h4 style="margin: 0 0 16px 0; font-size: 0.9375rem; color: #374151; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-stream" style="color: #10b981;"></i>
+                                    DNS Resolution Timeline
+                                </h4>
+                                
+                                <div style="display: flex; flex-direction: column; gap: 0;">
+                                    <!-- Query Step -->
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #dbeafe; border: 3px solid #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-right" style="color: #3b82f6;"></i>
+                                            </div>
+                                            <div style="width: 3px; flex: 1; background: linear-gradient(to bottom, #3b82f6, {{if $dns.HasResponse}}#10b981{{else}}#ef4444{{end}}); min-height: 20px;"></div>
+                                        </div>
+                                        <div style="flex: 1; background: #dbeafe; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0; padding: 12px 16px; margin-bottom: 8px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #1e40af; font-size: 0.875rem;">DNS QUERY</span>
+                                                <span style="font-size: 0.75rem; color: #3b82f6; background: white; padding: 2px 8px; border-radius: 4px;">Client → DNS Server</span>
+                                            </div>
+                                            <p style="margin: 0; color: #1e40af; font-size: 0.8125rem;">
+                                                <code style="background: white; padding: 2px 6px; border-radius: 4px;">{{$dns.SourceIP}}</code> queries for 
+                                                <code style="background: white; padding: 2px 6px; border-radius: 4px;">{{$dns.QueryName}}</code> (Type: {{$dns.QueryType}})
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Response Step -->
+                                    {{if $dns.HasResponse}}
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #d1fae5; border: 3px solid #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-arrow-left" style="color: #10b981;"></i>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; background: #d1fae5; border-left: 4px solid #10b981; border-radius: 0 8px 8px 0; padding: 12px 16px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #047857; font-size: 0.875rem;">DNS RESPONSE</span>
+                                                <span style="font-size: 0.75rem; color: #059669; background: white; padding: 2px 8px; border-radius: 4px;">DNS Server → Client</span>
+                                            </div>
+                                            <p style="margin: 0; color: #047857; font-size: 0.8125rem;">
+                                                Response Code: <strong>{{$dns.ResponseCode}} ({{$dns.ResponseCodeName}})</strong> 
+                                                {{if $dns.AnswerIPs}}- Resolved to: <code style="background: white; padding: 2px 6px; border-radius: 4px;">{{$dns.AnswerIPs}}</code>{{end}}
+                                                <strong>({{$dns.ResponseTimeMs}})</strong>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {{else}}
+                                    <div style="display: flex; align-items: stretch; gap: 16px;">
+                                        <div style="display: flex; flex-direction: column; align-items: center; width: 40px;">
+                                            <div style="width: 40px; height: 40px; background: #fee2e2; border: 3px solid #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                                                <i class="fas fa-times" style="color: #ef4444;"></i>
+                                            </div>
+                                        </div>
+                                        <div style="flex: 1; background: #fee2e2; border-left: 4px solid #ef4444; border-radius: 0 8px 8px 0; padding: 12px 16px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                                <span style="font-weight: 700; color: #b91c1c; font-size: 0.875rem;">NO RESPONSE</span>
+                                                <span style="font-size: 0.75rem; color: #dc2626; background: white; padding: 2px 8px; border-radius: 4px;">Timeout</span>
+                                            </div>
+                                            <p style="margin: 0; color: #b91c1c; font-size: 0.8125rem;">DNS query did not receive a response from the server</p>
+                                        </div>
+                                    </div>
+                                    {{end}}
+                                </div>
+                            </div>
+                            
+                            <!-- Explanation Section -->
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #475569; display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-lightbulb" style="color: #eab308;"></i>
+                                    What This Means
+                                </h4>
+                                <p style="margin: 0 0 8px 0; font-size: 0.8125rem; color: #64748b; line-height: 1.6;">
+                                    <strong>Query Type:</strong> {{$dns.QueryType}} - 
+                                    {{if eq $dns.QueryType "A"}}Looking up the IPv4 address for this domain{{else if eq $dns.QueryType "AAAA"}}Looking up the IPv6 address for this domain{{else if eq $dns.QueryType "CNAME"}}Looking up the canonical (real) name for this alias{{else if eq $dns.QueryType "MX"}}Looking up the mail server for this domain{{else if eq $dns.QueryType "TXT"}}Looking up text records (often used for verification){{else if eq $dns.QueryType "PTR"}}Reverse lookup - finding the domain name for an IP{{else}}Looking up DNS records for this domain{{end}}
+                                </p>
+                                {{if $dns.HasResponse}}
+                                <p style="margin: 0; font-size: 0.8125rem; color: #64748b; line-height: 1.6;">
+                                    <strong style="color: #047857;">✓ Resolution Successful:</strong> The DNS server responded in {{$dns.ResponseTimeMs}}.
+                                    {{if $dns.AnswerIPs}}The domain resolves to IP address(es): <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">{{$dns.AnswerIPs}}</code>{{end}}
+                                </p>
+                                {{else}}
+                                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-top: 8px;">
+                                    <p style="margin: 0; font-size: 0.8125rem; color: #b91c1c; font-weight: 500;">
+                                        <i class="fas fa-exclamation-triangle"></i> <strong>Resolution Failed:</strong> No response received from DNS server.
+                                    </p>
+                                    <p style="margin: 8px 0 0 0; font-size: 0.8125rem; color: #64748b;">
+                                        Possible causes: DNS server unreachable, network issues, or the domain doesn't exist.
+                                    </p>
+                                </div>
+                                {{end}}
+                                {{if $dns.IsAnomalous}}
+                                <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 12px; margin-top: 12px;">
+                                    <p style="margin: 0; font-size: 0.8125rem; color: #b45309; font-weight: 500;">
+                                        <i class="fas fa-exclamation-triangle"></i> <strong>Anomaly Detected:</strong> This DNS query shows unusual behavior.
+                                    </p>
+                                    <p style="margin: 8px 0 0 0; font-size: 0.8125rem; color: #92400e;">
+                                        This may indicate DNS tunneling, data exfiltration, or misconfiguration. Investigate further.
+                                    </p>
                                 </div>
                                 {{end}}
                             </div>
@@ -1377,19 +1713,17 @@
                     {{end}}
                     
                     {{if gt (len .DNSDetails) 50}}
-                    <p style="text-align: center; padding: 16px; color: var(--text-secondary); font-size: 0.875rem;">
+                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
                         <i class="fas fa-info-circle"></i> Showing first 50 of {{len .DNSDetails}} DNS queries.
-                    </p>
+                    </div>
                     {{end}}
                 </div>
-            </details>
+            </div>
             {{else}}
-            <div class="card mb-xl">
-                <div class="card-body">
-                    <div style="text-align: center; padding: var(--space-xl); color: var(--color-text-muted);">
-                        <i class="fas fa-info-circle" style="font-size: var(--font-size-3xl); margin-bottom: var(--space-md);"></i>
-                        <p>No DNS queries recorded in this capture.</p>
-                    </div>
+            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden;">
+                <div style="text-align: center; padding: 40px; color: #6b7280;">
+                    <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
+                    <p style="margin: 0; font-size: 0.875rem;">No DNS queries recorded in this capture.</p>
                 </div>
             </div>
             {{end}}
