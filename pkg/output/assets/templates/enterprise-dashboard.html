@@ -406,45 +406,122 @@
             
             <!-- Security Overview Widget Grid -->
             <div class="widget-grid mb-xl">
-                <!-- DDoS Attacks Widget -->
+                <!-- DDoS Attacks Widget - Redesigned for Junior Engineers -->
                 {{if gt .Stats.DDoSAttacks 0}}
-                <div class="widget">
-                    <div class="widget-header">
-                        <h3 class="widget-title">
-                            <i class="fas fa-bomb" style="color: var(--color-critical);"></i>
-                            DDoS Attacks ({{.Stats.DDoSAttacks}})
+                <div class="widget" style="grid-column: 1 / -1;">
+                    <div class="widget-header" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 20px 24px;">
+                        <h3 class="widget-title" style="color: white; margin: 0; font-size: 1.25rem;">
+                            <i class="fas fa-bomb" style="margin-right: 12px;"></i>
+                            DDoS Attacks Detected ({{.Stats.DDoSAttacks}})
                         </h3>
+                        <p style="margin: 8px 0 0 0; font-size: 0.875rem; opacity: 0.9;">
+                            <i class="fas fa-exclamation-circle"></i> Critical security threat requiring immediate attention
+                        </p>
                     </div>
-                    <div class="widget-body">
+                    
+                    <!-- Educational Context -->
+                    <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px 24px; margin: 0;">
+                        <h4 style="margin: 0 0 8px 0; color: #991b1b; font-size: 0.95rem;">
+                            <i class="fas fa-graduation-cap"></i> What is a DDoS Attack?
+                        </h4>
+                        <p style="margin: 0; color: #7f1d1d; font-size: 0.85rem; line-height: 1.6;">
+                            A <strong>Distributed Denial of Service (DDoS)</strong> attack floods your network with malicious traffic to overwhelm servers and disrupt legitimate services. 
+                            Common types include <strong>SYN floods</strong> (TCP connection exhaustion), <strong>UDP floods</strong> (bandwidth saturation), and <strong>ICMP floods</strong> (ping storms).
+                        </p>
+                    </div>
+                    
+                    <div class="widget-body" style="padding: 24px;">
                         {{if .DDoSFindings}}
-                        <div class="data-table-container">
-                            <table class="data-table">
+                        <!-- Attack Details Table -->
+                        <div class="data-table-container" style="margin-bottom: 20px;">
+                            <table class="data-table" style="width: 100%;">
                                 <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Source IP</th>
-                                        <th>Target IP</th>
-                                        <th>Packet Count</th>
-                                        <th>Severity</th>
+                                    <tr style="background: #fef2f2;">
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #991b1b;">Attack Type</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #991b1b;">Source IP</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #991b1b;">Target IP</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #991b1b;">Packets</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #991b1b;">Severity</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #991b1b;">Impact</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {{range .DDoSFindings}}
-                                    <tr>
-                                        <td><code>{{.Type}}</code></td>
-                                        <td><code>{{.SourceIP}}</code></td>
-                                        <td><code>{{.TargetIP}}</code></td>
-                                        <td>{{.PacketCount}}</td>
-                                        <td>
-                                            <span class="status-badge critical">
-                                                <span class="status-dot"></span>
-                                                High
+                                    <tr style="border-bottom: 1px solid #fecaca;">
+                                        <td style="padding: 14px 16px;">
+                                            <span style="display: inline-flex; align-items: center; gap: 8px;">
+                                                {{if eq .Type "SYN Flood"}}
+                                                <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">SYN FLOOD</span>
+                                                {{else if eq .Type "UDP Flood"}}
+                                                <span style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">UDP FLOOD</span>
+                                                {{else if eq .Type "ICMP Flood"}}
+                                                <span style="background: #ca8a04; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">ICMP FLOOD</span>
+                                                {{else}}
+                                                <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">{{.Type}}</span>
+                                                {{end}}
                                             </span>
+                                        </td>
+                                        <td style="padding: 14px 16px;"><code style="background: #fee2e2; padding: 4px 8px; border-radius: 4px; color: #991b1b;">{{.SourceIP}}</code></td>
+                                        <td style="padding: 14px 16px;"><code style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; color: #92400e;">{{.TargetIP}}</code></td>
+                                        <td style="padding: 14px 16px; font-weight: 600; color: #dc2626;">{{.PacketCount}}</td>
+                                        <td style="padding: 14px 16px;">
+                                            {{if gt .PacketCount 10000}}
+                                            <span style="background: #dc2626; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-fire"></i> SEVERE
+                                            </span>
+                                            {{else if gt .PacketCount 1000}}
+                                            <span style="background: #ea580c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-exclamation-triangle"></i> HIGH
+                                            </span>
+                                            {{else}}
+                                            <span style="background: #ca8a04; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-exclamation-circle"></i> MODERATE
+                                            </span>
+                                            {{end}}
+                                        </td>
+                                        <td style="padding: 14px 16px; font-size: 0.85rem; color: #6b7280;">
+                                            {{if eq .Type "SYN Flood"}}Connection exhaustion
+                                            {{else if eq .Type "UDP Flood"}}Bandwidth saturation
+                                            {{else if eq .Type "ICMP Flood"}}Network congestion
+                                            {{else}}Service disruption{{end}}
                                         </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <!-- Actionable Next Steps -->
+                        <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 20px;">
+                            <h4 style="margin: 0 0 12px 0; color: #166534; font-size: 1rem;">
+                                <i class="fas fa-tasks"></i> Recommended Actions for Junior Engineers
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #22c55e;">
+                                    <strong style="color: #166534; font-size: 0.85rem;">1. Identify & Block Source</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Add firewall rule to block attacking IP ranges. Use: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">iptables -A INPUT -s [SOURCE_IP] -j DROP</code>
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #22c55e;">
+                                    <strong style="color: #166534; font-size: 0.85rem;">2. Enable Rate Limiting</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Configure rate limiting on affected ports to prevent connection exhaustion. Check SD-WAN QoS policies.
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #22c55e;">
+                                    <strong style="color: #166534; font-size: 0.85rem;">3. Verify Target Services</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Confirm if targeted IPs host critical services. Prioritize protection for business-critical systems.
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #22c55e;">
+                                    <strong style="color: #166534; font-size: 0.85rem;">4. Escalate if Persistent</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        If attack continues, escalate to security team and consider enabling upstream DDoS protection.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         {{else}}
                         <p class="text-muted">No DDoS attacks detected.</p>
@@ -453,38 +530,131 @@
                 </div>
                 {{end}}
                 
-                <!-- Port Scans Widget -->
+                <!-- Port Scans Widget - Redesigned for Junior Engineers -->
                 {{if gt .Stats.PortScans 0}}
-                <div class="widget">
-                    <div class="widget-header">
-                        <h3 class="widget-title">
-                            <i class="fas fa-search" style="color: var(--color-warning);"></i>
-                            Port Scans ({{.Stats.PortScans}})
+                <div class="widget" style="grid-column: 1 / -1;">
+                    <div class="widget-header" style="background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); color: white; padding: 20px 24px;">
+                        <h3 class="widget-title" style="color: white; margin: 0; font-size: 1.25rem;">
+                            <i class="fas fa-search" style="margin-right: 12px;"></i>
+                            Port Scans Detected ({{.Stats.PortScans}})
                         </h3>
+                        <p style="margin: 8px 0 0 0; font-size: 0.875rem; opacity: 0.9;">
+                            <i class="fas fa-eye"></i> Reconnaissance activity detected - potential precursor to attack
+                        </p>
                     </div>
-                    <div class="widget-body">
+                    
+                    <!-- Educational Context -->
+                    <div style="background: #fff7ed; border-left: 4px solid #ea580c; padding: 16px 24px; margin: 0;">
+                        <h4 style="margin: 0 0 8px 0; color: #c2410c; font-size: 0.95rem;">
+                            <i class="fas fa-graduation-cap"></i> What is a Port Scan?
+                        </h4>
+                        <p style="margin: 0; color: #9a3412; font-size: 0.85rem; line-height: 1.6;">
+                            <strong>Port scanning</strong> is a technique attackers use to discover open services on your network. 
+                            <strong>Horizontal scans</strong> probe many IPs for one port (finding all web servers). 
+                            <strong>Vertical scans</strong> probe many ports on one IP (mapping all services on a target). 
+                            <strong>Block scans</strong> combine both approaches for comprehensive reconnaissance.
+                        </p>
+                    </div>
+                    
+                    <div class="widget-body" style="padding: 24px;">
                         {{if .PortScanFindings}}
-                        <div class="data-table-container">
-                            <table class="data-table">
+                        <!-- Scan Details Table -->
+                        <div class="data-table-container" style="margin-bottom: 20px;">
+                            <table class="data-table" style="width: 100%;">
                                 <thead>
-                                    <tr>
-                                        <th>Type</th>
-                                        <th>Source IP</th>
-                                        <th>Target IP</th>
-                                        <th>Ports Scanned</th>
+                                    <tr style="background: #fff7ed;">
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #c2410c;">Scan Type</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #c2410c;">Scanner IP</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #c2410c;">Target IP</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #c2410c;">Ports Probed</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #c2410c;">Intensity</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #c2410c;">Risk Level</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {{range .PortScanFindings}}
-                                    <tr>
-                                        <td><code>{{.Type}}</code></td>
-                                        <td><code>{{.SourceIP}}</code></td>
-                                        <td><code>{{.TargetIP}}</code></td>
-                                        <td>{{.PortsScanned}}</td>
+                                    <tr style="border-bottom: 1px solid #fed7aa;">
+                                        <td style="padding: 14px 16px;">
+                                            {{if eq .Type "Horizontal"}}
+                                            <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-arrows-alt-h"></i> HORIZONTAL
+                                            </span>
+                                            {{else if eq .Type "Vertical"}}
+                                            <span style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-arrows-alt-v"></i> VERTICAL
+                                            </span>
+                                            {{else if eq .Type "Block"}}
+                                            <span style="background: #7c3aed; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-th"></i> BLOCK
+                                            </span>
+                                            {{else}}
+                                            <span style="background: #ca8a04; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">{{.Type}}</span>
+                                            {{end}}
+                                        </td>
+                                        <td style="padding: 14px 16px;"><code style="background: #ffedd5; padding: 4px 8px; border-radius: 4px; color: #c2410c;">{{.SourceIP}}</code></td>
+                                        <td style="padding: 14px 16px;"><code style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; color: #92400e;">{{.TargetIP}}</code></td>
+                                        <td style="padding: 14px 16px; font-weight: 600; color: #ea580c;">{{.PortsScanned}}</td>
+                                        <td style="padding: 14px 16px;">
+                                            {{if gt .PortsScanned 100}}
+                                            <span style="background: #dc2626; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-bolt"></i> INTENSIVE
+                                            </span>
+                                            {{else if gt .PortsScanned 20}}
+                                            <span style="background: #ea580c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-search"></i> MODERATE
+                                            </span>
+                                            {{else}}
+                                            <span style="background: #ca8a04; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-eye"></i> LIGHT
+                                            </span>
+                                            {{end}}
+                                        </td>
+                                        <td style="padding: 14px 16px;">
+                                            {{if gt .PortsScanned 100}}
+                                            <span style="color: #dc2626; font-weight: 600; font-size: 0.85rem;">High - Active Attack Prep</span>
+                                            {{else if gt .PortsScanned 20}}
+                                            <span style="color: #ea580c; font-weight: 600; font-size: 0.85rem;">Medium - Reconnaissance</span>
+                                            {{else}}
+                                            <span style="color: #ca8a04; font-weight: 600; font-size: 0.85rem;">Low - Probing</span>
+                                            {{end}}
+                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <!-- Actionable Next Steps -->
+                        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px;">
+                            <h4 style="margin: 0 0 12px 0; color: #92400e; font-size: 1rem;">
+                                <i class="fas fa-tasks"></i> Recommended Actions for Junior Engineers
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #f59e0b;">
+                                    <strong style="color: #92400e; font-size: 0.85rem;">1. Investigate Scanner Source</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Check if scanner IP is internal (compromised host?) or external (attacker). Run: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">whois [IP]</code>
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #f59e0b;">
+                                    <strong style="color: #92400e; font-size: 0.85rem;">2. Review Scanned Ports</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Identify which ports were probed. Common targets: 22 (SSH), 3389 (RDP), 445 (SMB), 3306 (MySQL).
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #f59e0b;">
+                                    <strong style="color: #92400e; font-size: 0.85rem;">3. Check Target Vulnerabilities</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Verify target hosts have up-to-date patches. Disable unnecessary services on scanned ports.
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #f59e0b;">
+                                    <strong style="color: #92400e; font-size: 0.85rem;">4. Monitor for Follow-up</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Port scans often precede attacks. Set alerts for connections from scanner IP to discovered open ports.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         {{else}}
                         <p class="text-muted">No port scans detected.</p>
@@ -583,43 +753,129 @@
                 </div>
                 {{end}}
                 
-                <!-- TLS Security Issues Widget -->
+                <!-- TLS Security Issues Widget - Redesigned for Junior Engineers -->
                 {{if gt .Stats.TLSWeaknesses 0}}
-                <div class="widget">
-                    <div class="widget-header">
-                        <h3 class="widget-title">
-                            <i class="fas fa-lock-open" style="color: var(--color-warning);"></i>
+                <div class="widget" style="grid-column: 1 / -1;">
+                    <div class="widget-header" style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; padding: 20px 24px;">
+                        <h3 class="widget-title" style="color: white; margin: 0; font-size: 1.25rem;">
+                            <i class="fas fa-lock-open" style="margin-right: 12px;"></i>
                             TLS Security Issues ({{.Stats.TLSWeaknesses}})
                         </h3>
+                        <p style="margin: 8px 0 0 0; font-size: 0.875rem; opacity: 0.9;">
+                            <i class="fas fa-shield-alt"></i> Encryption vulnerabilities that could expose sensitive data
+                        </p>
                     </div>
-                    <div class="widget-body">
+                    
+                    <!-- Educational Context -->
+                    <div style="background: #f5f3ff; border-left: 4px solid #7c3aed; padding: 16px 24px; margin: 0;">
+                        <h4 style="margin: 0 0 8px 0; color: #5b21b6; font-size: 0.95rem;">
+                            <i class="fas fa-graduation-cap"></i> Understanding TLS Security
+                        </h4>
+                        <p style="margin: 0; color: #4c1d95; font-size: 0.85rem; line-height: 1.6;">
+                            <strong>TLS (Transport Layer Security)</strong> encrypts data in transit. Vulnerabilities include: 
+                            <strong>Weak ciphers</strong> (RC4, DES, MD5) that can be cracked, 
+                            <strong>Outdated protocols</strong> (SSLv2/3, TLS 1.0/1.1) with known exploits, and 
+                            <strong>Certificate issues</strong> (expired, self-signed, wrong hostname). These allow attackers to intercept or decrypt traffic.
+                        </p>
+                    </div>
+                    
+                    <div class="widget-body" style="padding: 24px;">
                         {{if .TLSSecurityFindings}}
-                        <div class="data-table-container">
-                            <table class="data-table">
+                        <!-- TLS Issues Table -->
+                        <div class="data-table-container" style="margin-bottom: 20px;">
+                            <table class="data-table" style="width: 100%;">
                                 <thead>
-                                    <tr>
-                                        <th>Server IP</th>
-                                        <th>Issue Type</th>
-                                        <th>Details</th>
-                                        <th>Severity</th>
+                                    <tr style="background: #f5f3ff;">
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #5b21b6;">Server</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #5b21b6;">Issue Type</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #5b21b6;">Details</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #5b21b6;">Severity</th>
+                                        <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #5b21b6;">Risk</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {{range .TLSSecurityFindings}}
-                                    <tr>
-                                        <td><code>{{.ServerIP}}</code></td>
-                                        <td>{{.WeaknessType}}</td>
-                                        <td>{{.Description}}</td>
-                                        <td>
-                                            <span class="status-badge {{if eq .Severity "High"}}critical{{else}}warning{{end}}">
-                                                <span class="status-dot"></span>
-                                                {{.Severity}}
+                                    <tr style="border-bottom: 1px solid #ddd6fe;">
+                                        <td style="padding: 14px 16px;">
+                                            <code style="background: #ede9fe; padding: 4px 8px; border-radius: 4px; color: #5b21b6;">{{.ServerIP}}</code>
+                                            {{if .ServerName}}<br><span style="font-size: 0.75rem; color: #6b7280;">{{.ServerName}}</span>{{end}}
+                                        </td>
+                                        <td style="padding: 14px 16px;">
+                                            {{if or (eq .WeaknessType "Weak Cipher") (eq .WeaknessType "weak_cipher")}}
+                                            <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-unlock"></i> WEAK CIPHER
                                             </span>
+                                            {{else if or (eq .WeaknessType "Outdated Protocol") (eq .WeaknessType "outdated_protocol")}}
+                                            <span style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-history"></i> OUTDATED PROTOCOL
+                                            </span>
+                                            {{else if or (eq .WeaknessType "Certificate Issue") (eq .WeaknessType "certificate_issue")}}
+                                            <span style="background: #ca8a04; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-certificate"></i> CERT ISSUE
+                                            </span>
+                                            {{else}}
+                                            <span style="background: #7c3aed; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">{{.WeaknessType}}</span>
+                                            {{end}}
+                                        </td>
+                                        <td style="padding: 14px 16px; font-size: 0.85rem; color: #4b5563; max-width: 300px;">{{.Description}}</td>
+                                        <td style="padding: 14px 16px;">
+                                            {{if eq .Severity "High"}}
+                                            <span style="background: #dc2626; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-fire"></i> CRITICAL
+                                            </span>
+                                            {{else if eq .Severity "Medium"}}
+                                            <span style="background: #ea580c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-exclamation-triangle"></i> HIGH
+                                            </span>
+                                            {{else}}
+                                            <span style="background: #ca8a04; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                                <i class="fas fa-exclamation-circle"></i> MEDIUM
+                                            </span>
+                                            {{end}}
+                                        </td>
+                                        <td style="padding: 14px 16px; font-size: 0.8rem; color: #6b7280;">
+                                            {{if or (eq .WeaknessType "Weak Cipher") (eq .WeaknessType "weak_cipher")}}Data decryption possible
+                                            {{else if or (eq .WeaknessType "Outdated Protocol") (eq .WeaknessType "outdated_protocol")}}Known exploits exist
+                                            {{else if or (eq .WeaknessType "Certificate Issue") (eq .WeaknessType "certificate_issue")}}MITM attack possible
+                                            {{else}}Security degradation{{end}}
                                         </td>
                                     </tr>
                                     {{end}}
                                 </tbody>
                             </table>
+                        </div>
+                        
+                        <!-- Actionable Next Steps -->
+                        <div style="background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 8px; padding: 20px;">
+                            <h4 style="margin: 0 0 12px 0; color: #5b21b6; font-size: 1rem;">
+                                <i class="fas fa-tasks"></i> Recommended Actions for Junior Engineers
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #8b5cf6;">
+                                    <strong style="color: #5b21b6; font-size: 0.85rem;">1. Identify Affected Services</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Determine what application runs on the affected server. Check with app owners before making changes.
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #8b5cf6;">
+                                    <strong style="color: #5b21b6; font-size: 0.85rem;">2. Update TLS Configuration</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Enforce TLS 1.2+ minimum. Disable weak ciphers (RC4, DES, 3DES, MD5). Use: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">ssl_protocols TLSv1.2 TLSv1.3;</code>
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #8b5cf6;">
+                                    <strong style="color: #5b21b6; font-size: 0.85rem;">3. Renew/Replace Certificates</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        For certificate issues, renew expired certs or replace self-signed with CA-signed certificates.
+                                    </p>
+                                </div>
+                                <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #8b5cf6;">
+                                    <strong style="color: #5b21b6; font-size: 0.85rem;">4. Test After Changes</strong>
+                                    <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                        Verify fix with: <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 3px;">openssl s_client -connect [IP]:443</code> or use SSL Labs scanner.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         {{else}}
                         <p class="text-muted">No TLS security issues detected.</p>
@@ -629,38 +885,143 @@
                 {{end}}
             </div>
             
-            <!-- DNS Anomalies Card -->
+            <!-- DNS Anomalies Card - Redesigned for Junior Engineers -->
             {{if gt .Stats.DNSAnomalies 0}}
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-exclamation-triangle card-title-icon"></i>
-                        DNS Anomalies ({{.Stats.DNSAnomalies}})
+            <div class="card mb-xl" style="border: none; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                <div style="background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); color: white; padding: 20px 24px;">
+                    <h3 style="color: white; margin: 0; font-size: 1.25rem;">
+                        <i class="fas fa-globe" style="margin-right: 12px;"></i>
+                        DNS Anomalies Detected ({{.Stats.DNSAnomalies}})
                     </h3>
+                    <p style="margin: 8px 0 0 0; font-size: 0.875rem; opacity: 0.9;">
+                        <i class="fas fa-search"></i> Unusual DNS activity that may indicate security issues or misconfigurations
+                    </p>
                 </div>
-                <div class="card-body">
+                
+                <!-- Educational Context -->
+                <div style="background: #ecfeff; border-left: 4px solid #0891b2; padding: 16px 24px; margin: 0;">
+                    <h4 style="margin: 0 0 8px 0; color: #0e7490; font-size: 0.95rem;">
+                        <i class="fas fa-graduation-cap"></i> Understanding DNS Anomalies
+                    </h4>
+                    <p style="margin: 0; color: #155e75; font-size: 0.85rem; line-height: 1.6;">
+                        <strong>DNS anomalies</strong> can indicate various issues: 
+                        <strong>NXDOMAIN storms</strong> (malware trying random domains), 
+                        <strong>DGA patterns</strong> (algorithmically generated malicious domains), 
+                        <strong>DNS tunneling</strong> (data exfiltration via DNS), 
+                        <strong>Suspicious patterns</strong> (unusual subdomains or query types), and 
+                        <strong>Private IP responses</strong> (possible DNS hijacking or split-horizon misconfiguration).
+                    </p>
+                </div>
+                
+                <div style="padding: 24px;">
                     {{if .DNSAnomalies}}
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Query</th>
-                                    <th>Answer IP</th>
-                                    <th>Server IP</th>
-                                    <th>Reason</th>
+                    <!-- DNS Anomalies Table -->
+                    <div class="data-table-container" style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;">
+                        <table class="data-table" style="width: 100%;">
+                            <thead style="position: sticky; top: 0; z-index: 10;">
+                                <tr style="background: #ecfeff;">
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #0e7490;">Domain Query</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #0e7490;">Response IP</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #0e7490;">DNS Server</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #0e7490;">Anomaly Type</th>
+                                    <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #0e7490;">Severity</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {{range .DNSAnomalies}}
-                                <tr>
-                                    <td><code>{{.Query}}</code></td>
-                                    <td><code>{{.AnswerIP}}</code></td>
-                                    <td><code>{{.ServerIP}}</code></td>
-                                    <td>{{.Reason}}</td>
+                                <tr style="border-bottom: 1px solid #a5f3fc;">
+                                    <td style="padding: 14px 16px; max-width: 250px;">
+                                        <code style="background: #cffafe; padding: 4px 8px; border-radius: 4px; color: #0e7490; font-size: 0.8rem; word-break: break-all;">{{.Query}}</code>
+                                    </td>
+                                    <td style="padding: 14px 16px;">
+                                        <code style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; color: #92400e;">{{.AnswerIP}}</code>
+                                    </td>
+                                    <td style="padding: 14px 16px;">
+                                        <code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; color: #374151;">{{.ServerIP}}</code>
+                                    </td>
+                                    <td style="padding: 14px 16px;">
+                                        {{if contains .Reason "hijack"}}
+                                        <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-skull-crossbones"></i> HIJACKING
+                                        </span>
+                                        {{else if contains .Reason "DGA"}}
+                                        <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-virus"></i> DGA PATTERN
+                                        </span>
+                                        {{else if contains .Reason "tunnel"}}
+                                        <span style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-upload"></i> TUNNELING
+                                        </span>
+                                        {{else if contains .Reason "NXDOMAIN"}}
+                                        <span style="background: #ca8a04; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-times-circle"></i> NXDOMAIN
+                                        </span>
+                                        {{else if contains .Reason "Private"}}
+                                        <span style="background: #ea580c; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-home"></i> PRIVATE IP
+                                        </span>
+                                        {{else if contains .Reason "Suspicious"}}
+                                        <span style="background: #ca8a04; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-question-circle"></i> SUSPICIOUS
+                                        </span>
+                                        {{else}}
+                                        <span style="background: #0891b2; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-info-circle"></i> ANOMALY
+                                        </span>
+                                        {{end}}
+                                    </td>
+                                    <td style="padding: 14px 16px;">
+                                        {{if or (contains .Reason "hijack") (contains .Reason "DGA")}}
+                                        <span style="background: #dc2626; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-fire"></i> HIGH
+                                        </span>
+                                        {{else if or (contains .Reason "tunnel") (contains .Reason "Private")}}
+                                        <span style="background: #ea580c; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-exclamation-triangle"></i> MEDIUM
+                                        </span>
+                                        {{else}}
+                                        <span style="background: #ca8a04; color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                                            <i class="fas fa-exclamation-circle"></i> LOW
+                                        </span>
+                                        {{end}}
+                                    </td>
                                 </tr>
                                 {{end}}
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Actionable Next Steps -->
+                    <div style="background: #ecfeff; border: 1px solid #67e8f9; border-radius: 8px; padding: 20px;">
+                        <h4 style="margin: 0 0 12px 0; color: #0e7490; font-size: 1rem;">
+                            <i class="fas fa-tasks"></i> Recommended Actions for Junior Engineers
+                        </h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+                            <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #06b6d4;">
+                                <strong style="color: #0e7490; font-size: 0.85rem;">1. Check for DNS Hijacking</strong>
+                                <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                    If private IPs returned for public domains, verify DNS server config. Could be split-horizon DNS or actual hijacking.
+                                </p>
+                            </div>
+                            <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #06b6d4;">
+                                <strong style="color: #0e7490; font-size: 0.85rem;">2. Investigate Suspicious Domains</strong>
+                                <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                    Check suspicious domains on VirusTotal or similar. DGA-like patterns may indicate malware on client devices.
+                                </p>
+                            </div>
+                            <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #06b6d4;">
+                                <strong style="color: #0e7490; font-size: 0.85rem;">3. Block Malicious Domains</strong>
+                                <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                    Add confirmed malicious domains to DNS firewall blocklist. Consider using threat intelligence feeds.
+                                </p>
+                            </div>
+                            <div style="background: white; border-radius: 6px; padding: 12px 16px; border-left: 3px solid #06b6d4;">
+                                <strong style="color: #0e7490; font-size: 0.85rem;">4. Identify Affected Clients</strong>
+                                <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: #4b5563;">
+                                    Find which internal hosts are making suspicious queries. Run malware scans on those devices.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                     {{else}}
                     <p class="text-muted">No DNS anomalies detected.</p>

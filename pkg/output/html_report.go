@@ -578,6 +578,7 @@ func GenerateEnterpriseHTMLReport(r *models.TriageReport, filename string, pcapF
 		"formatUnixTime":      formatUnixTime,
 		"formatUnixTimeShort": formatUnixTimeShort,
 		"hasPrefix":           strings.HasPrefix,
+		"contains":            strings.Contains,
 		"title":               strings.Title,
 		"add": func(a, b, c int) int {
 			return a + b + c
