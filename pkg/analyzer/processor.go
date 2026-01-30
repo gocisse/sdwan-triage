@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/detector"
+	"github.com/gocisse/sdwan-triage/pkg/detectors"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -39,6 +40,12 @@ type Processor struct {
 	tunnelAnalyzer      *detector.TunnelAnalyzer
 	bgpAnalyzer         *detector.BGPAnalyzer
 	handshakeTracker    *detector.TCPHandshakeTracker
+	packetLossDetector  *detectors.PacketLossDetector
+	smbDetector         *detectors.SMBDetector
+	ldapDetector        *detectors.LDAPDetector
+	kerberosDetector    *detectors.KerberosDetector
+	streamReassembler   *StreamReassembler
+	bandwidthAnalyzer   *BandwidthAnalyzer
 	handshakeTimeout    time.Duration
 	qosEnabled          bool
 	verbose             bool
@@ -75,7 +82,13 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		tunnelAnalyzer:      detector.NewTunnelAnalyzer(),
 		bgpAnalyzer:         detector.NewBGPAnalyzer(),
 		handshakeTracker:    detector.NewTCPHandshakeTracker(),
-		handshakeTimeout:    3 * time.Second, // Default 3 second timeout
+		packetLossDetector:  detectors.NewPacketLossDetector(),
+		smbDetector:         detectors.NewSMBDetector(),
+		ldapDetector:        detectors.NewLDAPDetector(),
+		kerberosDetector:    detectors.NewKerberosDetector(),
+		streamReassembler:   NewStreamReassembler(verbose),
+		bandwidthAnalyzer:   NewBandwidthAnalyzer(1000, verbose), // 1 second buckets
+		handshakeTimeout:    3 * time.Second,                     // Default 3 second timeout
 		qosEnabled:          qosEnabled,
 		verbose:             verbose,
 		skippedPackets:      0,
@@ -237,6 +250,16 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	p.rtpAnalyzer.Analyze(packet, state, report)
 	p.tunnelAnalyzer.Analyze(packet, state, report)
 	p.bgpAnalyzer.Analyze(packet, state, report)
+
+	// New protocol detectors
+	p.packetLossDetector.ProcessPacket(packet)
+	p.smbDetector.ProcessPacket(packet)
+	p.ldapDetector.ProcessPacket(packet)
+	p.kerberosDetector.ProcessPacket(packet)
+
+	// Stream reassembly and bandwidth tracking
+	p.streamReassembler.ProcessPacket(packet)
+	p.bandwidthAnalyzer.ProcessPacket(packet)
 }
 
 // quickFilterCheck performs a fast pre-filter check on raw packet data
@@ -382,6 +405,38 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Finalize QoS analysis
 	p.qosAnalyzer.Finalize(report)
 
+	// Add packet loss metrics
+	if metrics := p.packetLossDetector.GetMetrics(); metrics != nil {
+		report.PacketLoss = metrics
+	}
+
+	// Add protocol detection results
+	report.SMBFlows = p.smbDetector.GetFlows()
+	report.LDAPFlows = p.ldapDetector.GetFlows()
+	report.KerberosFlows = p.kerberosDetector.GetFlows()
+
+	// Add stream reassembly data (top 50 streams by bytes)
+	topStreams := p.streamReassembler.GetTopStreams(50)
+	report.RawStreams = topStreams // Store raw streams for actionable analysis
+	for _, stream := range topStreams {
+		viewData := p.streamReassembler.FormatStreamForDisplay(stream)
+		report.Streams = append(report.Streams, viewData)
+	}
+
+	// Add bandwidth time series data
+	report.BandwidthTimeSeries = p.bandwidthAnalyzer.GetTimeSeries()
+
+	// Detect and add traffic gaps (gaps > 2 seconds)
+	gaps := p.bandwidthAnalyzer.DetectTrafficGaps(2.0)
+	for _, gap := range gaps {
+		report.TrafficGaps = append(report.TrafficGaps, models.TrafficGapInfo{
+			StartTime:   float64(gap.StartTime.UnixNano()) / 1e9,
+			EndTime:     float64(gap.EndTime.UnixNano()) / 1e9,
+			DurationSec: gap.DurationSec,
+			Description: fmt.Sprintf("%.1f-second gap in traffic", gap.DurationSec),
+		})
+	}
+
 	// Sort timeline by timestamp
 	sort.Slice(report.Timeline, func(i, j int) bool {
 		return report.Timeline[i].Timestamp < report.Timeline[j].Timestamp
@@ -389,6 +444,9 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 
 	// Calculate risk score and generate recommendations
 	p.calculateRiskScore(report)
+
+	// Generate plain English summary (after risk score is calculated)
+	report.PlainEnglishSummary = p.bandwidthAnalyzer.GetPlainEnglishSummary(report, gaps)
 }
 
 // calculateRiskScore calculates the overall risk score and generates recommendations
@@ -614,6 +672,7 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 
 	// Finalize GeoIP analysis
 	report.LocationSummary = p.geoipAnalyzer.GetLocationSummary()
+	report.LocationIPs = p.geoipAnalyzer.GetCountryIPs()
 }
 
 // finalizeVoIPAnalysis populates VoIP analysis results

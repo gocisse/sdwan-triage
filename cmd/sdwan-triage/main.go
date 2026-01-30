@@ -17,7 +17,7 @@ import (
 	"github.com/google/gopacket/pcapgo"
 )
 
-const version = "3.1.0"
+const version = "4.0.0"
 
 // Global verbose flag for debug logging
 var verbose *bool
@@ -39,6 +39,7 @@ OPTIONS:
     -html <file>       Generate interactive HTML report with D3.js visualizations
     -multi-page-html <dir>  Generate multi-page HTML report in specified directory
     -pdf <file>        Export to PDF report (requires wkhtmltopdf installed)
+    -simple            Generate plain English report for non-technical users
     -config <path>     Use report configuration: default, performance, security, or file path
 
   Filtering:
@@ -227,6 +228,7 @@ For more information and documentation:
 	htmlOutput := flag.String("html", "", "Export findings to HTML report")
 	multiPageHTML := flag.String("multi-page-html", "", "Export findings to multi-page HTML report (specify output directory)")
 	pdfOutput := flag.String("pdf", "", "Export findings to PDF report")
+	simpleOutput := flag.Bool("simple", false, "Generate plain English report for non-technical users")
 	configPath := flag.String("config", "", "Report configuration (default, performance, security, or path)")
 	srcIP := flag.String("src-ip", "", "Filter by source IP address")
 	dstIP := flag.String("dst-ip", "", "Filter by destination IP address")
@@ -383,6 +385,9 @@ For more information and documentation:
 			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
 			os.Exit(1)
 		}
+	} else if *simpleOutput {
+		// Print plain English report for non-technical users
+		output.GenerateSimpleReport(report, filepath.Base(absPath))
 	} else {
 		// Print human-readable output
 		output.PrintExecutiveSummary(report)

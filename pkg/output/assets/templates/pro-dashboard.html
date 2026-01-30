@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Triage Pro - {{.FileName}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>{{.CSS}}</style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-top">
+            <div class="logo"><i class="fas fa-network-wired"></i> SD-WAN Triage <span>Pro</span></div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="globalSearch" placeholder="Search flows, IPs..." onkeyup="globalSearchHandler(event)">
+                    <span class="shortcut">⌘K</span>
+                </div>
+                <button class="btn btn-secondary" onclick="exportReport('json')"><i class="fas fa-download"></i> Export</button>
+                <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-file-pdf"></i> PDF</button>
+            </div>
+        </div>
+        <nav class="nav-tabs">
+            <a href="#dashboard" class="nav-tab active" data-section="dashboard"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="#security" class="nav-tab" data-section="security"><i class="fas fa-shield-alt"></i> Security</a>
+            <a href="#performance" class="nav-tab" data-section="performance"><i class="fas fa-tachometer-alt"></i> Performance</a>
+            <a href="#traffic" class="nav-tab" data-section="traffic"><i class="fas fa-exchange-alt"></i> Traffic</a>
+            <a href="#protocols" class="nav-tab" data-section="protocols"><i class="fas fa-layer-group"></i> Protocols</a>
+            <a href="#tunnels" class="nav-tab" data-section="tunnels"><i class="fas fa-project-diagram"></i> Tunnels</a>
+            <a href="#devices" class="nav-tab" data-section="devices"><i class="fas fa-laptop"></i> Devices</a>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="breadcrumb">
+            <a href="#"><i class="fas fa-home"></i></a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="current" id="currentSection">Dashboard</span>
+        </div>
+
+        <!-- DASHBOARD SECTION -->
+        <section id="dashboard" class="section active">
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon {{if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}danger{{end}}"><i class="fas fa-heartbeat"></i></div>
+                    </div>
+                    <div class="kpi-value"><span class="status-badge {{if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}critical{{end}}">{{if eq .HealthStatus "good"}}HEALTHY{{else if eq .HealthStatus "warning"}}WARNING{{else}}CRITICAL{{end}}</span></div>
+                    <div class="kpi-label">Network Health</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon {{if gt .Stats.FailedHandshakes 0}}danger{{else}}success{{end}}"><i class="fas fa-handshake-slash"></i></div></div>
+                    <div class="kpi-value">{{.Stats.FailedHandshakes}}</div>
+                    <div class="kpi-label">Failed Handshakes</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon {{if gt .Stats.DDoSAttacks 0}}danger{{else}}success{{end}}"><i class="fas fa-skull-crossbones"></i></div></div>
+                    <div class="kpi-value">{{.Stats.DDoSAttacks}}</div>
+                    <div class="kpi-label">DDoS Attacks</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon {{if gt .Stats.TCPRetransmissions 100}}warning{{else}}info{{end}}"><i class="fas fa-redo"></i></div></div>
+                    <div class="kpi-value">{{.Stats.TCPRetransmissions}}</div>
+                    <div class="kpi-label">Retransmissions</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon info"><i class="fas fa-network-wired"></i></div></div>
+                    <div class="kpi-value">{{.Stats.TunnelsDetected}}</div>
+                    <div class="kpi-label">Tunnels</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon info"><i class="fas fa-sitemap"></i></div></div>
+                    <div class="kpi-value">{{.Stats.SDWANVendors}}</div>
+                    <div class="kpi-label">SD-WAN Vendors</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon {{if gt .Stats.DNSAnomalies 0}}warning{{else}}success{{end}}"><i class="fas fa-globe"></i></div></div>
+                    <div class="kpi-value">{{.Stats.DNSAnomalies}}</div>
+                    <div class="kpi-label">DNS Anomalies</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header"><div class="kpi-icon info"><i class="fas fa-laptop"></i></div></div>
+                    <div class="kpi-value">{{.Stats.DevicesDetected}}</div>
+                    <div class="kpi-label">Devices</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-file-alt"></i> Executive Summary</div>
+                        <span class="status-badge {{if eq .HealthStatus "critical"}}critical{{else}}success{{end}}">{{if eq .HealthStatus "critical"}}Action Required{{else}}Normal{{end}}</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="summary-grid">
+                            <div><strong>File:</strong> {{.FileName}}</div>
+                            <div><strong>Size:</strong> {{.Stats.TotalTraffic}}</div>
+                            <div><strong>Generated:</strong> {{.GeneratedAt}}</div>
+                            <div><strong>Findings:</strong> {{.TotalFindings}}</div>
+                        </div>
+                        <div class="risk-score">
+                            <div class="risk-value" style="color: {{if eq .RiskLevel "low"}}var(--success){{else if eq .RiskLevel "medium"}}var(--warning){{else}}var(--danger){{end}};">{{.RiskScore}}</div>
+                            <div class="risk-bar"><div class="risk-fill" style="width: {{.RiskScore}}%;"></div></div>
+                            <div class="risk-label">{{.RiskLevel}} risk</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-exclamation-triangle"></i> Critical Findings</div></div>
+                    <div class="card-body">
+                        <div class="findings-list">
+                            {{if gt .Stats.DDoSAttacks 0}}<div class="finding critical"><span class="severity critical">CRITICAL</span> {{.Stats.DDoSAttacks}} DDoS attacks</div>{{end}}
+                            {{if gt .Stats.DNSAnomalies 0}}<div class="finding warning"><span class="severity high">HIGH</span> {{.Stats.DNSAnomalies}} DNS anomalies</div>{{end}}
+                            {{if gt .Stats.FailedHandshakes 0}}<div class="finding warning"><span class="severity medium">MEDIUM</span> {{.Stats.FailedHandshakes}} failed handshakes</div>{{end}}
+                            {{if gt .Stats.SuspiciousTraffic 0}}<div class="finding warning"><span class="severity high">HIGH</span> {{.Stats.SuspiciousTraffic}} suspicious flows</div>{{end}}
+                            {{if and (eq .Stats.DDoSAttacks 0) (eq .Stats.DNSAnomalies 0) (eq .Stats.FailedHandshakes 0)}}<div class="finding success"><span class="severity success">OK</span> No critical issues</div>{{end}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{if .RecommendedActions}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-tasks"></i> Recommended Actions</div></div>
+                <div class="card-body">
+                    <div class="action-checklist">
+                        <div class="action-checklist-title"><i class="fas fa-clipboard-check"></i> Action Plan</div>
+                        <ul>{{range $i, $a := .RecommendedActions}}<li><i class="fas fa-circle"></i> <strong>Step {{$i}}:</strong> {{$a}}</li>{{end}}</ul>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </section>
+
+        <!-- SECURITY SECTION -->
+        <section id="security" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-shield-alt"></i> Security Analysis</h1>
+                <span class="status-badge {{if or (gt .Stats.DDoSAttacks 0) (gt .Stats.SuspiciousTraffic 0)}}critical{{else}}success{{end}}">{{add .Stats.DDoSAttacks .Stats.PortScans .Stats.SuspiciousTraffic}} Threats</span>
+            </div>
+
+            {{if gt .Stats.DDoSAttacks 0}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-skull-crossbones"></i> DDoS Attacks</div><span class="severity critical">{{.Stats.DDoSAttacks}}</span></div>
+                <div class="card-body">
+                    <div class="edu-banner"><div class="edu-banner-header"><i class="fas fa-info-circle"></i> What is DDoS?</div><p>A DDoS attack floods targets with traffic to overwhelm them. Types: SYN floods, UDP floods, ICMP floods.</p></div>
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Type</th><th>Source</th><th>Target</th><th>Packets</th><th>Severity</th></tr></thead><tbody>
+                    {{range .DDoSFindings}}<tr><td><span class="severity critical">{{.Type}}</span></td><td class="mono">{{.SourceIP}}</td><td class="mono">{{.TargetIP}}</td><td>{{.PacketCount}}</td><td><span class="severity {{if gt .PacketCount 1000}}critical{{else}}high{{end}}">{{.Severity}}</span></td></tr>{{end}}
+                    </tbody></table></div>
+                    <div class="action-checklist"><div class="action-checklist-title"><i class="fas fa-user-shield"></i> Actions</div><ul><li><i class="fas fa-check-circle"></i> Check if multiple services affected → ESCALATE</li><li><i class="fas fa-check-circle"></i> Do NOT block IPs without approval</li></ul></div>
+                </div>
+            </div>
+            {{end}}
+
+            {{if gt .Stats.DNSAnomalies 0}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-globe"></i> DNS Anomalies</div><span class="severity warning">{{.Stats.DNSAnomalies}}</span></div>
+                <div class="card-body">
+                    <div class="edu-banner"><div class="edu-banner-header"><i class="fas fa-info-circle"></i> DNS Anomalies</div><p>May indicate DNS hijacking, tunneling, or misconfiguration.</p></div>
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Query</th><th>Response</th><th>Server</th><th>Reason</th></tr></thead><tbody>
+                    {{range .DNSAnomalies}}<tr><td class="mono">{{.Query}}</td><td class="mono">{{.AnswerIP}}</td><td class="mono">{{.ServerIP}}</td><td>{{.Reason}}</td></tr>{{end}}
+                    </tbody></table></div>
+                </div>
+            </div>
+            {{end}}
+
+            {{if gt .Stats.SuspiciousTraffic 0}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-exclamation-triangle"></i> Suspicious Traffic</div><span class="severity high">{{.Stats.SuspiciousTraffic}}</span></div>
+                <div class="card-body">
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Source</th><th>Destination</th><th>Reason</th></tr></thead><tbody>
+                    {{range .SuspiciousTraffic}}<tr><td class="mono">{{.SrcIP}}</td><td class="mono">{{.DstIP}}:{{.DstPort}}</td><td>{{.Reason}}</td></tr>{{end}}
+                    </tbody></table></div>
+                </div>
+            </div>
+            {{end}}
+        </section>
+
+        <!-- PERFORMANCE SECTION -->
+        <section id="performance" class="section">
+            <div class="section-header"><h1 class="section-title"><i class="fas fa-tachometer-alt"></i> Performance</h1></div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-handshake"></i> TCP Handshakes</div></div>
+                    <div class="card-body">
+                        <div class="stats-row">
+                            <div class="stat"><div class="stat-value success">{{.TCPHandshakeStats.SuccessfulCount}}</div><div class="stat-label">Successful</div></div>
+                            <div class="stat"><div class="stat-value danger">{{.TCPHandshakeStats.FailedCount}}</div><div class="stat-label">Failed</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-redo"></i> Retransmissions</div></div>
+                    <div class="card-body">
+                        <div class="stats-row">
+                            <div class="stat"><div class="stat-value warning">{{.Stats.TCPRetransmissions}}</div><div class="stat-label">Total</div></div>
+                            <div class="stat"><div class="stat-value warning">{{.Stats.HighRTTFlows}}</div><div class="stat-label">High RTT</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{if gt .Stats.FailedHandshakes 0}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-times-circle"></i> Failed Handshakes</div></div>
+                <div class="card-body">
+                    <div class="edu-banner"><div class="edu-banner-header"><i class="fas fa-info-circle"></i> TCP Handshake</div><p>SYN → SYN-ACK → ACK. Failures indicate firewall blocks or service issues.</p></div>
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Source</th><th>Destination</th><th>Port</th></tr></thead><tbody>
+                    {{range .FailedHandshakes}}<tr><td class="mono">{{.SrcIP}}:{{.SrcPort}}</td><td class="mono">{{.DstIP}}</td><td>{{.DstPort}}</td></tr>{{end}}
+                    </tbody></table></div>
+                </div>
+            </div>
+            {{end}}
+        </section>
+
+        <!-- TRAFFIC SECTION -->
+        <section id="traffic" class="section">
+            <div class="section-header"><h1 class="section-title"><i class="fas fa-exchange-alt"></i> Traffic</h1></div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-database"></i> Summary</div></div>
+                    <div class="card-body">
+                        <div class="summary-grid">
+                            <div><strong>Total:</strong> {{.Stats.TotalTraffic}}</div>
+                            <div><strong>HTTP/2:</strong> {{.Stats.HTTP2Flows}}</div>
+                            <div><strong>QUIC:</strong> {{.Stats.QUICFlows}}</div>
+                            <div><strong>TLS:</strong> {{.Stats.TLSCerts}}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title"><i class="fas fa-chart-pie"></i> Protocols</div></div>
+                    <div class="card-body">
+                        {{range .ProtocolStats}}<div class="protocol-row"><span class="protocol-color" style="background:{{.Color}}"></span><span>{{.Protocol}}</span><span>{{printf "%.1f" .Percent}}%</span></div>{{end}}
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-sort-amount-down"></i> Top Flows</div></div>
+                <div class="card-body">
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Source</th><th>Destination</th><th>Bytes</th><th>%</th></tr></thead><tbody>
+                    {{range .TopFlows}}<tr><td class="mono">{{.SrcIP}}:{{.SrcPort}}</td><td class="mono">{{.DstIP}}:{{.DstPort}}</td><td>{{.BytesFormatted}}</td><td>{{printf "%.1f" .Percentage}}%</td></tr>{{end}}
+                    </tbody></table></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PROTOCOLS SECTION -->
+        <section id="protocols" class="section">
+            <div class="section-header"><h1 class="section-title"><i class="fas fa-layer-group"></i> Protocols</h1></div>
+            <div class="grid-2">
+                <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-globe"></i> DNS</div></div><div class="card-body"><div><strong>Queries:</strong> {{.Stats.DNSQueries}}</div><div><strong>Anomalies:</strong> {{.Stats.DNSAnomalies}}</div></div></div>
+                <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-lock"></i> TLS</div></div><div class="card-body"><div><strong>Certificates:</strong> {{.Stats.TLSCerts}}</div><div><strong>Weaknesses:</strong> {{.Stats.TLSWeaknesses}}</div></div></div>
+            </div>
+            {{if .ProtocolGuidesHTML}}{{.ProtocolGuidesHTML}}{{end}}
+        </section>
+
+        <!-- TUNNELS SECTION -->
+        <section id="tunnels" class="section">
+            <div class="section-header"><h1 class="section-title"><i class="fas fa-project-diagram"></i> Tunnels & SD-WAN</h1></div>
+            {{if .SDWANVendors}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-sitemap"></i> SD-WAN Vendors</div></div>
+                <div class="card-body">
+                    <div class="grid-3">{{range .SDWANVendors}}<div class="vendor-card"><div class="vendor-name">{{.Name}}</div><div class="vendor-info">Confidence: {{.Confidence}}</div></div>{{end}}</div>
+                </div>
+            </div>
+            {{end}}
+            {{if .TunnelFindings}}
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-network-wired"></i> Tunnels</div></div>
+                <div class="card-body">
+                    <div class="table-container"><table class="data-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Packets</th></tr></thead><tbody>
+                    {{range .TunnelFindings}}<tr><td>{{.Type}}</td><td class="mono">{{.SrcIP}}</td><td class="mono">{{.DstIP}}</td><td>{{.PacketCount}}</td></tr>{{end}}
+                    </tbody></table></div>
+                </div>
+            </div>
+            {{end}}
+        </section>
+
+        <!-- DEVICES SECTION -->
+        <section id="devices" class="section">
+            <div class="section-header"><h1 class="section-title"><i class="fas fa-laptop"></i> Devices</h1></div>
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-fingerprint"></i> Device Fingerprinting</div><span class="status-badge info">{{.Stats.DevicesDetected}} Devices</span></div>
+                <div class="card-body">
+                    <div class="table-container"><table class="data-table"><thead><tr><th>IP</th><th>OS Type</th><th>OS Name</th><th>Confidence</th></tr></thead><tbody>
+                    {{range .DeviceFingerprints}}<tr><td class="mono">{{.IP}}</td><td>{{.OSType}}</td><td>{{.OSName}}</td><td><span class="severity {{if eq .Confidence "High"}}success{{else if eq .Confidence "Medium"}}warning{{else}}info{{end}}">{{.Confidence}}</span></td></tr>{{end}}
+                    </tbody></table></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast success"><i class="fas fa-check-circle"></i><span id="toastMessage">Copied!</span></div>
+
+    <script>
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            const sectionId = this.getAttribute('data-section');
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            document.getElementById('currentSection').textContent = this.textContent.trim();
+            window.location.hash = sectionId;
+        });
+    });
+    window.addEventListener('load', function() {
+        const hash = window.location.hash.slice(1);
+        if (hash) { const tab = document.querySelector(`[data-section="${hash}"]`); if (tab) tab.click(); }
+    });
+    function globalSearchHandler(e) {
+        const q = e.target.value.toLowerCase();
+        if (q.length < 2) return;
+        document.querySelectorAll('.section.active .mono, .section.active td').forEach(el => {
+            el.style.background = el.textContent.toLowerCase().includes(q) ? 'rgba(14,165,233,0.3)' : '';
+        });
+    }
+    document.addEventListener('keydown', function(e) { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); document.getElementById('globalSearch').focus(); }});
+    function copyFilter(btn, text) {
+        navigator.clipboard.writeText(text).then(() => {
+            btn.classList.add('copied'); btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            showToast('Copied!');
+            setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<i class="fas fa-copy"></i> Copy'; }, 2000);
+        });
+    }
+    function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toastMessage').textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+    function exportReport(fmt) {
+        const data = { timestamp: new Date().toISOString(), file: '{{.FileName}}', riskScore: {{.RiskScore}}, findings: { ddos: {{.Stats.DDoSAttacks}}, dns: {{.Stats.DNSAnomalies}}, handshakes: {{.Stats.FailedHandshakes}}, retransmissions: {{.Stats.TCPRetransmissions}} }};
+        if (fmt === 'json') { const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'sdwan-report.json'; a.click(); showToast('Exported JSON'); }
+    }
+    </script>
+    <script>{{.JS}}</script>
+</body>
+</html>

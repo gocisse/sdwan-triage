@@ -21,6 +21,9 @@ var cssContent string
 //go:embed assets/css/enterprise-dashboard.css
 var enterpriseCSSContent string
 
+//go:embed assets/css/pro-dashboard.css
+var proDashboardCSSContent string
+
 //go:embed assets/js/visualizations.js
 var jsContent string
 
@@ -29,6 +32,9 @@ var templateContent embed.FS
 
 //go:embed assets/templates/enterprise-dashboard.html
 var enterpriseTemplateContent embed.FS
+
+//go:embed assets/templates/pro-dashboard.html
+var proDashboardTemplateContent embed.FS
 
 // formatUnixTime converts a Unix timestamp (float64 seconds since epoch) to human-readable format
 func formatUnixTime(unixTimeFloat float64) string {
@@ -167,6 +173,9 @@ type ReportData struct {
 	GeoLocations    []GeoLocationView
 	BandwidthReport *BandwidthReportView
 
+	// Protocol Troubleshooting Guides
+	ProtocolGuidesHTML template.HTML
+
 	// Embedded assets
 	CSS template.CSS
 	JS  template.JS
@@ -178,6 +187,20 @@ type ReportData struct {
 	ProtocolStatsJSON template.JS
 	TopTalkersJSON    template.JS
 	RTTHistogramJSON  template.JS
+
+	// New features: Stream Reassembly, Bandwidth Graph, Plain English Summary
+	StreamSectionHTML           template.HTML
+	ActionableStreamSectionHTML template.HTML
+	ActionableStreamCSS         template.CSS
+	BandwidthGraphHTML          template.HTML
+	PlainEnglishSummaryHTML     template.HTML
+	TrafficGapsHTML             template.HTML
+	BandwidthTimeSeriesJSON     template.JS
+	HasStreams                  bool
+	HasBandwidthData            bool
+	HasPlainEnglishSummary      bool
+	StreamCount                 int
+	TrafficGapCount             int
 }
 
 // View structs for template rendering (with escaped/formatted data)
@@ -543,6 +566,7 @@ type SDWANVendorView struct {
 type GeoLocationView struct {
 	Country string
 	Count   int
+	IPs     []string
 }
 
 type BandwidthReportView struct {
@@ -563,9 +587,49 @@ type BandwidthFlowView struct {
 }
 
 // GenerateHTMLReport generates a professional HTML report using templates
-// This now uses the enterprise dashboard template by default
+// This uses the enterprise dashboard template with full troubleshooting features
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
 	return GenerateEnterpriseHTMLReport(r, filename, pcapFile)
+}
+
+// GenerateProDashboardReport generates the modern Pro Dashboard HTML report
+func GenerateProDashboardReport(r *models.TriageReport, filename string, pcapFile string) error {
+	// Prepare template data
+	data := prepareReportData(r, pcapFile)
+
+	// Use Pro Dashboard CSS
+	data.CSS = template.CSS(proDashboardCSSContent)
+
+	// Create template with custom functions
+	funcMap := template.FuncMap{
+		"formatUnixTime":      formatUnixTime,
+		"formatUnixTimeShort": formatUnixTimeShort,
+		"hasPrefix":           strings.HasPrefix,
+		"contains":            strings.Contains,
+		"title":               strings.Title,
+		"add": func(a, b, c int) int {
+			return a + b + c
+		},
+	}
+
+	// Parse Pro Dashboard template with functions
+	tmpl, err := template.New("pro-dashboard").Funcs(funcMap).Parse(getProDashboardTemplateContent())
+	if err != nil {
+		return fmt.Errorf("failed to parse pro dashboard template: %w", err)
+	}
+
+	// Execute template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("failed to execute pro dashboard template: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(filename, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HTML file: %w", err)
+	}
+
+	return nil
 }
 
 // GenerateEnterpriseHTMLReport generates an enterprise-grade dashboard HTML report
@@ -646,7 +710,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 		GeneratedAt: time.Now().Format("2006-01-02 15:04:05"),
 		FileName:    html.EscapeString(pcapFile),
 		PacketCount: 0, // PacketCount not in TriageReport, set externally,
-		Version:     "2.7.0",
+		Version:     "3.1.0",
 		Year:        time.Now().Year(),
 		CSS:         template.CSS(cssContent),
 		JS:          template.JS(jsContent),
@@ -764,7 +828,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.VoIPAnalysis = convertVoIPAnalysis(r.VoIPAnalysis)
 	data.TunnelFindings = convertTunnelFindings(r.TunnelAnalysis)
 	data.SDWANVendors = convertSDWANVendors(r.SDWANVendors)
-	data.GeoLocations = convertGeoLocations(r.LocationSummary)
+	data.GeoLocations = convertGeoLocations(r.LocationSummary, r.LocationIPs)
 	data.BandwidthReport = convertBandwidthReport(r.BandwidthReport)
 
 	// Generate visualization data
@@ -782,6 +846,42 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	// Add Wireshark filter guide
 	wfg := NewWiresharkFilterGenerator()
 	data.WiresharkFilterGuide = template.HTML(wfg.GetFilterGuideHTML())
+
+	// Generate Protocol Troubleshooting Guides only
+	wizard := GenerateTroubleshootingWizard(r)
+	data.ProtocolGuidesHTML = wizard.GenerateProtocolGuidesHTML()
+
+	// New features: Stream Reassembly, Bandwidth Graph, Plain English Summary
+	if len(r.Streams) > 0 {
+		data.HasStreams = true
+		data.StreamCount = len(r.Streams)
+		data.StreamSectionHTML = StreamSectionHTML(r.Streams)
+	}
+
+	// Actionable Stream Analysis (uses raw stream data)
+	if len(r.RawStreams) > 0 {
+		data.ActionableStreamSectionHTML = ActionableStreamSectionHTML(r.RawStreams)
+		data.ActionableStreamCSS = template.CSS(GetActionableStreamSectionCSS())
+	}
+
+	if r.BandwidthTimeSeries != nil && len(r.BandwidthTimeSeries.Buckets) > 0 {
+		data.HasBandwidthData = true
+		data.BandwidthGraphHTML = BandwidthGraphHTML(r.BandwidthTimeSeries)
+		// Also generate JSON for potential custom visualizations
+		if bwJSON, err := json.Marshal(r.BandwidthTimeSeries); err == nil {
+			data.BandwidthTimeSeriesJSON = template.JS(bwJSON)
+		}
+	}
+
+	if r.PlainEnglishSummary != nil {
+		data.HasPlainEnglishSummary = true
+		data.PlainEnglishSummaryHTML = PlainEnglishSummaryHTML(r.PlainEnglishSummary)
+	}
+
+	if len(r.TrafficGaps) > 0 {
+		data.TrafficGapCount = len(r.TrafficGaps)
+		data.TrafficGapsHTML = TrafficGapsHTML(r.TrafficGaps)
+	}
 
 	return data
 }
@@ -1846,15 +1946,22 @@ func convertSDWANVendors(vendors []models.SDWANVendor) []SDWANVendorView {
 	return result
 }
 
-func convertGeoLocations(locations map[string]int) []GeoLocationView {
+func convertGeoLocations(locations map[string]int, locationIPs map[string][]string) []GeoLocationView {
 	if locations == nil {
 		return nil
 	}
 	result := make([]GeoLocationView, 0, len(locations))
 	for country, count := range locations {
+		ips := locationIPs[country]
+		// Escape IPs for HTML safety
+		escapedIPs := make([]string, len(ips))
+		for i, ip := range ips {
+			escapedIPs[i] = html.EscapeString(ip)
+		}
 		result = append(result, GeoLocationView{
 			Country: html.EscapeString(country),
 			Count:   count,
+			IPs:     escapedIPs,
 		})
 	}
 	// Sort by count descending
@@ -1924,6 +2031,16 @@ func formatBitrate(bitsPerSecond float64) string {
 		return fmt.Sprintf("%.2f Kbps", bitsPerSecond/1e3)
 	}
 	return fmt.Sprintf("%.0f bps", bitsPerSecond)
+}
+
+// getProDashboardTemplateContent reads the Pro Dashboard template
+func getProDashboardTemplateContent() string {
+	content, err := proDashboardTemplateContent.ReadFile("assets/templates/pro-dashboard.html")
+	if err != nil {
+		// Fallback to enterprise template if pro template not found
+		return getEnterpriseTemplateContent()
+	}
+	return string(content)
 }
 
 // getEnterpriseTemplateContent reads the enterprise dashboard template

@@ -1,0 +1,1897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Triage Pro Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+:root {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --bg-card: #1e293b;
+    --bg-hover: #334155;
+    --border-color: #334155;
+    --border-light: #475569;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --primary: #0ea5e9;
+    --primary-hover: #38bdf8;
+    --success: #10b981;
+    --success-bg: rgba(16, 185, 129, 0.15);
+    --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.15);
+    --danger: #ef4444;
+    --danger-bg: rgba(239, 68, 68, 0.15);
+    --critical: #dc2626;
+    --info: #6366f1;
+    --info-bg: rgba(99, 102, 241, 0.15);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --transition: all 0.2s ease;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* Header */
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 24px;
+}
+
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.logo i { color: var(--primary); font-size: 24px; }
+.logo span { color: var(--primary); }
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.search-box {
+    position: relative;
+    width: 300px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 10px 16px 10px 40px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: var(--transition);
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+.search-box i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.search-box .shortcut {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover { background: var(--primary-hover); }
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover { background: var(--bg-hover); }
+
+/* Navigation Tabs */
+.nav-tabs {
+    display: flex;
+    gap: 4px;
+    padding-bottom: 0;
+    overflow-x: auto;
+}
+
+.nav-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.nav-tab:hover { color: var(--text-primary); }
+
+.nav-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.nav-tab .badge {
+    background: var(--danger);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Main Content */
+.main-content {
+    padding: 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+.breadcrumb a:hover { color: var(--primary); }
+.breadcrumb .current { color: var(--text-primary); }
+
+/* Section */
+.section {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.section.active { display: block; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* KPI Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    transition: var(--transition);
+}
+
+.kpi-card:hover {
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.kpi-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.kpi-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.kpi-icon.success { background: var(--success-bg); color: var(--success); }
+.kpi-icon.warning { background: var(--warning-bg); color: var(--warning); }
+.kpi-icon.danger { background: var(--danger-bg); color: var(--danger); }
+.kpi-icon.info { background: var(--info-bg); color: var(--info); }
+
+.kpi-trend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.kpi-trend.up { color: var(--danger); }
+.kpi-trend.down { color: var(--success); }
+.kpi-trend.neutral { color: var(--text-muted); }
+
+.kpi-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.kpi-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.status-badge.critical {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+
+.status-badge.warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+}
+
+.status-badge.success {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+
+/* Cards */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.card-title i { color: var(--primary); }
+
+.card-body { padding: 20px; }
+
+.card-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Tables */
+.table-container { overflow-x: auto; }
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.data-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+.data-table .mono {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--primary);
+}
+
+/* Severity Badges */
+.severity {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.severity.critical { background: var(--danger-bg); color: var(--danger); }
+.severity.high { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+.severity.medium { background: var(--warning-bg); color: var(--warning); }
+.severity.low { background: var(--success-bg); color: var(--success); }
+.severity.info { background: var(--info-bg); color: var(--info); }
+
+/* Educational Banners */
+.edu-banner {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(99, 102, 241, 0.1));
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.edu-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.edu-banner p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Action Checklist */
+.action-checklist {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: 16px 20px;
+    margin-top: 16px;
+}
+
+.action-checklist-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--warning);
+    margin-bottom: 12px;
+}
+
+.action-checklist ul {
+    list-style: none;
+    padding: 0;
+}
+
+.action-checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.action-checklist li i {
+    color: var(--success);
+    margin-top: 3px;
+}
+
+/* Expandable Sections */
+.expandable-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+    margin-bottom: 12px;
+}
+
+.expandable-header:hover { background: var(--bg-hover); }
+
+.expandable-header .title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+}
+
+.expandable-header .chevron {
+    transition: transform 0.3s ease;
+}
+
+.expandable-header.open .chevron { transform: rotate(180deg); }
+
+.expandable-content {
+    display: none;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-md);
+    margin-top: -8px;
+    margin-bottom: 12px;
+}
+
+.expandable-content.show { display: block; }
+
+/* Filter Box */
+.filter-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 12px;
+}
+
+.filter-box code {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--success);
+    word-break: break-all;
+}
+
+.filter-box .copy-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.filter-box .copy-btn:hover { background: var(--primary-hover); }
+.filter-box .copy-btn.copied { background: var(--success); }
+
+/* Flow Timeline */
+.flow-timeline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    margin: 12px 0;
+}
+
+.timeline-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.timeline-step .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.timeline-step .icon.success { background: var(--success-bg); color: var(--success); border: 2px solid var(--success); }
+.timeline-step .icon.pending { background: var(--bg-tertiary); color: var(--text-muted); border: 2px dashed var(--text-muted); }
+.timeline-step .icon.failed { background: var(--danger-bg); color: var(--danger); border: 2px solid var(--danger); }
+
+.timeline-step .label { font-size: 11px; color: var(--text-muted); }
+
+.timeline-arrow {
+    flex: 1;
+    height: 2px;
+    background: var(--border-color);
+    position: relative;
+}
+
+.timeline-arrow.success { background: var(--success); }
+.timeline-arrow.failed { background: var(--danger); }
+
+/* Grid Layouts */
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+@media (max-width: 1200px) {
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .header-top { flex-wrap: wrap; gap: 12px; }
+    .search-box { width: 100%; order: 3; }
+    .nav-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* Utility Classes */
+.text-success { color: var(--success) !important; }
+.text-warning { color: var(--warning) !important; }
+.text-danger { color: var(--danger) !important; }
+.text-muted { color: var(--text-muted) !important; }
+.text-primary { color: var(--primary) !important; }
+.mt-2 { margin-top: 8px; }
+.mt-4 { margin-top: 16px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-4 { margin-bottom: 16px; }
+.hidden { display: none !important; }
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-left: 4px solid var(--success); }
+.toast i { color: var(--success); }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-top">
+            <div class="logo">
+                <i class="fas fa-network-wired"></i>
+                SD-WAN Triage <span>Pro</span>
+            </div>
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="globalSearch" placeholder="Search flows, IPs, issues..." onkeyup="globalSearchHandler(event)">
+                    <span class="shortcut">⌘K</span>
+                </div>
+                <button class="btn btn-secondary" onclick="exportReport('json')">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button class="btn btn-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+        </div>
+        <nav class="nav-tabs">
+            <a href="#dashboard" class="nav-tab active" data-section="dashboard">
+                <i class="fas fa-th-large"></i> Dashboard
+            </a>
+            <a href="#security" class="nav-tab" data-section="security">
+                <i class="fas fa-shield-alt"></i> Security
+                <span class="badge">35</span>
+            </a>
+            <a href="#performance" class="nav-tab" data-section="performance">
+                <i class="fas fa-tachometer-alt"></i> Performance
+            </a>
+            <a href="#traffic" class="nav-tab" data-section="traffic">
+                <i class="fas fa-exchange-alt"></i> Traffic
+            </a>
+            <a href="#protocols" class="nav-tab" data-section="protocols">
+                <i class="fas fa-layer-group"></i> Protocols
+            </a>
+            <a href="#tunnels" class="nav-tab" data-section="tunnels">
+                <i class="fas fa-project-diagram"></i> Tunnels
+            </a>
+            <a href="#devices" class="nav-tab" data-section="devices">
+                <i class="fas fa-laptop"></i> Devices
+            </a>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="#"><i class="fas fa-home"></i></a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="#">Analysis</a>
+            <i class="fas fa-chevron-right"></i>
+            <span class="current" id="currentSection">Dashboard</span>
+        </div>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section active">
+            <!-- KPI Grid -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon danger"><i class="fas fa-heartbeat"></i></div>
+                        <div class="kpi-trend up"><i class="fas fa-arrow-up"></i> Critical</div>
+                    </div>
+                    <div class="kpi-value">
+                        <span class="status-badge critical"><i class="fas fa-exclamation-triangle"></i> CRITICAL</span>
+                    </div>
+                    <div class="kpi-label">Network Health Status</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon danger"><i class="fas fa-handshake-slash"></i></div>
+                        <div class="kpi-trend up"><i class="fas fa-arrow-up"></i> +12%</div>
+                    </div>
+                    <div class="kpi-value">31</div>
+                    <div class="kpi-label">Failed TCP Handshakes</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon danger"><i class="fas fa-skull-crossbones"></i></div>
+                        <div class="kpi-trend up"><i class="fas fa-arrow-up"></i> Active</div>
+                    </div>
+                    <div class="kpi-value">27</div>
+                    <div class="kpi-label">DDoS Attacks Detected</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon warning"><i class="fas fa-redo"></i></div>
+                        <div class="kpi-trend up"><i class="fas fa-arrow-up"></i> 1.6%</div>
+                    </div>
+                    <div class="kpi-value">1,240</div>
+                    <div class="kpi-label">TCP Retransmissions</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon info"><i class="fas fa-project-diagram"></i></div>
+                        <div class="kpi-trend neutral"><i class="fas fa-minus"></i> Stable</div>
+                    </div>
+                    <div class="kpi-value">3</div>
+                    <div class="kpi-label">SD-WAN Tunnels</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon info"><i class="fas fa-building"></i></div>
+                        <div class="kpi-trend neutral"><i class="fas fa-check"></i></div>
+                    </div>
+                    <div class="kpi-value">2</div>
+                    <div class="kpi-label">SD-WAN Vendors</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon warning"><i class="fas fa-globe"></i></div>
+                        <div class="kpi-trend up"><i class="fas fa-arrow-up"></i> +8</div>
+                    </div>
+                    <div class="kpi-value">43</div>
+                    <div class="kpi-label">DNS Anomalies</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-header">
+                        <div class="kpi-icon success"><i class="fas fa-laptop"></i></div>
+                        <div class="kpi-trend neutral"><i class="fas fa-check"></i></div>
+                    </div>
+                    <div class="kpi-value">41</div>
+                    <div class="kpi-label">Devices Identified</div>
+                </div>
+            </div>
+
+            <!-- Executive Summary -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-file-alt"></i> Executive Summary</div>
+                        <span class="status-badge critical"><i class="fas fa-exclamation-circle"></i> Immediate Action Required</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="margin-bottom: 16px;">
+                            <div class="text-muted mb-2">PCAP Analysis</div>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <div><strong>File:</strong> TestFile4.pcap</div>
+                                <div><strong>Packets:</strong> 78,613</div>
+                                <div><strong>Duration:</strong> 1.693s</div>
+                                <div><strong>Size:</strong> 30.3 MB</div>
+                            </div>
+                        </div>
+                        <div class="text-muted mb-2">Risk Score</div>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="font-size: 48px; font-weight: 700; color: var(--danger);">87</div>
+                            <div style="flex: 1;">
+                                <div style="height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 87%; height: 100%; background: linear-gradient(90deg, var(--warning), var(--danger));"></div>
+                                </div>
+                                <div class="text-muted mt-2" style="font-size: 12px;">High risk - multiple critical findings</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-exclamation-triangle"></i> Top Critical Findings</div>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--danger-bg); border-radius: var(--radius-md); border-left: 4px solid var(--danger);">
+                                <span class="severity critical">CRITICAL</span>
+                                <span>27 DDoS attack patterns detected</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--danger-bg); border-radius: var(--radius-md); border-left: 4px solid var(--danger);">
+                                <span class="severity critical">CRITICAL</span>
+                                <span>43 DNS anomalies (possible hijacking)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(249, 115, 22, 0.15); border-radius: var(--radius-md); border-left: 4px solid #f97316;">
+                                <span class="severity high">HIGH</span>
+                                <span>1,240 TCP retransmissions (1.6% rate)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(249, 115, 22, 0.15); border-radius: var(--radius-md); border-left: 4px solid #f97316;">
+                                <span class="severity high">HIGH</span>
+                                <span>8 suspicious ADB connections</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--warning-bg); border-radius: var(--radius-md); border-left: 4px solid var(--warning);">
+                                <span class="severity medium">MEDIUM</span>
+                                <span>31 failed TCP handshakes</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommended Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-tasks"></i> Recommended Actions (Prioritized)</div>
+                </div>
+                <div class="card-body">
+                    <div class="action-checklist">
+                        <div class="action-checklist-title">
+                            <i class="fas fa-clipboard-check"></i> Junior Engineer Action Plan
+                        </div>
+                        <ul>
+                            <li>
+                                <i class="fas fa-circle"></i>
+                                <div>
+                                    <strong>Step 1: Check Scope</strong> - Ask colleagues if they're experiencing network issues. This determines if it's isolated or widespread.
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-circle"></i>
+                                <div>
+                                    <strong>Step 2: Verify SD-WAN Health</strong> - Check the SD-WAN controller dashboard for tunnel status and alerts.
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-circle"></i>
+                                <div>
+                                    <strong>Step 3: Review DDoS Alerts</strong> - 27 attacks detected. If affecting multiple services, <span class="text-danger">ESCALATE IMMEDIATELY</span>.
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-circle"></i>
+                                <div>
+                                    <strong>Step 4: Investigate DNS</strong> - 43 anomalies suggest possible DNS hijacking. Check DNS server configuration.
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security Section -->
+        <section id="security" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-shield-alt text-primary"></i> Security Analysis</h1>
+                <div class="status-badge critical"><i class="fas fa-exclamation-triangle"></i> 35 Threats Detected</div>
+            </div>
+
+            <!-- DDoS Attacks -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-skull-crossbones"></i> DDoS Attacks Detected</div>
+                    <span class="severity critical">27 Attacks</span>
+                </div>
+                <div class="card-body">
+                    <div class="edu-banner">
+                        <div class="edu-banner-header">
+                            <i class="fas fa-info-circle"></i> What is a DDoS Attack?
+                        </div>
+                        <p>A Distributed Denial of Service (DDoS) attack floods a target with traffic to overwhelm it. Signs include: unusually high packet rates from single sources, SYN floods (many connection attempts without completion), and UDP floods targeting specific ports.</p>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Attack Type</th>
+                                    <th>Source IP</th>
+                                    <th>Target IP</th>
+                                    <th>Packets</th>
+                                    <th>Severity</th>
+                                    <th>Impact</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="severity critical">SYN Flood</span></td>
+                                    <td class="mono">10.11.2.201</td>
+                                    <td class="mono">44.205.176.169</td>
+                                    <td>2,847</td>
+                                    <td><span class="severity critical">Critical</span></td>
+                                    <td>Service disruption likely</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="severity high">UDP Flood</span></td>
+                                    <td class="mono">10.11.1.217</td>
+                                    <td class="mono">10.77.1.71</td>
+                                    <td>1,523</td>
+                                    <td><span class="severity high">High</span></td>
+                                    <td>Bandwidth exhaustion</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="severity high">SYN Flood</span></td>
+                                    <td class="mono">10.11.2.17</td>
+                                    <td class="mono">10.199.1.100</td>
+                                    <td>1,245</td>
+                                    <td><span class="severity high">High</span></td>
+                                    <td>SMB service targeted</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="severity medium">ICMP Flood</span></td>
+                                    <td class="mono">10.11.3.252</td>
+                                    <td class="mono">10.199.2.100</td>
+                                    <td>892</td>
+                                    <td><span class="severity medium">Medium</span></td>
+                                    <td>Network latency increase</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="action-checklist">
+                        <div class="action-checklist-title">
+                            <i class="fas fa-user-shield"></i> Junior Engineer Actions
+                        </div>
+                        <ul>
+                            <li><i class="fas fa-check-circle"></i> <strong>Step 1:</strong> Check if multiple services are affected. If YES → <span class="text-danger">ESCALATE IMMEDIATELY</span></li>
+                            <li><i class="fas fa-check-circle"></i> <strong>Step 2:</strong> Verify source IPs are internal (10.x.x.x). Internal sources suggest compromised hosts.</li>
+                            <li><i class="fas fa-check-circle"></i> <strong>Step 3:</strong> Do NOT block IPs without senior approval - you might block legitimate traffic.</li>
+                            <li><i class="fas fa-check-circle"></i> <strong>Step 4:</strong> Document attack patterns and escalate to Security team with this report.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Port Scans -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-search"></i> Port Scan Activity</div>
+                    <span class="severity high">4 Scans</span>
+                </div>
+                <div class="card-body">
+                    <div class="edu-banner">
+                        <div class="edu-banner-header">
+                            <i class="fas fa-info-circle"></i> What is Port Scanning?
+                        </div>
+                        <p>Port scanning is reconnaissance activity where an attacker probes a system to find open ports and services. This is often the first step before an attack. Types include: Vertical (many ports on one host), Horizontal (one port across many hosts), and Block scans (many ports across many hosts).</p>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Scanner IP</th>
+                                    <th>Target IP</th>
+                                    <th>Ports Probed</th>
+                                    <th>Scan Type</th>
+                                    <th>Risk Level</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="mono">10.11.1.99</td>
+                                    <td class="mono">10.77.1.71</td>
+                                    <td>5555, 30275</td>
+                                    <td><span class="severity high">Vertical</span></td>
+                                    <td><span class="severity high">High</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.1.27</td>
+                                    <td class="mono">10.77.1.71</td>
+                                    <td>5555</td>
+                                    <td><span class="severity medium">Horizontal</span></td>
+                                    <td><span class="severity medium">Medium</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DNS Anomalies -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-globe"></i> DNS Anomalies</div>
+                    <span class="severity critical">43 Anomalies</span>
+                </div>
+                <div class="card-body">
+                    <div class="edu-banner">
+                        <div class="edu-banner-header">
+                            <i class="fas fa-info-circle"></i> Understanding DNS Anomalies
+                        </div>
+                        <p>DNS anomalies can indicate: <strong>DNS Hijacking</strong> (queries redirected to malicious servers), <strong>DNS Tunneling</strong> (data exfiltration via DNS), or <strong>Misconfiguration</strong> (internal domains resolving to private IPs). Private IPs (10.x, 192.168.x) returned for public domains is suspicious.</p>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Domain Query</th>
+                                    <th>Response IP</th>
+                                    <th>DNS Server</th>
+                                    <th>Anomaly Type</th>
+                                    <th>Severity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="mono">dc01core002.vccuonline.net</td>
+                                    <td class="mono">10.51.1.191</td>
+                                    <td class="mono">10.199.1.100</td>
+                                    <td>Private IP for public domain</td>
+                                    <td><span class="severity critical">Critical</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">usersfs.vccuonline.net</td>
+                                    <td class="mono">10.199.1.128</td>
+                                    <td class="mono">10.199.1.100</td>
+                                    <td>Private IP for public domain</td>
+                                    <td><span class="severity critical">Critical</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">4.tlu.dl.delivery.mp.microsoft.com</td>
+                                    <td class="mono">92.223.96.6</td>
+                                    <td class="mono">10.199.1.100</td>
+                                    <td>Suspicious domain pattern</td>
+                                    <td><span class="severity medium">Medium</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">ManageEngine001.vccuonline.net</td>
+                                    <td class="mono">10.199.1.59</td>
+                                    <td class="mono">10.199.1.100</td>
+                                    <td>Private IP for public domain</td>
+                                    <td><span class="severity high">High</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="filter-box">
+                        <code>dns.qry.name contains "vccuonline" || dns.a == 10.51.1.191</code>
+                        <button class="copy-btn" onclick="copyFilter(this, 'dns.qry.name contains \"vccuonline\" || dns.a == 10.51.1.191')">
+                            <i class="fas fa-copy"></i> Copy Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suspicious Traffic -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-exclamation-triangle"></i> Suspicious Traffic</div>
+                    <span class="severity high">8 Connections</span>
+                </div>
+                <div class="card-body">
+                    <div class="edu-banner">
+                        <div class="edu-banner-header">
+                            <i class="fas fa-exclamation-triangle text-warning"></i> Android Debug Bridge (ADB) Detected
+                        </div>
+                        <p>Port 5555 is used by Android Debug Bridge. If you don't have authorized Android development, this could indicate: unauthorized device access, malware communication, or compromised mobile devices. <strong>This requires immediate investigation.</strong></p>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Destination</th>
+                                    <th>Protocol</th>
+                                    <th>Reason</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="mono">10.11.1.217:5555</td>
+                                    <td class="mono">10.77.1.71:30275</td>
+                                    <td>UDP</td>
+                                    <td>Android Debug Bridge</td>
+                                    <td><span class="severity critical">Investigate</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.1.27:5555</td>
+                                    <td class="mono">10.77.1.71:30275</td>
+                                    <td>UDP</td>
+                                    <td>Android Debug Bridge</td>
+                                    <td><span class="severity critical">Investigate</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.1.216:5555</td>
+                                    <td class="mono">10.77.1.71:30275</td>
+                                    <td>UDP</td>
+                                    <td>Android Debug Bridge</td>
+                                    <td><span class="severity critical">Investigate</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Performance Section -->
+        <section id="performance" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-tachometer-alt text-primary"></i> Performance Analysis</h1>
+            </div>
+
+            <!-- TCP Connection Summary -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-handshake"></i> TCP Handshake Analysis</div>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; align-items: center; gap: 24px; margin-bottom: 20px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; font-weight: 700; color: var(--success);">529</div>
+                                <div class="text-muted">Successful</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; font-weight: 700; color: var(--danger);">31</div>
+                                <div class="text-muted">Failed</div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="height: 24px; background: var(--bg-tertiary); border-radius: 12px; overflow: hidden; display: flex;">
+                                    <div style="width: 94.5%; background: var(--success);"></div>
+                                    <div style="width: 5.5%; background: var(--danger);"></div>
+                                </div>
+                                <div class="text-muted mt-2" style="font-size: 12px;">94.5% Success Rate</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-redo"></i> Retransmission Analysis</div>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; align-items: center; gap: 24px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 48px; font-weight: 700; color: var(--warning);">1,240</div>
+                                <div class="text-muted">Retransmissions</div>
+                            </div>
+                            <div style="flex: 1;">
+                                <div class="text-muted mb-2">Retransmission Rate</div>
+                                <div style="font-size: 24px; font-weight: 600; color: var(--warning);">1.6%</div>
+                                <div class="text-muted" style="font-size: 12px;">Threshold: &lt;1% Good, 1-3% Warning, &gt;3% Critical</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Failed Handshakes Detail -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-times-circle"></i> Failed TCP Handshakes (Top 10)</div>
+                    <button class="btn btn-secondary" onclick="exportFlows('failed-handshakes')">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="edu-banner">
+                        <div class="edu-banner-header">
+                            <i class="fas fa-info-circle"></i> Understanding TCP Handshakes
+                        </div>
+                        <p>A TCP connection requires a 3-way handshake: <strong>SYN → SYN-ACK → ACK</strong>. Failed handshakes mean the connection couldn't be established. Common causes: firewall blocking, service not running, network path issues, or resource exhaustion.</p>
+                    </div>
+
+                    <!-- Expandable Flow Details -->
+                    <div class="expandable-header" onclick="toggleExpand(this)">
+                        <div class="title">
+                            <span class="severity high">Failed</span>
+                            <span class="mono">10.11.2.12:52040 → 52.217.84.12:443</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="expandable-content">
+                        <div class="flow-timeline">
+                            <div class="timeline-step">
+                                <div class="icon success">SYN</div>
+                                <div class="label">Sent</div>
+                            </div>
+                            <div class="timeline-arrow success"></div>
+                            <div class="timeline-step">
+                                <div class="icon pending">S-A</div>
+                                <div class="label">No Response</div>
+                            </div>
+                            <div class="timeline-arrow"></div>
+                            <div class="timeline-step">
+                                <div class="icon pending">ACK</div>
+                                <div class="label">Not Sent</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 16px;">
+                            <strong>What This Means:</strong>
+                            <p class="text-secondary mt-2">The client sent a connection request (SYN) but never received a response. This usually means the destination is unreachable, firewalled, or the service isn't running.</p>
+                        </div>
+                        <div class="filter-box mt-4">
+                            <code>ip.addr == 10.11.2.12 && ip.addr == 52.217.84.12 && tcp.port == 443</code>
+                            <button class="copy-btn" onclick="copyFilter(this, 'ip.addr == 10.11.2.12 && ip.addr == 52.217.84.12 && tcp.port == 443')">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="expandable-header" onclick="toggleExpand(this)">
+                        <div class="title">
+                            <span class="severity high">Failed</span>
+                            <span class="mono">10.199.2.100:445 → 10.11.3.252:56014</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="expandable-content">
+                        <div class="flow-timeline">
+                            <div class="timeline-step">
+                                <div class="icon success">SYN</div>
+                                <div class="label">Sent</div>
+                            </div>
+                            <div class="timeline-arrow success"></div>
+                            <div class="timeline-step">
+                                <div class="icon failed">RST</div>
+                                <div class="label">Reset</div>
+                            </div>
+                            <div class="timeline-arrow failed"></div>
+                            <div class="timeline-step">
+                                <div class="icon pending">ACK</div>
+                                <div class="label">Aborted</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 16px;">
+                            <strong>What This Means:</strong>
+                            <p class="text-secondary mt-2">The connection was actively refused (RST). The destination received the request but rejected it. This often means the port is closed or the service is refusing connections.</p>
+                        </div>
+                        <div class="filter-box mt-4">
+                            <code>ip.addr == 10.199.2.100 && ip.addr == 10.11.3.252 && tcp.port == 445</code>
+                            <button class="copy-btn" onclick="copyFilter(this, 'ip.addr == 10.199.2.100 && ip.addr == 10.11.3.252 && tcp.port == 445')">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="expandable-header" onclick="toggleExpand(this)">
+                        <div class="title">
+                            <span class="severity medium">Timeout</span>
+                            <span class="mono">10.11.2.17:59155 → 10.199.1.100:445</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="expandable-content">
+                        <div class="flow-timeline">
+                            <div class="timeline-step">
+                                <div class="icon success">SYN</div>
+                                <div class="label">Sent</div>
+                            </div>
+                            <div class="timeline-arrow"></div>
+                            <div class="timeline-step">
+                                <div class="icon pending">...</div>
+                                <div class="label">Timeout</div>
+                            </div>
+                            <div class="timeline-arrow"></div>
+                            <div class="timeline-step">
+                                <div class="icon pending">ACK</div>
+                                <div class="label">Never</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 16px;">
+                            <strong>What This Means:</strong>
+                            <p class="text-secondary mt-2">The connection timed out waiting for a response. This could indicate network congestion, routing issues, or the destination being overwhelmed.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Retransmitting Flows -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-redo"></i> Top Retransmitting Flows</div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Destination</th>
+                                    <th>Retransmits</th>
+                                    <th>Total Packets</th>
+                                    <th>Rate</th>
+                                    <th>Filter</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="mono">10.199.1.88:445</td>
+                                    <td class="mono">10.11.2.207:57978</td>
+                                    <td>127</td>
+                                    <td>3,421</td>
+                                    <td><span class="severity high">3.7%</span></td>
+                                    <td>
+                                        <button class="copy-btn" onclick="copyFilter(this, 'ip.addr == 10.199.1.88 && ip.addr == 10.11.2.207')">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.2.224:54367</td>
+                                    <td class="mono">13.217.132.27:443</td>
+                                    <td>89</td>
+                                    <td>2,156</td>
+                                    <td><span class="severity high">4.1%</span></td>
+                                    <td>
+                                        <button class="copy-btn" onclick="copyFilter(this, 'ip.addr == 10.11.2.224 && ip.addr == 13.217.132.27')">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.1.27:55634</td>
+                                    <td class="mono">158.115.133.137:443</td>
+                                    <td>67</td>
+                                    <td>1,892</td>
+                                    <td><span class="severity medium">3.5%</span></td>
+                                    <td>
+                                        <button class="copy-btn" onclick="copyFilter(this, 'ip.addr == 10.11.1.27 && ip.addr == 158.115.133.137')">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Traffic Section -->
+        <section id="traffic" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-exchange-alt text-primary"></i> Traffic Analysis</h1>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-chart-pie"></i> Traffic Distribution</div>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 12px; height: 12px; background: var(--primary); border-radius: 2px;"></div>
+                                <span style="flex: 1;">SMB (Port 445)</span>
+                                <span style="font-weight: 600;">49.2%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 12px; height: 12px; background: var(--success); border-radius: 2px;"></div>
+                                <span style="flex: 1;">HTTPS (Port 443)</span>
+                                <span style="font-weight: 600;">35.8%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 12px; height: 12px; background: var(--warning); border-radius: 2px;"></div>
+                                <span style="flex: 1;">DNS (Port 53)</span>
+                                <span style="font-weight: 600;">8.3%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 12px; height: 12px; background: var(--info); border-radius: 2px;"></div>
+                                <span style="flex: 1;">Other</span>
+                                <span style="font-weight: 600;">6.7%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-database"></i> Traffic Summary</div>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                            <div>
+                                <div class="text-muted" style="font-size: 12px;">Total Bytes</div>
+                                <div style="font-size: 24px; font-weight: 600;">30.3 MB</div>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size: 12px;">Total Packets</div>
+                                <div style="font-size: 24px; font-weight: 600;">78,613</div>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size: 12px;">TLS Connections</div>
+                                <div style="font-size: 24px; font-weight: 600;">618</div>
+                            </div>
+                            <div>
+                                <div class="text-muted" style="font-size: 12px;">HTTP/2 Flows</div>
+                                <div style="font-size: 24px; font-weight: 600;">147</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Flows -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-sort-amount-down"></i> Top Traffic Flows</div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Destination</th>
+                                    <th>Bytes</th>
+                                    <th>% of Total</th>
+                                    <th>Protocol</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="mono">10.199.1.88:445</td>
+                                    <td class="mono">10.11.2.207:57978</td>
+                                    <td>7.5 MB</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <div style="flex: 1; height: 6px; background: var(--bg-tertiary); border-radius: 3px;">
+                                                <div style="width: 24.6%; height: 100%; background: var(--primary); border-radius: 3px;"></div>
+                                            </div>
+                                            <span>24.6%</span>
+                                        </div>
+                                    </td>
+                                    <td>SMB</td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.199.1.88:445</td>
+                                    <td class="mono">10.11.2.207:57953</td>
+                                    <td>3.7 MB</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <div style="flex: 1; height: 6px; background: var(--bg-tertiary); border-radius: 3px;">
+                                                <div style="width: 12.3%; height: 100%; background: var(--primary); border-radius: 3px;"></div>
+                                            </div>
+                                            <span>12.3%</span>
+                                        </div>
+                                    </td>
+                                    <td>SMB</td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.2.17:59699</td>
+                                    <td class="mono">52.217.69.132:443</td>
+                                    <td>1.8 MB</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <div style="flex: 1; height: 6px; background: var(--bg-tertiary); border-radius: 3px;">
+                                                <div style="width: 5.8%; height: 100%; background: var(--success); border-radius: 3px;"></div>
+                                            </div>
+                                            <span>5.8%</span>
+                                        </div>
+                                    </td>
+                                    <td>HTTPS</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Protocols Section -->
+        <section id="protocols" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-layer-group text-primary"></i> Protocol Analysis</h1>
+            </div>
+
+            <div class="grid-2">
+                <!-- DNS Protocol Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-globe"></i> DNS</div>
+                        <span class="severity warning">43 Anomalies</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+                            <div><strong>Queries:</strong> 1,247</div>
+                            <div><strong>Responses:</strong> 1,198</div>
+                            <div><strong>Servers:</strong> 2</div>
+                            <div><strong>Failed:</strong> 49</div>
+                        </div>
+                        <div class="expandable-header" onclick="toggleExpand(this)">
+                            <div class="title"><i class="fas fa-lightbulb text-warning"></i> Troubleshooting Tips</div>
+                            <i class="fas fa-chevron-down chevron"></i>
+                        </div>
+                        <div class="expandable-content">
+                            <ul style="padding-left: 20px; color: var(--text-secondary);">
+                                <li>Check if DNS servers (10.199.1.100, 10.199.2.100) are responding</li>
+                                <li>Verify DNS configuration on affected clients</li>
+                                <li>Look for DNS cache poisoning indicators</li>
+                                <li>Review firewall rules for DNS traffic</li>
+                            </ul>
+                            <a href="https://wiki.wireshark.org/DNS" target="_blank" class="btn btn-secondary mt-4" style="font-size: 12px;">
+                                <i class="fas fa-external-link-alt"></i> Wireshark DNS Wiki
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TLS Protocol Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-lock"></i> TLS/SSL</div>
+                        <span class="severity info">618 Connections</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+                            <div><strong>TLS 1.2:</strong> 412</div>
+                            <div><strong>TLS 1.3:</strong> 206</div>
+                            <div><strong>Certificates:</strong> 1</div>
+                            <div><strong>Errors:</strong> 5</div>
+                        </div>
+                        <div class="expandable-header" onclick="toggleExpand(this)">
+                            <div class="title"><i class="fas fa-lightbulb text-warning"></i> Troubleshooting Tips</div>
+                            <i class="fas fa-chevron-down chevron"></i>
+                        </div>
+                        <div class="expandable-content">
+                            <ul style="padding-left: 20px; color: var(--text-secondary);">
+                                <li>Check certificate validity and chain</li>
+                                <li>Verify cipher suite compatibility</li>
+                                <li>Look for TLS handshake failures</li>
+                                <li>Review SSL inspection proxy settings</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SMB Protocol Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-folder-open"></i> SMB</div>
+                        <span class="severity info">High Volume</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+                            <div><strong>Connections:</strong> 89</div>
+                            <div><strong>Bytes:</strong> 14.9 MB</div>
+                            <div><strong>Servers:</strong> 3</div>
+                            <div><strong>Errors:</strong> 12</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HTTP Protocol Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title"><i class="fas fa-globe"></i> HTTP/HTTPS</div>
+                        <span class="severity low">6 Errors</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+                            <div><strong>HTTP/2:</strong> 147</div>
+                            <div><strong>QUIC:</strong> 6</div>
+                            <div><strong>404 Errors:</strong> 6</div>
+                            <div><strong>5xx Errors:</strong> 0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tunnels Section -->
+        <section id="tunnels" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-project-diagram text-primary"></i> SD-WAN Tunnels</h1>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-network-wired"></i> Detected SD-WAN Vendors</div>
+                </div>
+                <div class="card-body">
+                    <div class="grid-3">
+                        <div style="padding: 20px; background: var(--bg-tertiary); border-radius: var(--radius-md); text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🔷</div>
+                            <div style="font-weight: 600;">Cisco Viptela</div>
+                            <div class="text-muted" style="font-size: 12px;">Ports: 12346, 12366</div>
+                        </div>
+                        <div style="padding: 20px; background: var(--bg-tertiary); border-radius: var(--radius-md); text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🟢</div>
+                            <div style="font-weight: 600;">VMware VeloCloud</div>
+                            <div class="text-muted" style="font-size: 12px;">Ports: 2426</div>
+                        </div>
+                        <div style="padding: 20px; background: var(--bg-tertiary); border-radius: var(--radius-md); text-align: center; opacity: 0.5;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">⚪</div>
+                            <div style="font-weight: 600;">Aruba EdgeConnect</div>
+                            <div class="text-muted" style="font-size: 12px;">Not Detected</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-list"></i> Tunnel Details</div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Vendor</th>
+                                    <th>Local Endpoint</th>
+                                    <th>Remote Endpoint</th>
+                                    <th>Protocol</th>
+                                    <th>Status</th>
+                                    <th>Packets</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Cisco Viptela</td>
+                                    <td class="mono">10.199.1.1:12346</td>
+                                    <td class="mono">10.77.1.1:12346</td>
+                                    <td>DTLS</td>
+                                    <td><span class="severity success">Active</span></td>
+                                    <td>12,456</td>
+                                </tr>
+                                <tr>
+                                    <td>VMware VeloCloud</td>
+                                    <td class="mono">10.199.1.2:2426</td>
+                                    <td class="mono">52.40.123.45:2426</td>
+                                    <td>VCMP</td>
+                                    <td><span class="severity success">Active</span></td>
+                                    <td>8,234</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Devices Section -->
+        <section id="devices" class="section">
+            <div class="section-header">
+                <h1 class="section-title"><i class="fas fa-laptop text-primary"></i> Device Fingerprinting</h1>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-fingerprint"></i> Identified Devices</div>
+                    <span class="severity info">41 Devices</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>OS Type</th>
+                                    <th>OS Version</th>
+                                    <th>Confidence</th>
+                                    <th>Activity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="mono">10.11.2.201</td>
+                                    <td>Unix-like</td>
+                                    <td>Unknown</td>
+                                    <td><span class="severity low">Low</span></td>
+                                    <td>High traffic volume</td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.7.1</td>
+                                    <td>Unix-like</td>
+                                    <td>Unknown</td>
+                                    <td><span class="severity low">Low</span></td>
+                                    <td>Gateway device</td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.11.2.12</td>
+                                    <td>Unix-like</td>
+                                    <td>Unknown</td>
+                                    <td><span class="severity low">Low</span></td>
+                                    <td>AWS S3 access</td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.199.1.88</td>
+                                    <td>Windows Server</td>
+                                    <td>2019</td>
+                                    <td><span class="severity medium">Medium</span></td>
+                                    <td>File server (SMB)</td>
+                                </tr>
+                                <tr>
+                                    <td class="mono">10.199.1.100</td>
+                                    <td>Windows Server</td>
+                                    <td>2016</td>
+                                    <td><span class="severity medium">Medium</span></td>
+                                    <td>DNS Server</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast success">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Copied to clipboard!</span>
+    </div>
+
+    <script>
+    // Tab Navigation
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            const sectionId = this.getAttribute('data-section');
+            
+            // Update active tab
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show section
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Update breadcrumb
+            document.getElementById('currentSection').textContent = this.textContent.trim().split('\n')[0];
+            
+            // Update URL hash
+            window.location.hash = sectionId;
+        });
+    });
+
+    // Handle URL hash on load
+    window.addEventListener('load', function() {
+        const hash = window.location.hash.slice(1);
+        if (hash) {
+            const tab = document.querySelector(`[data-section="${hash}"]`);
+            if (tab) tab.click();
+        }
+    });
+
+    // Global Search
+    function globalSearchHandler(event) {
+        const query = event.target.value.toLowerCase();
+        if (query.length < 2) return;
+        
+        // Highlight matching text in visible section
+        const activeSection = document.querySelector('.section.active');
+        if (!activeSection) return;
+        
+        // Simple search - highlight matching cells
+        activeSection.querySelectorAll('.mono, td').forEach(el => {
+            if (el.textContent.toLowerCase().includes(query)) {
+                el.style.background = 'rgba(14, 165, 233, 0.3)';
+            } else {
+                el.style.background = '';
+            }
+        });
+    }
+
+    // Keyboard shortcut for search
+    document.addEventListener('keydown', function(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            document.getElementById('globalSearch').focus();
+        }
+    });
+
+    // Copy to Clipboard
+    function copyFilter(btn, text) {
+        navigator.clipboard.writeText(text).then(() => {
+            btn.classList.add('copied');
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            showToast('Filter copied to clipboard!');
+            
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+            }, 2000);
+        });
+    }
+
+    // Toast Notification
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toastMessage').textContent = message;
+        toast.classList.add('show');
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
+    // Expandable Sections
+    function toggleExpand(header) {
+        header.classList.toggle('open');
+        const content = header.nextElementSibling;
+        content.classList.toggle('show');
+    }
+
+    // Export Functions
+    function exportReport(format) {
+        const data = {
+            timestamp: new Date().toISOString(),
+            summary: {
+                packets: 78613,
+                bytes: '30.3 MB',
+                duration: '1.693s',
+                health: 'CRITICAL'
+            },
+            findings: {
+                ddos_attacks: 27,
+                dns_anomalies: 43,
+                failed_handshakes: 31,
+                retransmissions: 1240
+            }
+        };
+        
+        if (format === 'json') {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sdwan-triage-report.json';
+            a.click();
+            showToast('Report exported as JSON');
+        }
+    }
+
+    function exportFlows(type) {
+        showToast(`Exporting ${type} flows...`);
+    }
+
+    function refreshData() {
+        showToast('Refreshing data...');
+        // In production, this would reload the analysis
+    }
+
+    // Initialize
+    console.log('SD-WAN Triage Pro Dashboard loaded');
+    </script>
+</body>
+</html>

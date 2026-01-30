@@ -393,6 +393,70 @@
                     <i class="fas fa-clock"></i> Last updated: {{.GeneratedAt}}
                 </div>
             </div>
+            
+            <!-- ================================================================
+                 DEVICE FINGERPRINTING (Visible on Dashboard)
+                 ================================================================ -->
+            {{if .DeviceFingerprints}}
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-fingerprint card-title-icon"></i>
+                        Device Fingerprinting
+                    </h2>
+                    <span class="status-badge info">{{.Stats.DevicesDetected}} Devices Detected</span>
+                </div>
+                <div class="card-body">
+                    <div class="data-table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table" id="device-fingerprint-table">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>OS Type</th>
+                                    <th>Operating System</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .DeviceFingerprints}}
+                                <tr>
+                                    <td><code>{{.IP}}</code></td>
+                                    <td>{{.OSType}}</td>
+                                    <td>{{.OSName}}</td>
+                                    <td>
+                                        <span class="status-badge {{if eq .Confidence "High"}}healthy{{else if eq .Confidence "Medium"}}warning{{else}}unknown{{end}}">
+                                            <span class="status-dot"></span>
+                                            {{.Confidence}}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+
+            <!-- ================================================================
+                 PROTOCOL TROUBLESHOOTING GUIDES
+                 ================================================================ -->
+            <div class="card mb-xl">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-book-open card-title-icon"></i>
+                        Protocol Troubleshooting Guides
+                    </h2>
+                    <div class="card-actions">
+                        <button class="card-action-button" onclick="toggleSection('protocol-guides')">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" id="protocol-guides">
+                    {{.ProtocolGuidesHTML}}
+                </div>
+            </div>
         </section>
         
         <!-- ====================================================================
@@ -1260,10 +1324,9 @@
                 </div>
                 
                 <!-- Flow List -->
-                <div style="padding: 16px 24px;">
-                    {{range $index, $flow := .TCPHandshakeFlows}}
-                    {{if lt $index 50}}
-                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if eq $flow.StateColor "danger"}}border-color: #fca5a5; background: #fef2f2;{{else if eq $flow.StateColor "success"}}border-color: #86efac;{{end}}">
+                <div style="padding: 16px 24px;" data-expandable-flows>
+                    {{range $flow := .TCPHandshakeFlows}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if eq $flow.StateColor "danger"}}border-color: #fca5a5; background: #fef2f2;{{else if eq $flow.StateColor "success"}}border-color: #86efac;{{end}}">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if eq $flow.StateColor "success"}}#f0fdf4{{else if eq $flow.StateColor "danger"}}#fef2f2{{else if eq $flow.StateColor "warning"}}#fffbeb{{else}}#f8fafc{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-network-wired" style="color: {{if eq $flow.StateColor "success"}}#10b981{{else if eq $flow.StateColor "danger"}}#ef4444{{else if eq $flow.StateColor "warning"}}#f59e0b{{else}}#3b82f6{{end}};"></i>
@@ -1526,13 +1589,6 @@
                         </div>
                     </details>
                     {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .TCPHandshakeFlows) 50}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing first 50 of {{len .TCPHandshakeFlows}} TCP handshake flows.
-                    </div>
-                    {{end}}
                 </div>
             </div>
             {{end}}
@@ -1640,11 +1696,10 @@
                 </div>
                 
                 <!-- Retransmission List -->
-                <div style="padding: 16px 24px;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
                     {{if .TCPRetransmissions}}
-                    {{range $index, $retrans := .TCPRetransmissions}}
-                    {{if lt $index 20}}
-                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if gt $retrans.Count 50}}border-color: #fca5a5; background: #fef2f2;{{else if gt $retrans.Count 10}}border-color: #fcd34d; background: #fffbeb;{{else}}border-color: #86efac; background: #f0fdf4;{{end}}">
+                    {{range $retrans := .TCPRetransmissions}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if gt $retrans.Count 50}}border-color: #fca5a5; background: #fef2f2;{{else if gt $retrans.Count 10}}border-color: #fcd34d; background: #fffbeb;{{else}}border-color: #86efac; background: #f0fdf4;{{end}}">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if gt $retrans.Count 50}}#fef2f2{{else if gt $retrans.Count 10}}#fffbeb{{else}}#f0fdf4{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-redo" style="color: {{if gt $retrans.Count 50}}#ef4444{{else if gt $retrans.Count 10}}#f59e0b{{else}}#22c55e{{end}};"></i>
@@ -1734,17 +1789,10 @@
                         </div>
                     </details>
                     {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .TCPRetransmissions) 20}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .TCPRetransmissions}} retransmission flows (sorted by count).
-                    </div>
-                    {{end}}
                     {{else}}
                     <div style="text-align: center; padding: 40px; color: #6b7280;">
                         <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
-                        <p style="margin: 0; font-size: 0.875rem;">No significant retransmission issues detected.</p>
+                        <p style="margin: 0; font-size: 0.875rem;">No retransmission issues detected.</p>
                     </div>
                     {{end}}
                 </div>
@@ -1795,11 +1843,10 @@
                 </div>
                 
                 <!-- High Latency Flow List -->
-                <div style="padding: 16px 24px;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
                     {{if .HighRTTFlows}}
-                    {{range $index, $flow := .HighRTTFlows}}
-                    {{if lt $index 20}}
-                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if gt $flow.AvgRTT 150.0}}border-color: #fca5a5; background: #fef2f2;{{else if gt $flow.AvgRTT 50.0}}border-color: #fcd34d; background: #fffbeb;{{else}}border-color: #86efac; background: #f0fdf4;{{end}}">
+                    {{range $flow := .HighRTTFlows}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if gt $flow.AvgRTT 150.0}}border-color: #fca5a5; background: #fef2f2;{{else if gt $flow.AvgRTT 50.0}}border-color: #fcd34d; background: #fffbeb;{{else}}border-color: #86efac; background: #f0fdf4;{{end}}">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if gt $flow.AvgRTT 150.0}}#fef2f2{{else if gt $flow.AvgRTT 50.0}}#fffbeb{{else}}#f0fdf4{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-clock" style="color: {{if gt $flow.AvgRTT 150.0}}#ef4444{{else if gt $flow.AvgRTT 50.0}}#f59e0b{{else}}#22c55e{{end}};"></i>
@@ -1905,13 +1952,6 @@
                         </div>
                     </details>
                     {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .HighRTTFlows) 20}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .HighRTTFlows}} high latency flows (sorted by RTT).
-                    </div>
-                    {{end}}
                     {{else}}
                     <div style="text-align: center; padding: 40px; color: #6b7280;">
                         <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
@@ -1932,8 +1972,73 @@
                 Traffic Analysis
             </h2>
             
+            <!-- Plain English Summary -->
+            {{if .HasPlainEnglishSummary}}
+            <div style="margin-bottom: 24px;">
+                {{.PlainEnglishSummaryHTML}}
+            </div>
+            {{end}}
+            
+            <!-- Bandwidth Time Series Graph -->
+            {{if .HasBandwidthData}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-chart-area"></i>
+                        Bandwidth Over Time
+                        {{if gt .TrafficGapCount 0}}<span style="background: rgba(255,200,0,0.3); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{.TrafficGapCount}} gaps detected</span>{{end}}
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Interactive time-series visualization of network throughput. Hover to see details at each point.</p>
+                </div>
+                <div style="padding: 20px; background: var(--color-card);">
+                    {{.BandwidthGraphHTML}}
+                </div>
+                {{if gt .TrafficGapCount 0}}
+                <div style="padding: 16px 24px; background: rgba(245, 158, 11, 0.15); border-top: 1px solid rgba(245, 158, 11, 0.3);">
+                    <h4 style="margin: 0 0 12px 0; color: #f59e0b; font-size: 0.9rem;"><i class="fas fa-exclamation-triangle"></i> Traffic Gaps Detected</h4>
+                    {{.TrafficGapsHTML}}
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+            
+            <!-- Follow TCP/UDP Stream Section -->
+            {{if .HasStreams}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-stream"></i>
+                        Follow TCP/UDP Stream
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{.StreamCount}} streams</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Reconstructed application-layer conversations. Click to expand and view payload data.</p>
+                </div>
+                <div style="padding: 20px; background: var(--color-card);">
+                    {{.StreamSectionHTML}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Actionable Stream Analysis -->
+            {{if .ActionableStreamSectionHTML}}
+            <style>{{.ActionableStreamCSS}}</style>
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-stethoscope"></i>
+                        Actionable Stream Analysis
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">With Wireshark Guides</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Human-readable traffic analysis with investigation guides and remediation plans. Junior engineers can triage without escalation.</p>
+                </div>
+                <div style="padding: 20px; background: var(--color-card);">
+                    {{.ActionableStreamSectionHTML}}
+                </div>
+            </div>
+            {{end}}
+            
             <!-- Top Traffic Flows - Complete Redesign with Inline Styles -->
-            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
                 <!-- Header -->
                 <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: white; padding: 20px 24px;">
                     <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
@@ -1945,14 +2050,14 @@
                 </div>
                 
                 <!-- Educational Introduction -->
-                <div style="background: #fff7ed; border-bottom: 1px solid #fed7aa; padding: 20px 24px;">
+                <div style="background: rgba(249, 115, 22, 0.1); border-bottom: 1px solid rgba(249, 115, 22, 0.3); padding: 20px 24px;">
                     <div style="display: flex; align-items: flex-start; gap: 16px;">
                         <div style="background: #ea580c; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             <i class="fas fa-graduation-cap"></i>
                         </div>
                         <div>
-                            <h4 style="margin: 0 0 8px 0; color: #c2410c; font-size: 1rem;">Understanding Traffic Flows</h4>
-                            <p style="margin: 0 0 12px 0; color: #ea580c; font-size: 0.875rem; line-height: 1.6;">
+                            <h4 style="margin: 0 0 8px 0; color: #fb923c; font-size: 1rem;">Understanding Traffic Flows</h4>
+                            <p style="margin: 0 0 12px 0; color: var(--color-text-secondary); font-size: 0.875rem; line-height: 1.6;">
                                 Traffic flows show which connections consume the most bandwidth. High-volume flows may indicate 
                                 <strong>large file transfers</strong>, <strong>video streaming</strong>, <strong>backups</strong>, or potentially 
                                 <strong>unauthorized data exfiltration</strong>. Monitoring top consumers helps optimize network performance.
@@ -1960,15 +2065,15 @@
                             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
                                 <span style="display: flex; align-items: center; gap: 6px;">
                                     <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
-                                    <span style="color: #166534;">0-5% = Normal usage</span>
+                                    <span style="color: #4ade80;">0-5% = Normal usage</span>
                                 </span>
                                 <span style="display: flex; align-items: center; gap: 6px;">
                                     <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
-                                    <span style="color: #92400e;">5-15% = High usage</span>
+                                    <span style="color: #fbbf24;">5-15% = High usage</span>
                                 </span>
                                 <span style="display: flex; align-items: center; gap: 6px;">
                                     <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
-                                    <span style="color: #dc2626;">&gt;15% = Bandwidth hog</span>
+                                    <span style="color: #f87171;">&gt;15% = Bandwidth hog</span>
                                 </span>
                             </div>
                         </div>
@@ -1976,74 +2081,73 @@
                 </div>
                 
                 <!-- Traffic Flow List -->
-                <div style="padding: 16px 24px;">
+                <div style="padding: 16px 24px; background: var(--color-card);" data-expandable-flows>
                     {{if .TopFlows}}
-                    {{range $index, $flow := .TopFlows}}
-                    {{if lt $index 15}}
-                    <details style="margin-bottom: 12px; border: 1px solid {{if gt $flow.Percentage 15.0}}#fecaca{{else if gt $flow.Percentage 5.0}}#fde68a{{else}}#bbf7d0{{end}}; border-radius: 8px; overflow: hidden; background: {{if gt $flow.Percentage 15.0}}#fef2f2{{else if gt $flow.Percentage 5.0}}#fefce8{{else}}#f0fdf4{{end}};">
+                    {{range $flow := .TopFlows}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid {{if gt $flow.Percentage 15.0}}rgba(239,68,68,0.3){{else if gt $flow.Percentage 5.0}}rgba(245,158,11,0.3){{else}}rgba(16,185,129,0.3){{end}}; border-radius: 8px; overflow: hidden; background: {{if gt $flow.Percentage 15.0}}rgba(239,68,68,0.1){{else if gt $flow.Percentage 5.0}}rgba(245,158,11,0.1){{else}}rgba(16,185,129,0.1){{end}};">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-exchange-alt" style="color: {{if gt $flow.Percentage 15.0}}#ef4444{{else if gt $flow.Percentage 5.0}}#f59e0b{{else}}#22c55e{{end}};"></i>
-                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: var(--color-text-primary);">
                                     {{$flow.SrcIP}}:{{$flow.SrcPort}}
                                 </span>
-                                <span style="color: #9ca3af; font-weight: bold;">→</span>
-                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: #1f2937;">
+                                <span style="color: var(--color-text-muted); font-weight: bold;">→</span>
+                                <span style="font-family: 'Courier New', monospace; font-weight: 500; color: var(--color-text-primary);">
                                     {{$flow.DstIP}}:{{$flow.DstPort}}
                                 </span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="background: {{if gt $flow.Percentage 15.0}}#fecaca{{else if gt $flow.Percentage 5.0}}#fde68a{{else}}#d1fae5{{end}}; color: {{if gt $flow.Percentage 15.0}}#dc2626{{else if gt $flow.Percentage 5.0}}#92400e{{else}}#047857{{end}}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                <span style="background: {{if gt $flow.Percentage 15.0}}rgba(239,68,68,0.2){{else if gt $flow.Percentage 5.0}}rgba(245,158,11,0.2){{else}}rgba(16,185,129,0.2){{end}}; color: {{if gt $flow.Percentage 15.0}}#f87171{{else if gt $flow.Percentage 5.0}}#fbbf24{{else}}#4ade80{{end}}; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
                                     {{printf "%.1f" $flow.Percentage}}%
                                 </span>
-                                <span style="background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                                <span style="background: rgba(99,102,241,0.2); color: #a5b4fc; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
                                     {{$flow.Protocol}}
                                 </span>
-                                <span style="color: #6b7280; font-size: 0.8125rem; font-weight: 500;">
+                                <span style="color: var(--color-text-secondary); font-size: 0.8125rem; font-weight: 500;">
                                     {{$flow.BytesFormatted}}
                                 </span>
                             </div>
                         </summary>
                         
-                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                        <div style="padding: 20px; background: var(--color-surface); border-top: 1px solid var(--color-border);">
                             <!-- Traffic Volume Visualization -->
                             <div style="margin-bottom: 16px;">
                                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                                    <span style="font-weight: 600; color: #374151; font-size: 0.875rem;">Bandwidth Usage:</span>
-                                    <div style="flex: 1; height: 12px; background: #e5e7eb; border-radius: 6px; overflow: hidden;">
+                                    <span style="font-weight: 600; color: var(--color-text-primary); font-size: 0.875rem;">Bandwidth Usage:</span>
+                                    <div style="flex: 1; height: 12px; background: var(--color-border); border-radius: 6px; overflow: hidden;">
                                         <div style="width: {{printf "%.1f" $flow.Percentage}}%; height: 100%; background: {{if gt $flow.Percentage 15.0}}#ef4444{{else if gt $flow.Percentage 5.0}}#f59e0b{{else}}#22c55e{{end}}; border-radius: 6px;"></div>
                                     </div>
-                                    <span style="font-size: 0.875rem; color: #374151; font-weight: 600; min-width: 60px;">{{printf "%.1f" $flow.Percentage}}%</span>
+                                    <span style="font-size: 0.875rem; color: var(--color-text-primary); font-weight: 600; min-width: 60px;">{{printf "%.1f" $flow.Percentage}}%</span>
                                 </div>
                             </div>
                             
                             <!-- Connection Details -->
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px;">
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Source</div>
-                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.SrcIP}}:{{$flow.SrcPort}}</code>
+                                <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">Source</div>
+                                    <code style="font-size: 0.875rem; color: #22d3ee;">{{$flow.SrcIP}}:{{$flow.SrcPort}}</code>
                                 </div>
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Destination</div>
-                                    <code style="font-size: 0.875rem; color: #0f172a;">{{$flow.DstIP}}:{{$flow.DstPort}}</code>
+                                <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">Destination</div>
+                                    <code style="font-size: 0.875rem; color: #22d3ee;">{{$flow.DstIP}}:{{$flow.DstPort}}</code>
                                 </div>
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Protocol</div>
-                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$flow.Protocol}}</span>
+                                <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">Protocol</div>
+                                    <span style="font-size: 0.875rem; color: var(--color-text-primary); font-weight: 600;">{{$flow.Protocol}}</span>
                                 </div>
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Data Transferred</div>
-                                    <span style="font-size: 0.875rem; color: #0f172a; font-weight: 600;">{{$flow.BytesFormatted}}</span>
+                                <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">Data Transferred</div>
+                                    <span style="font-size: 0.875rem; color: var(--color-text-primary); font-weight: 600;">{{$flow.BytesFormatted}}</span>
                                 </div>
                             </div>
                             
                             <!-- What This Means -->
-                            <div style="background: {{if gt $flow.Percentage 15.0}}#fef2f2{{else if gt $flow.Percentage 5.0}}#fefce8{{else}}#f0fdf4{{end}}; border: 1px solid {{if gt $flow.Percentage 15.0}}#fecaca{{else if gt $flow.Percentage 5.0}}#fde68a{{else}}#bbf7d0{{end}}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: {{if gt $flow.Percentage 15.0}}#dc2626{{else if gt $flow.Percentage 5.0}}#92400e{{else}}#166534{{end}}; display: flex; align-items: center; gap: 8px;">
+                            <div style="background: {{if gt $flow.Percentage 15.0}}rgba(239,68,68,0.1){{else if gt $flow.Percentage 5.0}}rgba(245,158,11,0.1){{else}}rgba(16,185,129,0.1){{end}}; border: 1px solid {{if gt $flow.Percentage 15.0}}rgba(239,68,68,0.3){{else if gt $flow.Percentage 5.0}}rgba(245,158,11,0.3){{else}}rgba(16,185,129,0.3){{end}}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: {{if gt $flow.Percentage 15.0}}#f87171{{else if gt $flow.Percentage 5.0}}#fbbf24{{else}}#4ade80{{end}}; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas {{if gt $flow.Percentage 15.0}}fa-exclamation-circle{{else if gt $flow.Percentage 5.0}}fa-exclamation-triangle{{else}}fa-check-circle{{end}}"></i>
                                     {{if gt $flow.Percentage 15.0}}High Bandwidth Consumer{{else if gt $flow.Percentage 5.0}}Elevated Traffic{{else}}Normal Traffic{{end}}
                                 </h4>
-                                <p style="margin: 0; font-size: 0.8125rem; color: {{if gt $flow.Percentage 15.0}}#991b1b{{else if gt $flow.Percentage 5.0}}#78350f{{else}}#047857{{end}}; line-height: 1.6;">
+                                <p style="margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.6;">
                                     {{if gt $flow.Percentage 15.0}}This flow is consuming a significant portion of available bandwidth. This could indicate large file transfers, video streaming, backup operations, or potentially unauthorized data movement. Immediate investigation recommended.
                                     {{else if gt $flow.Percentage 5.0}}This flow shows elevated traffic levels. While not critical, it's worth monitoring to ensure it's legitimate business traffic and not impacting other users.
                                     {{else}}This flow shows normal traffic patterns. No immediate action required, but continue monitoring for changes.{{end}}
@@ -2051,12 +2155,12 @@
                             </div>
                             
                             <!-- Next Actions -->
-                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                            <div style="background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #60a5fa; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-tasks"></i>
                                     Next Actions
                                 </h4>
-                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.8;">
                                     {{if gt $flow.Percentage 15.0}}
                                     <li><strong>Identify Application:</strong> Determine what application is generating this traffic</li>
                                     <li><strong>Verify Legitimacy:</strong> Confirm this is authorized business traffic</li>
@@ -2074,22 +2178,15 @@
                             </div>
                             
                             <!-- Wireshark Filter -->
-                            <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 16px;">
-                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+                            <div style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #a78bfa; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-filter"></i>
                                     Wireshark Filter
                                 </h4>
-                                <code style="display: block; padding: 10px 12px; background: #ffffff; border: 1px solid #ddd6fe; border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #5b21b6;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}}</code>
+                                <code style="display: block; padding: 10px 12px; background: var(--color-background); border: 1px solid var(--color-border); border-radius: 6px; font-size: 0.75rem; word-break: break-all; font-family: 'Courier New', monospace; color: #22d3ee;">ip.addr=={{$flow.SrcIP}} && ip.addr=={{$flow.DstIP}}</code>
                             </div>
                         </div>
                     </details>
-                    {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .TopFlows) 15}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 15 of {{len .TopFlows}} traffic flows.
-                    </div>
                     {{end}}
                     {{else}}
                     <div style="text-align: center; padding: 40px; color: #6b7280;">
@@ -2167,10 +2264,9 @@
                 </div>
                 
                 <!-- Protocol List -->
-                <div style="padding: 16px 24px;">
-                    {{range $index, $proto := .ProtocolStats}}
-                    {{if lt $index 10}}
-                    <details style="margin-bottom: 12px; border: 1px solid #c7d2fe; border-radius: 8px; overflow: hidden; background: #f5f3ff;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
+                    {{range $proto := .ProtocolStats}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #c7d2fe; border-radius: 8px; overflow: hidden; background: #f5f3ff;">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-network-wired" style="color: #6366f1;"></i>
@@ -2262,13 +2358,6 @@
                             </div>
                         </div>
                     </details>
-                    {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .ProtocolStats) 10}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 10 of {{len .ProtocolStats}} protocols.
-                    </div>
                     {{end}}
                 </div>
                 
@@ -2416,10 +2505,9 @@
                 </div>
                 
                 <!-- DNS Query List -->
-                <div style="padding: 16px 24px;">
-                    {{range $index, $dns := .DNSDetails}}
-                    {{if lt $index 50}}
-                    <details style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if $dns.IsAnomalous}}border-color: #fca5a5; background: #fef2f2;{{else if $dns.HasResponse}}border-color: #86efac;{{else}}border-color: #fca5a5;{{end}}">
+                <div style="padding: 16px 24px;" data-expandable-flows>
+                    {{range $dns := .DNSDetails}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; {{if $dns.IsAnomalous}}border-color: #fca5a5; background: #fef2f2;{{else if $dns.HasResponse}}border-color: #86efac;{{else}}border-color: #fca5a5;{{end}}">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: {{if $dns.IsAnomalous}}#fef2f2{{else if $dns.HasResponse}}#f0fdf4{{else}}#fef2f2{{end}}; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-globe" style="color: {{if $dns.HasResponse}}#10b981{{else}}#ef4444{{end}};"></i>
@@ -2554,13 +2642,6 @@
                         </div>
                     </details>
                     {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .DNSDetails) 50}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing first 50 of {{len .DNSDetails}} DNS queries.
-                    </div>
-                    {{end}}
                 </div>
             </div>
             {{else}}
@@ -2639,10 +2720,9 @@
                 </div>
                 
                 <!-- HTTP/2 Flow List -->
-                <div style="padding: 16px 24px;">
-                    {{range $index, $flow := .HTTP2Flows}}
-                    {{if lt $index 20}}
-                    <details style="margin-bottom: 12px; border: 1px solid #86efac; border-radius: 8px; overflow: hidden; background: #f0fdf4;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
+                    {{range $flow := .HTTP2Flows}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #86efac; border-radius: 8px; overflow: hidden; background: #f0fdf4;">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #f0fdf4; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-bolt" style="color: #22c55e;"></i>
@@ -2716,13 +2796,6 @@
                             </div>
                         </div>
                     </details>
-                    {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .HTTP2Flows) 20}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .HTTP2Flows}} HTTP/2 flows.
-                    </div>
                     {{end}}
                 </div>
                 
@@ -2820,10 +2893,9 @@
                 </div>
                 
                 <!-- QUIC Flow List -->
-                <div style="padding: 16px 24px;">
-                    {{range $index, $flow := .QUICFlows}}
-                    {{if lt $index 20}}
-                    <details style="margin-bottom: 12px; border: 1px solid #c4b5fd; border-radius: 8px; overflow: hidden; background: #faf5ff;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
+                    {{range $flow := .QUICFlows}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #c4b5fd; border-radius: 8px; overflow: hidden; background: #faf5ff;">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: #faf5ff; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-rocket" style="color: #8b5cf6;"></i>
@@ -2907,13 +2979,6 @@
                             </div>
                         </div>
                     </details>
-                    {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .QUICFlows) 20}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 20 of {{len .QUICFlows}} QUIC flows.
-                    </div>
                     {{end}}
                 </div>
                 
@@ -3018,12 +3083,11 @@
                 </div>
                 
                 <!-- Tunnel List -->
-                <div style="padding: 16px 24px;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
                     {{if gt .Stats.TunnelsDetected 0}}
                     {{if .TunnelFindings}}
-                    {{range $index, $tunnel := .TunnelFindings}}
-                    {{if lt $index 15}}
-                    <details style="margin-bottom: 12px; border: 1px solid #a5f3fc; border-radius: 8px; overflow: hidden; background: #ecfeff;">
+                    {{range $tunnel := .TunnelFindings}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #a5f3fc; border-radius: 8px; overflow: hidden; background: #ecfeff;">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-shield-alt" style="color: #0891b2;"></i>
@@ -3151,7 +3215,6 @@
                         </div>
                     </details>
                     {{end}}
-                    {{end}}
                     {{else}}
                     <div style="text-align: center; padding: 40px; color: #6b7280;">
                         <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 12px; color: #22c55e;"></i>
@@ -3238,11 +3301,11 @@
                 </div>
                 
                 <!-- Vendor List -->
-                <div style="padding: 16px 24px;">
+                <div style="padding: 16px 24px;" data-expandable-flows>
                     {{if gt .Stats.SDWANVendors 0}}
                     {{if .SDWANVendors}}
-                    {{range $index, $vendor := .SDWANVendors}}
-                    <details style="margin-bottom: 12px; border: 1px solid #ddd6fe; border-radius: 8px; overflow: hidden; background: #faf5ff;" open>
+                    {{range $vendor := .SDWANVendors}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid #ddd6fe; border-radius: 8px; overflow: hidden; background: #faf5ff;" open>
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <i class="fas fa-building" style="color: #7c3aed;"></i>
@@ -3429,26 +3492,26 @@
             {{end}}
             
             <!-- Geographic Distribution - Complete Redesign with Inline Styles -->
-            <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
                 <!-- Header -->
                 <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 20px 24px;">
                     <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
                         <i class="fas fa-globe-americas"></i>
                         Geographic Distribution
-                        {{if .GeoLocations}}<span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .GeoLocations}} countries</span>{{end}}
+                        {{if .GeoLocations}}<span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .GeoLocations}} regions</span>{{end}}
                     </h3>
                     <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Analyze traffic origins and destinations by geographic location</p>
                 </div>
                 
                 <!-- Educational Introduction -->
-                <div style="background: #ecfdf5; border-bottom: 1px solid #a7f3d0; padding: 20px 24px;">
+                <div style="background: rgba(16, 185, 129, 0.1); border-bottom: 1px solid rgba(16, 185, 129, 0.3); padding: 20px 24px;">
                     <div style="display: flex; align-items: flex-start; gap: 16px;">
                         <div style="background: #059669; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             <i class="fas fa-graduation-cap"></i>
                         </div>
                         <div>
-                            <h4 style="margin: 0 0 8px 0; color: #047857; font-size: 1rem;">Understanding Geographic Distribution</h4>
-                            <p style="margin: 0 0 12px 0; color: #059669; font-size: 0.875rem; line-height: 1.6;">
+                            <h4 style="margin: 0 0 8px 0; color: #4ade80; font-size: 1rem;">Understanding Geographic Distribution</h4>
+                            <p style="margin: 0 0 12px 0; color: var(--color-text-secondary); font-size: 0.875rem; line-height: 1.6;">
                                 Geographic analysis reveals where network traffic originates and terminates. This helps identify 
                                 <strong>expected business traffic</strong>, <strong>potential security threats</strong>, and 
                                 <strong>compliance concerns</strong> related to data sovereignty.
@@ -3456,15 +3519,15 @@
                             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.8125rem;">
                                 <span style="display: flex; align-items: center; gap: 6px;">
                                     <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
-                                    <span style="color: #166534;">Expected region</span>
+                                    <span style="color: #4ade80;">Expected region</span>
                                 </span>
                                 <span style="display: flex; align-items: center; gap: 6px;">
                                     <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
-                                    <span style="color: #92400e;">Review recommended</span>
+                                    <span style="color: #fbbf24;">Review recommended</span>
                                 </span>
                                 <span style="display: flex; align-items: center; gap: 6px;">
                                     <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
-                                    <span style="color: #dc2626;">Security concern</span>
+                                    <span style="color: #f87171;">Security concern</span>
                                 </span>
                             </div>
                         </div>
@@ -3472,57 +3535,73 @@
                 </div>
                 
                 <!-- Geographic List -->
-                <div style="padding: 16px 24px;">
+                <div style="padding: 16px 24px; background: var(--color-card);" data-expandable-flows>
                     {{if .GeoLocations}}
-                    {{range $index, $geo := .GeoLocations}}
-                    {{if lt $index 15}}
-                    <details style="margin-bottom: 12px; border: 1px solid #a7f3d0; border-radius: 8px; overflow: hidden; background: #f0fdf4;">
+                    {{range $geo := .GeoLocations}}
+                    <details data-flow-item style="margin-bottom: 12px; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; overflow: hidden; background: rgba(16, 185, 129, 0.1);">
                         <summary style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 0.875rem;">
                             <div style="display: flex; align-items: center; gap: 12px;">
-                                <i class="fas fa-map-marker-alt" style="color: #059669;"></i>
-                                <span style="font-weight: 700; color: #1f2937; font-size: 1rem;">
+                                <i class="fas fa-map-marker-alt" style="color: #10b981;"></i>
+                                <span style="font-weight: 700; color: var(--color-text-primary); font-size: 1rem;">
                                     {{$geo.Country}}
                                 </span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="background: #d1fae5; color: #047857; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
+                                <span style="background: rgba(16, 185, 129, 0.2); color: #4ade80; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">
                                     {{$geo.Count}} IPs
                                 </span>
                             </div>
                         </summary>
                         
-                        <div style="padding: 20px; background: #ffffff; border-top: 1px solid #e5e7eb;">
+                        <div style="padding: 20px; background: var(--color-surface); border-top: 1px solid var(--color-border);">
                             <!-- Location Details -->
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Country/Region</div>
-                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 700;">{{$geo.Country}}</span>
+                                <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">Country/Region</div>
+                                    <span style="font-size: 1rem; color: var(--color-text-primary); font-weight: 700;">{{$geo.Country}}</span>
                                 </div>
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-                                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 4px;">Unique IP Addresses</div>
-                                    <span style="font-size: 1rem; color: #0f172a; font-weight: 600;">{{$geo.Count}}</span>
+                                <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">Unique IP Addresses</div>
+                                    <span style="font-size: 1rem; color: var(--color-text-primary); font-weight: 600;">{{$geo.Count}}</span>
                                 </div>
                             </div>
                             
+                            <!-- IP Address List -->
+                            {{if $geo.IPs}}
+                            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-network-wired"></i>
+                                    IP Addresses ({{len $geo.IPs}})
+                                </h4>
+                                <div style="max-height: 200px; overflow-y: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 12px;">
+                                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                        {{range $ip := $geo.IPs}}
+                                        <span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 4px 10px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.8125rem; border: 1px solid rgba(59, 130, 246, 0.3);">{{$ip}}</span>
+                                        {{end}}
+                                    </div>
+                                </div>
+                            </div>
+                            {{end}}
+                            
                             <!-- What This Means -->
-                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #166534; display: flex; align-items: center; gap: 8px;">
+                            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #4ade80; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-info-circle"></i>
                                     What This Means
                                 </h4>
-                                <p style="margin: 0; font-size: 0.8125rem; color: #047857; line-height: 1.6;">
+                                <p style="margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.6;">
                                     Traffic detected from/to {{$geo.Country}}. Verify this aligns with your expected business operations and geographic footprint. 
                                     Consider data sovereignty requirements and compliance regulations that may apply to traffic crossing international boundaries.
                                 </p>
                             </div>
                             
                             <!-- Next Actions -->
-                            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+                            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #60a5fa; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-tasks"></i>
                                     Next Actions
                                 </h4>
-                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #1e3a8a; line-height: 1.8;">
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.8;">
                                     <li><strong>Verify business need:</strong> Confirm traffic to/from {{$geo.Country}} is expected</li>
                                     <li><strong>Check applications:</strong> Identify which applications communicate with this region</li>
                                     <li><strong>Review compliance:</strong> Ensure data handling meets regulatory requirements</li>
@@ -3531,12 +3610,12 @@
                             </div>
                             
                             <!-- Security Considerations -->
-                            <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px;">
-                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #854d0e; display: flex; align-items: center; gap: 8px;">
+                            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 16px;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 0.875rem; color: #fbbf24; display: flex; align-items: center; gap: 8px;">
                                     <i class="fas fa-shield-alt"></i>
                                     Security Considerations
                                 </h4>
-                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: #78350f; line-height: 1.8;">
+                                <ul style="margin: 0; padding-left: 20px; font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.8;">
                                     <li>Verify traffic is from legitimate business partners or services</li>
                                     <li>Check for unexpected data transfers to unfamiliar regions</li>
                                     <li>Review firewall logs for any blocked attempts from this region</li>
@@ -3545,13 +3624,6 @@
                             </div>
                         </div>
                     </details>
-                    {{end}}
-                    {{end}}
-                    
-                    {{if gt (len .GeoLocations) 15}}
-                    <div style="text-align: center; padding: 16px; color: #6b7280; font-size: 0.875rem; background: #f9fafb; border-radius: 8px; margin-top: 12px;">
-                        <i class="fas fa-info-circle"></i> Showing top 15 of {{len .GeoLocations}} geographic locations.
-                    </div>
                     {{end}}
                     {{else}}
                     <div style="text-align: center; padding: 40px; color: #6b7280;">
@@ -3587,69 +3659,43 @@
         </section>
         
         <!-- ====================================================================
-             VISUALIZATIONS SECTION
+             VISUALIZATIONS SECTION - FULL PAGE NETWORK TOPOLOGY
              ==================================================================== -->
         <section id="visualizations" class="dashboard-section" style="display: none;">
             <h2 class="mb-xl">
                 <i class="fas fa-project-diagram" style="color: var(--color-primary);"></i>
-                Network Visualizations
+                Network Topology
             </h2>
             
-            <!-- Network Topology -->
-            <div class="card mb-xl">
+            <!-- Network Topology - Full Page -->
+            <div class="card" style="height: calc(100vh - 200px); min-height: 800px;">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-network-wired card-title-icon"></i>
-                        Network Topology
+                        Interactive Network Topology Map
                     </h3>
                     <div class="card-actions">
                         <button class="card-action-button" onclick="resetTopology()">
-                            <i class="fas fa-sync-alt"></i> Reset
+                            <i class="fas fa-sync-alt"></i> Reset View
+                        </button>
+                        <button class="card-action-button" onclick="zoomIn()">
+                            <i class="fas fa-search-plus"></i> Zoom In
+                        </button>
+                        <button class="card-action-button" onclick="zoomOut()">
+                            <i class="fas fa-search-minus"></i> Zoom Out
                         </button>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div id="network-diagram" class="chart-container" style="min-height: 600px; background: #ffffff; border: 1px solid var(--color-border); border-radius: var(--radius-md); position: relative;"></div>
+                <div class="card-body" style="padding: 0; height: calc(100% - 60px);">
+                    <div id="network-diagram" class="chart-container" style="width: 100%; height: 100%; background: var(--color-surface); border-radius: var(--radius-md); position: relative;"></div>
                 </div>
             </div>
             
-            <!-- Timeline Visualization -->
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-timeline card-title-icon"></i>
-                        Event Timeline
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div id="timeline" class="chart-container"></div>
-                </div>
-            </div>
-            
-            <!-- Sankey Diagram -->
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-stream card-title-icon"></i>
-                        Traffic Flow Diagram
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div id="sankey-diagram" class="chart-container"></div>
-                </div>
-            </div>
-            
-            <!-- RTT Histogram -->
-            <div class="card mb-xl">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-bar card-title-icon"></i>
-                        RTT Distribution
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div id="rtt-histogram" class="chart-container"></div>
-                </div>
+            <!-- Hidden containers for unused visualizations (keep for data compatibility) -->
+            <div style="display: none;">
+                <div id="timeline"></div>
+                <div id="sankey-diagram"></div>
+                <div id="rtt-histogram"></div>
             </div>
         </section>
         
@@ -3927,7 +3973,602 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize visualizations after a short delay to ensure DOM is ready
             setTimeout(initializeVisualizations, 100);
+            
+            // Initialize expandable flows
+            initializeExpandableFlows();
         });
+        
+        // ============================================================================
+        // EXPANDABLE FLOWS WITH SUBNET-BASED IP SEARCH
+        // ============================================================================
+        
+        // Debounce function for search performance
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // Subnet-based IP matching - matches partial IPs like "10.11.3" to "10.11.3.x"
+        function matchesSubnet(ip, searchTerm) {
+            if (!searchTerm || searchTerm.trim() === '') return true;
+            
+            const search = searchTerm.toLowerCase().trim();
+            const ipLower = ip.toLowerCase();
+            
+            // Exact match or starts with (subnet matching)
+            if (ipLower.includes(search) || ipLower.startsWith(search)) {
+                return true;
+            }
+            
+            // Check if it's a partial IP match (e.g., "10.11.3" matches "10.11.3.20")
+            const searchParts = search.split('.');
+            const ipParts = ipLower.split('.');
+            
+            // Match if all search parts match the beginning of IP parts
+            for (let i = 0; i < searchParts.length; i++) {
+                if (i >= ipParts.length || !ipParts[i].startsWith(searchParts[i])) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // Extract all IPs from a flow item (source and destination)
+        function extractIPsFromFlowItem(item) {
+            const ips = [];
+            const text = item.textContent || item.innerText;
+            
+            // Match IP addresses in various formats
+            const ipRegex = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+            const matches = text.match(ipRegex);
+            
+            if (matches) {
+                ips.push(...matches);
+            }
+            
+            // Also check code elements specifically
+            const codeElements = item.querySelectorAll('code');
+            codeElements.forEach(code => {
+                const codeText = code.textContent;
+                const codeMatches = codeText.match(ipRegex);
+                if (codeMatches) {
+                    ips.push(...codeMatches);
+                }
+            });
+            
+            return ips;
+        }
+        
+        // Filter flow items based on subnet search
+        function filterFlowItems(container, searchTerm) {
+            const flowItems = container.querySelectorAll('[data-flow-item]');
+            let visibleCount = 0;
+            
+            flowItems.forEach(item => {
+                const ips = extractIPsFromFlowItem(item);
+                const matches = ips.some(ip => matchesSubnet(ip, searchTerm));
+                
+                if (matches) {
+                    item.style.display = '';
+                    item.classList.remove('flow-item-highlight');
+                    
+                    // Highlight matching items if there's a search term
+                    if (searchTerm && searchTerm.trim() !== '') {
+                        item.classList.add('flow-item-highlight');
+                    }
+                    
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Update count display
+            const countDisplay = container.querySelector('[data-flow-count]');
+            if (countDisplay) {
+                const totalCount = flowItems.length;
+                if (searchTerm && searchTerm.trim() !== '') {
+                    countDisplay.textContent = `Showing ${visibleCount} of ${totalCount} flows (filtered)`;
+                } else {
+                    countDisplay.textContent = `Showing ${visibleCount} of ${totalCount} flows`;
+                }
+            }
+            
+            // Update export count
+            const exportCount = container.querySelector('[data-export-count]');
+            if (exportCount) {
+                if (searchTerm && searchTerm.trim() !== '') {
+                    exportCount.textContent = `${visibleCount} flow${visibleCount !== 1 ? 's' : ''} (filtered)`;
+                } else {
+                    exportCount.textContent = `${visibleCount} flow${visibleCount !== 1 ? 's' : ''} available`;
+                }
+            }
+            
+            // Show "no results" message if needed
+            let noResultsMsg = container.querySelector('.no-results-message');
+            if (visibleCount === 0 && searchTerm && searchTerm.trim() !== '') {
+                if (!noResultsMsg) {
+                    noResultsMsg = document.createElement('div');
+                    noResultsMsg.className = 'no-results-message';
+                    noResultsMsg.innerHTML = `
+                        <i class="fas fa-search"></i>
+                        <p>No flows found matching "${searchTerm}"</p>
+                        <p style="font-size: 0.8rem; margin-top: 8px;">Try a different IP or subnet pattern</p>
+                    `;
+                    container.appendChild(noResultsMsg);
+                }
+                noResultsMsg.style.display = 'block';
+            } else if (noResultsMsg) {
+                noResultsMsg.style.display = 'none';
+            }
+        }
+        
+        // Initialize expandable flows for a container
+        function initializeExpandableFlow(container) {
+            const flowItems = container.querySelectorAll('[data-flow-item]');
+            const totalCount = flowItems.length;
+            
+            if (totalCount === 0) return;
+            
+            // Create header with count and search
+            const header = document.createElement('div');
+            header.className = 'flow-list-header';
+            header.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <span class="flow-count-badge" data-flow-count>Showing ${Math.min(20, totalCount)} of ${totalCount} flows</span>
+                    <div class="flow-search-box" style="flex: 1; max-width: 400px; margin-left: 16px;">
+                        <input type="text" 
+                               class="flow-search-input" 
+                               placeholder="Search by IP or subnet (e.g., 10.11.3)..." 
+                               data-flow-search>
+                        <button class="flow-search-btn" onclick="this.previousElementSibling.value = ''; this.previousElementSibling.dispatchEvent(new Event('input'));">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                </div>
+                <div class="flow-export-controls">
+                    <span class="flow-export-label">
+                        <i class="fas fa-download"></i> Export:
+                    </span>
+                    <select class="flow-export-format-select" data-export-format>
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                        <option value="wireshark">Wireshark Filters</option>
+                        <option value="text">Text Summary</option>
+                    </select>
+                    <button class="flow-export-btn" data-export-btn>
+                        <i class="fas fa-file-export"></i>
+                        Export Current View
+                    </button>
+                    <span class="flow-export-count" data-export-count>
+                        ${totalCount} flow${totalCount !== 1 ? 's' : ''} available
+                    </span>
+                </div>
+            `;
+            
+            container.insertBefore(header, container.firstChild);
+            
+            // Add export button click handler
+            const exportBtn = header.querySelector('[data-export-btn]');
+            const formatSelect = header.querySelector('[data-export-format]');
+            if (exportBtn && formatSelect) {
+                exportBtn.addEventListener('click', function() {
+                    const format = formatSelect.value;
+                    exportFlows(container, format);
+                });
+            }
+            
+            // Hide items beyond the first 20 initially
+            flowItems.forEach((item, index) => {
+                if (index >= 20) {
+                    item.style.display = 'none';
+                    item.setAttribute('data-initially-hidden', 'true');
+                }
+            });
+            
+            // Add expand/collapse controls if there are more than 20 items
+            if (totalCount > 20) {
+                const controls = document.createElement('div');
+                controls.className = 'flow-expand-controls';
+                controls.innerHTML = `
+                    <button class="flow-expand-btn" data-expand-btn>
+                        <i class="fas fa-chevron-down"></i>
+                        Show All ${totalCount} Flows
+                    </button>
+                `;
+                
+                container.appendChild(controls);
+                
+                const expandBtn = controls.querySelector('[data-expand-btn]');
+                let isExpanded = false;
+                
+                expandBtn.addEventListener('click', function() {
+                    isExpanded = !isExpanded;
+                    
+                    flowItems.forEach((item, index) => {
+                        if (index >= 20) {
+                            item.style.display = isExpanded ? '' : 'none';
+                        }
+                    });
+                    
+                    if (isExpanded) {
+                        expandBtn.innerHTML = '<i class="fas fa-chevron-up"></i> Show Less';
+                        expandBtn.classList.add('expanded');
+                        
+                        // Update count
+                        const countDisplay = container.querySelector('[data-flow-count]');
+                        if (countDisplay) {
+                            countDisplay.textContent = `Showing all ${totalCount} flows`;
+                        }
+                    } else {
+                        expandBtn.innerHTML = `<i class="fas fa-chevron-down"></i> Show All ${totalCount} Flows`;
+                        expandBtn.classList.remove('expanded');
+                        
+                        // Update count
+                        const countDisplay = container.querySelector('[data-flow-count]');
+                        if (countDisplay) {
+                            countDisplay.textContent = `Showing 20 of ${totalCount} flows`;
+                        }
+                        
+                        // Scroll back to top of the section
+                        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            }
+            
+            // Add search functionality with debouncing
+            const searchInput = container.querySelector('[data-flow-search]');
+            if (searchInput) {
+                const debouncedSearch = debounce((searchTerm) => {
+                    filterFlowItems(container, searchTerm);
+                }, 300);
+                
+                searchInput.addEventListener('input', function() {
+                    debouncedSearch(this.value);
+                });
+                
+                // Clear search on Escape key
+                searchInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        this.value = '';
+                        filterFlowItems(container, '');
+                    }
+                });
+            }
+        }
+        
+        // Initialize all expandable flow containers
+        function initializeExpandableFlows() {
+            // Find all containers that should have expandable flows
+            const containers = document.querySelectorAll('[data-expandable-flows]');
+            
+            containers.forEach(container => {
+                initializeExpandableFlow(container);
+            });
+            
+            console.log(`Initialized ${containers.length} expandable flow containers`);
+        }
+        
+        // ====================================================================
+        // EXPORT FUNCTIONALITY
+        // ====================================================================
+        
+        // Extract flow data from a flow item element
+        function extractFlowData(flowItem) {
+            const data = {};
+            
+            // Extract IPs
+            const ips = extractIPsFromFlowItem(flowItem);
+            if (ips.length >= 2) {
+                data.srcIP = ips[0];
+                data.dstIP = ips[1];
+            } else if (ips.length === 1) {
+                data.srcIP = ips[0];
+                data.dstIP = '';
+            }
+            
+            // Extract ports from text content
+            const text = flowItem.textContent;
+            const portMatch = text.match(/(\d+\.\d+\.\d+\.\d+):(\d+)\s*[-→>]\s*(\d+\.\d+\.\d+\.\d+):(\d+)/);
+            if (portMatch) {
+                data.srcPort = portMatch[2];
+                data.dstPort = portMatch[4];
+            }
+            
+            // Extract protocol
+            const protocolMatch = text.match(/Protocol:\s*(\w+)/i) || text.match(/\b(TCP|UDP|ICMP|DNS|HTTP|HTTPS|TLS|QUIC|GRE|IPSec)\b/i);
+            if (protocolMatch) {
+                data.protocol = protocolMatch[1];
+            }
+            
+            // Extract packet/byte counts
+            const packetsMatch = text.match(/(\d+(?:,\d+)*)\s*packets?/i);
+            if (packetsMatch) {
+                data.packets = packetsMatch[1].replace(/,/g, '');
+            }
+            
+            const bytesMatch = text.match(/(\d+(?:\.\d+)?)\s*(KB|MB|GB|bytes?)/i);
+            if (bytesMatch) {
+                data.bytes = bytesMatch[1] + ' ' + bytesMatch[2];
+            }
+            
+            // Extract timestamps
+            const timestampMatch = text.match(/(\d{2}:\d{2}:\d{2})/);
+            if (timestampMatch) {
+                data.timestamp = timestampMatch[1];
+            }
+            
+            // Extract RTT/latency
+            const rttMatch = text.match(/RTT:\s*(\d+(?:\.\d+)?)\s*ms/i) || text.match(/Latency:\s*(\d+(?:\.\d+)?)\s*ms/i);
+            if (rttMatch) {
+                data.rtt = rttMatch[1] + ' ms';
+            }
+            
+            // Extract retransmissions
+            const retransMatch = text.match(/(\d+)\s*retransmissions?/i);
+            if (retransMatch) {
+                data.retransmissions = retransMatch[1];
+            }
+            
+            // Get full text as description
+            data.description = text.replace(/\s+/g, ' ').trim().substring(0, 200);
+            
+            return data;
+        }
+        
+        // Get all visible (filtered) flows from a container
+        function getVisibleFlows(container) {
+            const flowItems = container.querySelectorAll('[data-flow-item]');
+            const visibleFlows = [];
+            
+            flowItems.forEach(item => {
+                if (item.style.display !== 'none') {
+                    const flowData = extractFlowData(item);
+                    visibleFlows.push(flowData);
+                }
+            });
+            
+            return visibleFlows;
+        }
+        
+        // Generate CSV from flow data
+        function generateCSV(flows, searchTerm = '') {
+            if (flows.length === 0) {
+                return 'No flows to export';
+            }
+            
+            // CSV header
+            let csv = 'Source IP,Source Port,Destination IP,Destination Port,Protocol,Packets,Bytes,RTT,Retransmissions,Timestamp,Description\n';
+            
+            // Add metadata as comment
+            if (searchTerm) {
+                csv = `# Filtered by: ${searchTerm}\n# Export Date: ${new Date().toISOString()}\n# Total Flows: ${flows.length}\n` + csv;
+            }
+            
+            // Add flow data
+            flows.forEach(flow => {
+                const row = [
+                    flow.srcIP || '',
+                    flow.srcPort || '',
+                    flow.dstIP || '',
+                    flow.dstPort || '',
+                    flow.protocol || '',
+                    flow.packets || '',
+                    flow.bytes || '',
+                    flow.rtt || '',
+                    flow.retransmissions || '',
+                    flow.timestamp || '',
+                    `"${(flow.description || '').replace(/"/g, '""')}"`
+                ];
+                csv += row.join(',') + '\n';
+            });
+            
+            return csv;
+        }
+        
+        // Generate JSON from flow data
+        function generateJSON(flows, searchTerm = '') {
+            const exportData = {
+                metadata: {
+                    exportDate: new Date().toISOString(),
+                    totalFlows: flows.length,
+                    filterCriteria: searchTerm || 'none',
+                    exportFormat: 'JSON'
+                },
+                flows: flows
+            };
+            
+            return JSON.stringify(exportData, null, 2);
+        }
+        
+        // Generate Wireshark display filters from flow data
+        function generateWiresharkFilters(flows, searchTerm = '') {
+            if (flows.length === 0) {
+                return '# No flows to generate filters for';
+            }
+            
+            let filters = `# Wireshark Display Filters\n`;
+            filters += `# Generated: ${new Date().toISOString()}\n`;
+            if (searchTerm) {
+                filters += `# Filter Criteria: ${searchTerm}\n`;
+            }
+            filters += `# Total Flows: ${flows.length}\n\n`;
+            
+            // Generate individual flow filters
+            filters += '# Individual Flow Filters (OR combined):\n';
+            const flowFilters = [];
+            
+            flows.forEach((flow, index) => {
+                if (flow.srcIP && flow.dstIP) {
+                    let filter = `(ip.addr==${flow.srcIP} && ip.addr==${flow.dstIP}`;
+                    
+                    if (flow.srcPort && flow.dstPort) {
+                        filter += ` && tcp.port==${flow.srcPort} && tcp.port==${flow.dstPort}`;
+                    }
+                    
+                    if (flow.protocol && flow.protocol.toLowerCase() !== 'tcp' && flow.protocol.toLowerCase() !== 'udp') {
+                        filter += ` && ${flow.protocol.toLowerCase()}`;
+                    }
+                    
+                    filter += ')';
+                    flowFilters.push(filter);
+                    
+                    if (index < 10) { // Show first 10 as examples
+                        filters += `${filter}\n`;
+                    }
+                }
+            });
+            
+            if (flows.length > 10) {
+                filters += `\n# ... and ${flows.length - 10} more flows\n`;
+            }
+            
+            // Generate combined filter
+            filters += '\n# Combined Filter (copy this to Wireshark):\n';
+            if (flowFilters.length > 0) {
+                if (flowFilters.length <= 50) {
+                    filters += flowFilters.join(' || ');
+                } else {
+                    filters += '# Too many flows for single filter. Use individual filters or export to PCAP.\n';
+                    filters += '# First 50 flows combined:\n';
+                    filters += flowFilters.slice(0, 50).join(' || ');
+                }
+            }
+            
+            // Add subnet filter if search term looks like subnet
+            if (searchTerm && searchTerm.match(/^\d+\.\d+(\.\d+)?(\.\d+)?$/)) {
+                filters += '\n\n# Subnet Filter:\n';
+                filters += `ip.addr==${searchTerm}.0/24`;
+            }
+            
+            return filters;
+        }
+        
+        // Generate plain text summary
+        function generateTextSummary(flows, searchTerm = '') {
+            let text = `Flow Export Summary\n`;
+            text += `===================\n\n`;
+            text += `Export Date: ${new Date().toLocaleString()}\n`;
+            text += `Total Flows: ${flows.length}\n`;
+            if (searchTerm) {
+                text += `Filter Criteria: ${searchTerm}\n`;
+            }
+            text += `\n`;
+            
+            flows.forEach((flow, index) => {
+                text += `\nFlow ${index + 1}:\n`;
+                text += `  Source: ${flow.srcIP || 'N/A'}${flow.srcPort ? ':' + flow.srcPort : ''}\n`;
+                text += `  Destination: ${flow.dstIP || 'N/A'}${flow.dstPort ? ':' + flow.dstPort : ''}\n`;
+                if (flow.protocol) text += `  Protocol: ${flow.protocol}\n`;
+                if (flow.packets) text += `  Packets: ${flow.packets}\n`;
+                if (flow.bytes) text += `  Bytes: ${flow.bytes}\n`;
+                if (flow.rtt) text += `  RTT: ${flow.rtt}\n`;
+                if (flow.retransmissions) text += `  Retransmissions: ${flow.retransmissions}\n`;
+                if (flow.timestamp) text += `  Timestamp: ${flow.timestamp}\n`;
+            });
+            
+            return text;
+        }
+        
+        // Download file with given content
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Export flows from a container
+        function exportFlows(container, format) {
+            const flows = getVisibleFlows(container);
+            const searchInput = container.querySelector('[data-flow-search]');
+            const searchTerm = searchInput ? searchInput.value : '';
+            
+            if (flows.length === 0) {
+                alert('No flows to export. Please adjust your search criteria.');
+                return;
+            }
+            
+            // Show loading indicator
+            const exportBtn = container.querySelector('[data-export-btn]');
+            const originalText = exportBtn ? exportBtn.innerHTML : '';
+            if (exportBtn) {
+                exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+                exportBtn.disabled = true;
+            }
+            
+            // Generate export with slight delay to show loading
+            setTimeout(() => {
+                try {
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+                    let content, filename, mimeType;
+                    
+                    switch(format) {
+                        case 'csv':
+                            content = generateCSV(flows, searchTerm);
+                            filename = `flows_export_${timestamp}.csv`;
+                            mimeType = 'text/csv';
+                            break;
+                        case 'json':
+                            content = generateJSON(flows, searchTerm);
+                            filename = `flows_export_${timestamp}.json`;
+                            mimeType = 'application/json';
+                            break;
+                        case 'wireshark':
+                            content = generateWiresharkFilters(flows, searchTerm);
+                            filename = `wireshark_filters_${timestamp}.txt`;
+                            mimeType = 'text/plain';
+                            break;
+                        case 'text':
+                            content = generateTextSummary(flows, searchTerm);
+                            filename = `flows_summary_${timestamp}.txt`;
+                            mimeType = 'text/plain';
+                            break;
+                        default:
+                            throw new Error('Unknown export format');
+                    }
+                    
+                    downloadFile(content, filename, mimeType);
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'export-success-message';
+                    successMsg.innerHTML = `
+                        <i class="fas fa-check-circle"></i>
+                        Successfully exported ${flows.length} flow${flows.length !== 1 ? 's' : ''} to ${filename}
+                    `;
+                    successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 10000; animation: slideIn 0.3s ease-out;';
+                    document.body.appendChild(successMsg);
+                    
+                    setTimeout(() => {
+                        successMsg.style.animation = 'slideOut 0.3s ease-in';
+                        setTimeout(() => successMsg.remove(), 300);
+                    }, 3000);
+                    
+                } catch (error) {
+                    console.error('Export error:', error);
+                    alert('Export failed: ' + error.message);
+                } finally {
+                    if (exportBtn) {
+                        exportBtn.innerHTML = originalText;
+                        exportBtn.disabled = false;
+                    }
+                }
+            }, 100);
+        }
     </script>
     
     <!-- Visualization Functions -->

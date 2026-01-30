@@ -1,0 +1,672 @@
+/* Stream Reassembly Styles */
+.stream-section {
+    margin: 20px 0;
+}
+
+.stream-intro {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.stream-intro p {
+    margin: 0;
+}
+
+.stream-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stream-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.stream-item[open] {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.stream-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: #f8f9fa;
+    transition: background 0.2s;
+}
+
+.stream-header:hover {
+    background: #e9ecef;
+}
+
+.stream-icon {
+    font-size: 1.2em;
+    margin-right: 10px;
+}
+
+.stream-label {
+    flex: 1;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.9em;
+}
+
+.stream-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 0.85em;
+    color: #666;
+}
+
+.stream-bytes {
+    font-weight: 600;
+    color: #3498db;
+}
+
+.stream-content {
+    padding: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.stream-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.btn-copy-filter {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background 0.2s;
+}
+
+.btn-copy-filter:hover {
+    background: #2980b9;
+}
+
+.wireshark-filter {
+    flex: 1;
+    background: #f4f4f4;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+/* Conversation View - Enhanced Stream Display */
+.stream-conversation {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.conversation-segment {
+    display: grid;
+    grid-template-columns: 100px 140px 1fr;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 0.85em;
+    transition: all 0.2s ease;
+}
+
+.conversation-segment:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.conversation-segment.client-to-server {
+    background: linear-gradient(90deg, #dbeafe 0%, #f8fafc 100%);
+    border-left: 4px solid #2563eb;
+}
+
+.conversation-segment.server-to-client {
+    background: linear-gradient(90deg, #dcfce7 0%, #f8fafc 100%);
+    border-left: 4px solid #16a34a;
+}
+
+.conversation-segment.anomaly {
+    border: 2px solid #f59e0b;
+    background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%) !important;
+}
+
+/* Segment Meta (timestamps) */
+.segment-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.85em;
+}
+
+.segment-time {
+    color: #64748b;
+    font-weight: 500;
+}
+
+.segment-rel-time {
+    color: #94a3b8;
+    font-size: 0.9em;
+}
+
+/* Direction Indicator */
+.segment-direction-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 6px;
+}
+
+.segment-direction-indicator.client-to-server {
+    background: #2563eb;
+    color: white;
+}
+
+.segment-direction-indicator.server-to-client {
+    background: #16a34a;
+    color: white;
+}
+
+.direction-arrow {
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+.direction-label {
+    font-size: 0.7em;
+    white-space: nowrap;
+    opacity: 0.9;
+}
+
+/* Segment Body */
+.segment-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Anomaly Indicator */
+.anomaly-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #92400e;
+}
+
+.anomaly-icon {
+    font-size: 1.1em;
+}
+
+.anomaly-text {
+    font-weight: 500;
+}
+
+/* Plain English Summary - Primary Display */
+.segment-plain-english {
+    background: #fff;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    font-size: 0.95em;
+    color: #1e293b;
+    line-height: 1.5;
+}
+
+.client-to-server .segment-plain-english {
+    border-left: 3px solid #2563eb;
+}
+
+.server-to-client .segment-plain-english {
+    border-left: 3px solid #16a34a;
+}
+
+/* Data Summary for Binary */
+.segment-data-summary {
+    color: #64748b;
+    font-style: italic;
+    padding: 6px 10px;
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+/* Text Content Toggle */
+.text-content-toggle summary {
+    cursor: pointer;
+    padding: 6px 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    color: #475569;
+}
+
+.text-content-toggle summary:hover {
+    background: #f1f5f9;
+}
+
+.text-preview {
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.segment-text-full {
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 12px;
+    border-radius: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 8px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+/* Hex Toggle */
+.hex-toggle {
+    margin-top: 4px;
+}
+
+.hex-toggle-btn {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: #475569;
+    transition: all 0.2s;
+}
+
+.hex-toggle-btn:hover {
+    background: #e2e8f0;
+}
+
+.segment-hex {
+    white-space: pre;
+    font-size: 0.8em;
+    background: #0f172a;
+    color: #7dd3fc;
+    padding: 12px;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow: auto;
+    margin-top: 8px;
+    line-height: 1.3;
+}
+
+/* Size Indicator */
+.segment-size {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: #64748b;
+    align-self: flex-start;
+}
+
+.segment-truncated,
+.stream-truncated {
+    text-align: center;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+/* Legacy segment styles (kept for compatibility) */
+.stream-segments {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.segment {
+    border-radius: 6px;
+    padding: 10px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.85em;
+}
+
+.segment.client-to-server {
+    background: linear-gradient(90deg, #e3f2fd 0%, #fff 100%);
+    border-left: 4px solid #2196f3;
+}
+
+.segment.server-to-client {
+    background: linear-gradient(90deg, #ffebee 0%, #fff 100%);
+    border-left: 4px solid #f44336;
+}
+
+.segment-header {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.segment-direction {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.client-to-server .segment-direction {
+    color: #2196f3;
+}
+
+.server-to-client .segment-direction {
+    color: #f44336;
+}
+
+.segment-length {
+    margin-left: auto;
+    font-weight: 500;
+}
+
+.segment-decoded {
+    background: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    border: 1px solid #ddd;
+}
+
+.segment-data-details summary {
+    cursor: pointer;
+    padding: 5px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.segment-preview {
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #555;
+}
+
+.segment-ascii {
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 10px;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 8px;
+}
+
+.segment-hex-details {
+    margin-top: 8px;
+}
+
+/* Bandwidth Chart Styles */
+.bandwidth-section {
+    margin: 20px 0;
+}
+
+.bandwidth-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.bandwidth-stat {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.4em;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.bandwidth-chart {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 320px;
+}
+
+.bandwidth-tooltip {
+    display: none;
+    position: absolute;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 250px;
+}
+
+/* Plain English Summary Styles */
+.plain-english-summary {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.plain-english-summary.health-good {
+    border-left: 5px solid #27ae60;
+}
+
+.plain-english-summary.health-warning {
+    border-left: 5px solid #f39c12;
+}
+
+.plain-english-summary.health-critical {
+    border-left: 5px solid #e74c3c;
+}
+
+.summary-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.health-icon {
+    font-size: 2em;
+}
+
+.health-status {
+    font-size: 1.2em;
+}
+
+.summary-section {
+    margin-bottom: 15px;
+}
+
+.summary-section h4 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+}
+
+.summary-section ul,
+.summary-section ol {
+    margin: 0;
+    padding-left: 25px;
+}
+
+.summary-section li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.security-alerts li {
+    color: #c0392b;
+}
+
+.performance-issues li {
+    color: #d35400;
+}
+
+.quick-actions {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.quick-actions h4 {
+    color: #27ae60;
+}
+
+/* Traffic Gaps Styles */
+.traffic-gaps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.traffic-gap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+.traffic-gap.warning {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+}
+
+.traffic-gap.critical {
+    background: #f8d7da;
+    border: 1px solid #dc3545;
+}
+
+.gap-icon {
+    font-size: 1.2em;
+}
+
+.gap-duration {
+    font-weight: 600;
+}
+
+.gap-time {
+    color: #666;
+    margin-left: auto;
+}
+
+.no-gaps {
+    color: #27ae60;
+    font-weight: 500;
+}
+
+.no-data {
+    color: #888;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .stream-item {
+        background: #2d2d2d;
+        border-color: #444;
+    }
+    
+    .stream-header {
+        background: #333;
+    }
+    
+    .stream-header:hover {
+        background: #3d3d3d;
+    }
+    
+    .stream-label {
+        color: #e0e0e0;
+    }
+    
+    .stream-content {
+        border-color: #444;
+    }
+    
+    .wireshark-filter {
+        background: #1e1e1e;
+        color: #9cdcfe;
+    }
+    
+    .segment.client-to-server {
+        background: linear-gradient(90deg, #1a365d 0%, #2d2d2d 100%);
+    }
+    
+    .segment.server-to-client {
+        background: linear-gradient(90deg, #4a1a1a 0%, #2d2d2d 100%);
+    }
+    
+    .bandwidth-chart {
+        background: #2d2d2d;
+        border-color: #444;
+    }
+    
+    .plain-english-summary {
+        background: #2d2d2d;
+    }
+    
+    .summary-section h4 {
+        color: #e0e0e0;
+    }
+    
+    .quick-actions {
+        background: #333;
+    }
+}
+
+/* Copy to clipboard helper */
+.copy-success {
+    animation: copyFlash 0.5s ease;
+}
+
+@keyframes copyFlash {
+    0% { background: #27ae60; }
+    100% { background: #3498db; }
+}

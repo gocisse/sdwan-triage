@@ -43,11 +43,47 @@ type TriageReport struct {
 	Security SecurityAnalysis `json:"security"`
 
 	// Network Analysis
-	ICMPAnalysis    []ICMPFinding   `json:"icmp_analysis,omitempty"`
-	VoIPAnalysis    *VoIPAnalysis   `json:"voip_analysis,omitempty"`
-	TunnelAnalysis  []TunnelFinding `json:"tunnel_analysis,omitempty"`
-	SDWANVendors    []SDWANVendor   `json:"sdwan_vendors,omitempty"`
-	LocationSummary map[string]int  `json:"location_summary,omitempty"`
+	ICMPAnalysis    []ICMPFinding       `json:"icmp_analysis,omitempty"`
+	VoIPAnalysis    *VoIPAnalysis       `json:"voip_analysis,omitempty"`
+	TunnelAnalysis  []TunnelFinding     `json:"tunnel_analysis,omitempty"`
+	SDWANVendors    []SDWANVendor       `json:"sdwan_vendors,omitempty"`
+	LocationSummary map[string]int      `json:"location_summary,omitempty"`
+	LocationIPs     map[string][]string `json:"location_ips,omitempty"`
+
+	// Packet Loss Metrics
+	PacketLoss *PacketLossMetrics `json:"packet_loss,omitempty"`
+
+	// Protocol Detection
+	SMBFlows      []SMBFlow      `json:"smb_flows,omitempty"`
+	LDAPFlows     []LDAPFlow     `json:"ldap_flows,omitempty"`
+	KerberosFlows []KerberosFlow `json:"kerberos_flows,omitempty"`
+
+	// Baseline Comparison
+	BaselineComparison *BaselineComparison `json:"baseline_comparison,omitempty"`
+
+	// Stream Reassembly (Follow TCP/UDP Stream)
+	Streams    []StreamViewData `json:"streams,omitempty"`
+	RawStreams []*StreamData    `json:"-"` // Raw stream data for actionable analysis
+
+	// Bandwidth Time Series
+	BandwidthTimeSeries *BandwidthTimeSeries `json:"bandwidth_timeseries,omitempty"`
+
+	// Plain English Summary
+	PlainEnglishSummary *PlainEnglishSummary `json:"plain_english_summary,omitempty"`
+
+	// Traffic Gaps
+	TrafficGaps []TrafficGapInfo `json:"traffic_gaps,omitempty"`
+
+	// PCAP Export Info
+	SourcePCAPPath string `json:"source_pcap_path,omitempty"`
+}
+
+// TrafficGapInfo represents a gap in network traffic
+type TrafficGapInfo struct {
+	StartTime   float64 `json:"start_time"`
+	EndTime     float64 `json:"end_time"`
+	DurationSec float64 `json:"duration_sec"`
+	Description string  `json:"description"`
 }
 
 // TimelineEvent represents a network event in the timeline
@@ -434,6 +470,120 @@ type TunnelFinding struct {
 	IsAuthorized    bool   `json:"is_authorized,omitempty"`    // For SD-WAN security validation
 	// SD-WAN specific fields
 	SDWANPath string `json:"sdwan_path,omitempty"` // Wireshark filter for this tunnel
+}
+
+// PacketLossMetrics contains packet loss analysis
+type PacketLossMetrics struct {
+	TotalPacketsSent     uint64           `json:"total_packets_sent"`
+	TotalPacketsReceived uint64           `json:"total_packets_received"`
+	PacketsLost          uint64           `json:"packets_lost"`
+	LossPercentage       float64          `json:"loss_percentage"`
+	RetransmissionRate   float64          `json:"retransmission_rate"`
+	OutOfOrderPackets    uint64           `json:"out_of_order_packets"`
+	DuplicatePackets     uint64           `json:"duplicate_packets"`
+	PerFlowLoss          []FlowPacketLoss `json:"per_flow_loss,omitempty"`
+}
+
+// FlowPacketLoss represents packet loss for a specific flow
+type FlowPacketLoss struct {
+	SrcIP          string  `json:"src_ip"`
+	DstIP          string  `json:"dst_ip"`
+	SrcPort        uint16  `json:"src_port"`
+	DstPort        uint16  `json:"dst_port"`
+	Protocol       string  `json:"protocol"`
+	PacketsSent    uint64  `json:"packets_sent"`
+	PacketsLost    uint64  `json:"packets_lost"`
+	LossPercentage float64 `json:"loss_percentage"`
+}
+
+// SMBFlow represents SMB/CIFS protocol traffic
+type SMBFlow struct {
+	SrcIP       string  `json:"src_ip"`
+	DstIP       string  `json:"dst_ip"`
+	SrcPort     uint16  `json:"src_port"`
+	DstPort     uint16  `json:"dst_port"`
+	Version     string  `json:"version"` // SMB1, SMB2, SMB3
+	Command     string  `json:"command,omitempty"`
+	ShareName   string  `json:"share_name,omitempty"`
+	FileName    string  `json:"file_name,omitempty"`
+	PacketCount uint64  `json:"packet_count"`
+	ByteCount   uint64  `json:"byte_count"`
+	FirstSeen   float64 `json:"first_seen"`
+	LastSeen    float64 `json:"last_seen"`
+	IsEncrypted bool    `json:"is_encrypted"`
+	Status      string  `json:"status,omitempty"`
+}
+
+// LDAPFlow represents LDAP protocol traffic
+type LDAPFlow struct {
+	SrcIP       string  `json:"src_ip"`
+	DstIP       string  `json:"dst_ip"`
+	SrcPort     uint16  `json:"src_port"`
+	DstPort     uint16  `json:"dst_port"`
+	Operation   string  `json:"operation"` // bind, search, modify, etc.
+	BaseDN      string  `json:"base_dn,omitempty"`
+	Filter      string  `json:"filter,omitempty"`
+	PacketCount uint64  `json:"packet_count"`
+	ByteCount   uint64  `json:"byte_count"`
+	FirstSeen   float64 `json:"first_seen"`
+	LastSeen    float64 `json:"last_seen"`
+	IsSecure    bool    `json:"is_secure"` // LDAPS
+	ResultCode  int     `json:"result_code,omitempty"`
+}
+
+// KerberosFlow represents Kerberos authentication traffic
+type KerberosFlow struct {
+	SrcIP       string  `json:"src_ip"`
+	DstIP       string  `json:"dst_ip"`
+	SrcPort     uint16  `json:"src_port"`
+	DstPort     uint16  `json:"dst_port"`
+	MessageType string  `json:"message_type"` // AS-REQ, AS-REP, TGS-REQ, TGS-REP, AP-REQ, AP-REP
+	Realm       string  `json:"realm,omitempty"`
+	Principal   string  `json:"principal,omitempty"`
+	Service     string  `json:"service,omitempty"`
+	PacketCount uint64  `json:"packet_count"`
+	ByteCount   uint64  `json:"byte_count"`
+	FirstSeen   float64 `json:"first_seen"`
+	LastSeen    float64 `json:"last_seen"`
+	ErrorCode   int     `json:"error_code,omitempty"`
+	EncType     string  `json:"enc_type,omitempty"` // Encryption type
+}
+
+// BaselineComparison contains baseline comparison metrics
+type BaselineComparison struct {
+	HasBaseline          bool                `json:"has_baseline"`
+	BaselineFile         string              `json:"baseline_file,omitempty"`
+	IsNormal             bool                `json:"is_normal"`
+	Deviations           []BaselineDeviation `json:"deviations,omitempty"`
+	TrafficVolumeChange  float64             `json:"traffic_volume_change"` // Percentage change
+	ProtocolDistribution map[string]float64  `json:"protocol_distribution,omitempty"`
+	BaselineMetrics      *BaselineMetrics    `json:"baseline_metrics,omitempty"`
+	CurrentMetrics       *BaselineMetrics    `json:"current_metrics,omitempty"`
+	Recommendation       string              `json:"recommendation,omitempty"`
+}
+
+// BaselineDeviation represents a deviation from baseline
+type BaselineDeviation struct {
+	Metric      string  `json:"metric"`
+	Baseline    float64 `json:"baseline"`
+	Current     float64 `json:"current"`
+	Change      float64 `json:"change"`   // Percentage change
+	Severity    string  `json:"severity"` // "Low", "Medium", "High", "Critical"
+	Description string  `json:"description"`
+}
+
+// BaselineMetrics contains key metrics for baseline comparison
+type BaselineMetrics struct {
+	TotalPackets       uint64            `json:"total_packets"`
+	TotalBytes         uint64            `json:"total_bytes"`
+	AvgPacketSize      float64           `json:"avg_packet_size"`
+	PacketRate         float64           `json:"packet_rate"` // packets per second
+	RetransmissionRate float64           `json:"retransmission_rate"`
+	DNSQueries         uint64            `json:"dns_queries"`
+	HTTPRequests       uint64            `json:"http_requests"`
+	TLSConnections     uint64            `json:"tls_connections"`
+	UniqueIPs          int               `json:"unique_ips"`
+	TopProtocols       map[string]uint64 `json:"top_protocols"`
 }
 
 // SDWANVendor represents a detected SD-WAN vendor
