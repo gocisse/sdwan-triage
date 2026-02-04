@@ -173,6 +173,14 @@ type ReportData struct {
 	GeoLocations    []GeoLocationView
 	BandwidthReport *BandwidthReportView
 
+	// LAN Protocol Detection
+	HasLANProtocols bool
+	VRRPSessions    []VRRPSessionView
+	CDPDevices      []CDPDeviceView
+	LLDPDevices     []LLDPDeviceView
+	HSRPGroups      []HSRPGroupView
+	STPBridges      []STPBridgeView
+
 	// Protocol Troubleshooting Guides
 	ProtocolGuidesHTML template.HTML
 
@@ -586,6 +594,68 @@ type BandwidthFlowView struct {
 	AvgBitrate   string // Formatted as Mbps/Kbps
 }
 
+// LAN Protocol View Structures
+type VRRPSessionView struct {
+	VirtualRouterID uint8
+	Priority        uint8
+	State           string
+	MasterIP        string
+	VirtualIPs      string // Comma-separated
+	AdvertInterval  uint8
+	FirstSeen       string
+	LastSeen        string
+	PacketCount     uint64
+	TransitionCount int
+	IsFlapping      bool
+	FlappingReason  string
+}
+
+type CDPDeviceView struct {
+	DeviceID     string
+	IPAddress    string
+	Platform     string
+	Capabilities string
+	SoftwareVer  string
+	PortID       string
+	FirstSeen    string
+	LastSeen     string
+	PacketCount  uint64
+}
+
+type LLDPDeviceView struct {
+	ChassisID    string
+	PortID       string
+	SystemName   string
+	SystemDesc   string
+	Capabilities string
+	ManagementIP string
+	FirstSeen    string
+	LastSeen     string
+	PacketCount  uint64
+}
+
+type HSRPGroupView struct {
+	GroupNumber   uint8
+	State         string
+	Priority      uint8
+	VirtualIP     string
+	ActiveRouter  string
+	StandbyRouter string
+	FirstSeen     string
+	LastSeen      string
+	PacketCount   uint64
+}
+
+type STPBridgeView struct {
+	BridgeID     string
+	RootBridgeID string
+	RootCost     uint32
+	PortID       uint16
+	FirstSeen    string
+	LastSeen     string
+	PacketCount  uint64
+}
+
 // GenerateHTMLReport generates a professional HTML report using templates
 // This uses the enterprise dashboard template with full troubleshooting features
 func GenerateHTMLReport(r *models.TriageReport, filename string, pcapFile string) error {
@@ -830,6 +900,16 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.SDWANVendors = convertSDWANVendors(r.SDWANVendors)
 	data.GeoLocations = convertGeoLocations(r.LocationSummary, r.LocationIPs)
 	data.BandwidthReport = convertBandwidthReport(r.BandwidthReport)
+
+	// LAN Protocol Detection
+	if r.LANProtocols != nil {
+		data.HasLANProtocols = true
+		data.VRRPSessions = convertVRRPSessions(r.LANProtocols.VRRPSessions)
+		data.CDPDevices = convertCDPDevices(r.LANProtocols.CDPDevices)
+		data.LLDPDevices = convertLLDPDevices(r.LANProtocols.LLDPDevices)
+		data.HSRPGroups = convertHSRPGroups(r.LANProtocols.HSRPGroups)
+		data.STPBridges = convertSTPBridges(r.LANProtocols.STPBridges)
+	}
 
 	// Generate visualization data
 	data.NetworkDataJSON = template.JS(generateNetworkJSON(r))
@@ -2031,6 +2111,99 @@ func formatBitrate(bitsPerSecond float64) string {
 		return fmt.Sprintf("%.2f Kbps", bitsPerSecond/1e3)
 	}
 	return fmt.Sprintf("%.0f bps", bitsPerSecond)
+}
+
+// LAN Protocol Conversion Functions
+func convertVRRPSessions(sessions []models.VRRPFinding) []VRRPSessionView {
+	result := make([]VRRPSessionView, len(sessions))
+	for i, s := range sessions {
+		virtualIPs := strings.Join(s.VirtualIPs, ", ")
+		result[i] = VRRPSessionView{
+			VirtualRouterID: s.VirtualRouterID,
+			Priority:        s.Priority,
+			State:           html.EscapeString(s.State),
+			MasterIP:        html.EscapeString(s.MasterIP),
+			VirtualIPs:      html.EscapeString(virtualIPs),
+			AdvertInterval:  s.AdvertInterval,
+			FirstSeen:       s.FirstSeen,
+			LastSeen:        s.LastSeen,
+			PacketCount:     s.PacketCount,
+			TransitionCount: s.TransitionCount,
+			IsFlapping:      s.IsFlapping,
+			FlappingReason:  html.EscapeString(s.FlappingReason),
+		}
+	}
+	return result
+}
+
+func convertCDPDevices(devices []models.CDPFinding) []CDPDeviceView {
+	result := make([]CDPDeviceView, len(devices))
+	for i, d := range devices {
+		result[i] = CDPDeviceView{
+			DeviceID:     html.EscapeString(d.DeviceID),
+			IPAddress:    html.EscapeString(d.IPAddress),
+			Platform:     html.EscapeString(d.Platform),
+			Capabilities: html.EscapeString(d.Capabilities),
+			SoftwareVer:  html.EscapeString(d.SoftwareVer),
+			PortID:       html.EscapeString(d.PortID),
+			FirstSeen:    d.FirstSeen,
+			LastSeen:     d.LastSeen,
+			PacketCount:  d.PacketCount,
+		}
+	}
+	return result
+}
+
+func convertLLDPDevices(devices []models.LLDPFinding) []LLDPDeviceView {
+	result := make([]LLDPDeviceView, len(devices))
+	for i, d := range devices {
+		result[i] = LLDPDeviceView{
+			ChassisID:    html.EscapeString(d.ChassisID),
+			PortID:       html.EscapeString(d.PortID),
+			SystemName:   html.EscapeString(d.SystemName),
+			SystemDesc:   html.EscapeString(d.SystemDesc),
+			Capabilities: html.EscapeString(d.Capabilities),
+			ManagementIP: html.EscapeString(d.ManagementIP),
+			FirstSeen:    d.FirstSeen,
+			LastSeen:     d.LastSeen,
+			PacketCount:  d.PacketCount,
+		}
+	}
+	return result
+}
+
+func convertHSRPGroups(groups []models.HSRPFinding) []HSRPGroupView {
+	result := make([]HSRPGroupView, len(groups))
+	for i, g := range groups {
+		result[i] = HSRPGroupView{
+			GroupNumber:   g.GroupNumber,
+			State:         html.EscapeString(g.State),
+			Priority:      g.Priority,
+			VirtualIP:     html.EscapeString(g.VirtualIP),
+			ActiveRouter:  html.EscapeString(g.ActiveRouter),
+			StandbyRouter: html.EscapeString(g.StandbyRouter),
+			FirstSeen:     g.FirstSeen,
+			LastSeen:      g.LastSeen,
+			PacketCount:   g.PacketCount,
+		}
+	}
+	return result
+}
+
+func convertSTPBridges(bridges []models.STPFinding) []STPBridgeView {
+	result := make([]STPBridgeView, len(bridges))
+	for i, b := range bridges {
+		result[i] = STPBridgeView{
+			BridgeID:     html.EscapeString(b.BridgeID),
+			RootBridgeID: html.EscapeString(b.RootBridgeID),
+			RootCost:     b.RootCost,
+			PortID:       b.PortID,
+			FirstSeen:    b.FirstSeen,
+			LastSeen:     b.LastSeen,
+			PacketCount:  b.PacketCount,
+		}
+	}
+	return result
 }
 
 // getProDashboardTemplateContent reads the Pro Dashboard template
