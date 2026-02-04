@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="v4.0.0"
+VERSION="v4.1.0.1"
 RELEASE_DIR="releases/${VERSION}"
 BUILD_DIR="cmd/sdwan-triage"
 

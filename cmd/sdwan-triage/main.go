@@ -17,7 +17,7 @@ import (
 	"github.com/google/gopacket/pcapgo"
 )
 
-const version = "4.0.0"
+const version = "4.1.0.1"
 
 // Global verbose flag for debug logging
 var verbose *bool
@@ -193,6 +193,22 @@ EXAMPLES:
     # Check IPsec tunnel traffic
     sdwan-triage -protocol esp -html ipsec-report.html capture.pcap
 
+  LAN Protocol Analysis (VRRP, CDP, LLDP, HSRP, STP):
+    # Re-analyze capture with VRRP detection
+    sdwan-triage analyze vrrp-capture.pcap
+
+    # Check for VRRP flapping
+    sdwan-triage analyze vrrp-capture.pcap | jq '.lan_protocols.vrrp_sessions[] | select(.is_flapping == true)'
+
+    # View VRRP timeline events
+    sdwan-triage analyze vrrp-capture.pcap | jq '.timeline[] | select(.protocol == "VRRP")'
+
+    # Discover CDP devices
+    sdwan-triage -html report.html capture.pcap | jq '.lan_protocols.cdp_devices[]'
+
+    # Check HSRP failover events
+    sdwan-triage analyze capture.pcap | jq '.timeline[] | select(.protocol == "HSRP")'
+
   Advanced Usage:
     # Multiple output formats simultaneously
     sdwan-triage -html report.html -json -csv findings.csv capture.pcap
@@ -215,6 +231,7 @@ SUPPORTED PROTOCOLS:
   Tunnels:   VXLAN, GRE, NVGRE, ERSPAN, MPLS, IPsec (ESP/AH), GTP, L2TP
   VPN:       OpenVPN, WireGuard
   App Layer: HTTP, HTTPS, HTTP/2, QUIC, DNS, TLS/SSL, SIP, RTP/RTCP
+  LAN:       VRRP, CDP, LLDP, HSRP, STP (with flapping detection)
 
 For more information and documentation:
   https://github.com/gocisse/sdwan-triage

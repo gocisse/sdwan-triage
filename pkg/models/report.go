@@ -58,6 +58,9 @@ type TriageReport struct {
 	LDAPFlows     []LDAPFlow     `json:"ldap_flows,omitempty"`
 	KerberosFlows []KerberosFlow `json:"kerberos_flows,omitempty"`
 
+	// LAN Protocol Detection
+	LANProtocols *LANProtocolFindings `json:"lan_protocols,omitempty"`
+
 	// Baseline Comparison
 	BaselineComparison *BaselineComparison `json:"baseline_comparison,omitempty"`
 
@@ -594,4 +597,80 @@ type SDWANVendor struct {
 	PacketCount int     `json:"packet_count"`
 	FirstSeen   float64 `json:"first_seen"`
 	LastSeen    float64 `json:"last_seen"`
+}
+
+// LANProtocolFindings contains all LAN protocol detection results
+type LANProtocolFindings struct {
+	VRRPSessions []VRRPFinding `json:"vrrp_sessions,omitempty"`
+	CDPDevices   []CDPFinding  `json:"cdp_devices,omitempty"`
+	LLDPDevices  []LLDPFinding `json:"lldp_devices,omitempty"`
+	HSRPGroups   []HSRPFinding `json:"hsrp_groups,omitempty"`
+	STPBridges   []STPFinding  `json:"stp_bridges,omitempty"`
+}
+
+// VRRPFinding represents a detected VRRP session
+type VRRPFinding struct {
+	VirtualRouterID uint8    `json:"virtual_router_id"`
+	Priority        uint8    `json:"priority"`
+	State           string   `json:"state"`
+	MasterIP        string   `json:"master_ip"`
+	VirtualIPs      []string `json:"virtual_ips"`
+	AuthType        uint8    `json:"auth_type"`
+	AdvertInterval  uint8    `json:"advert_interval"`
+	FirstSeen       string   `json:"first_seen"`
+	LastSeen        string   `json:"last_seen"`
+	PacketCount     uint64   `json:"packet_count"`
+	TransitionCount int      `json:"transition_count"`
+	IsFlapping      bool     `json:"is_flapping"`
+	FlappingReason  string   `json:"flapping_reason,omitempty"`
+}
+
+// CDPFinding represents a Cisco Discovery Protocol device
+type CDPFinding struct {
+	DeviceID     string `json:"device_id"`
+	IPAddress    string `json:"ip_address"`
+	Platform     string `json:"platform"`
+	Capabilities string `json:"capabilities"`
+	SoftwareVer  string `json:"software_version"`
+	PortID       string `json:"port_id"`
+	FirstSeen    string `json:"first_seen"`
+	LastSeen     string `json:"last_seen"`
+	PacketCount  uint64 `json:"packet_count"`
+}
+
+// LLDPFinding represents an LLDP device
+type LLDPFinding struct {
+	ChassisID    string `json:"chassis_id"`
+	PortID       string `json:"port_id"`
+	SystemName   string `json:"system_name"`
+	SystemDesc   string `json:"system_desc"`
+	Capabilities string `json:"capabilities"`
+	ManagementIP string `json:"management_ip"`
+	FirstSeen    string `json:"first_seen"`
+	LastSeen     string `json:"last_seen"`
+	PacketCount  uint64 `json:"packet_count"`
+}
+
+// HSRPFinding represents an HSRP group
+type HSRPFinding struct {
+	GroupNumber   uint8  `json:"group_number"`
+	State         string `json:"state"`
+	Priority      uint8  `json:"priority"`
+	VirtualIP     string `json:"virtual_ip"`
+	ActiveRouter  string `json:"active_router"`
+	StandbyRouter string `json:"standby_router"`
+	FirstSeen     string `json:"first_seen"`
+	LastSeen      string `json:"last_seen"`
+	PacketCount   uint64 `json:"packet_count"`
+}
+
+// STPFinding represents a Spanning Tree Protocol bridge
+type STPFinding struct {
+	BridgeID     string `json:"bridge_id"`
+	RootBridgeID string `json:"root_bridge_id"`
+	RootCost     uint32 `json:"root_cost"`
+	PortID       uint16 `json:"port_id"`
+	FirstSeen    string `json:"first_seen"`
+	LastSeen     string `json:"last_seen"`
+	PacketCount  uint64 `json:"packet_count"`
 }

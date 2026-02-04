@@ -44,6 +44,7 @@ type Processor struct {
 	smbDetector         *detectors.SMBDetector
 	ldapDetector        *detectors.LDAPDetector
 	kerberosDetector    *detectors.KerberosDetector
+	lanProtocolAnalyzer *detector.LANProtocolAnalyzer
 	streamReassembler   *StreamReassembler
 	bandwidthAnalyzer   *BandwidthAnalyzer
 	handshakeTimeout    time.Duration
@@ -86,6 +87,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		smbDetector:         detectors.NewSMBDetector(),
 		ldapDetector:        detectors.NewLDAPDetector(),
 		kerberosDetector:    detectors.NewKerberosDetector(),
+		lanProtocolAnalyzer: detector.NewLANProtocolAnalyzer(),
 		streamReassembler:   NewStreamReassembler(verbose),
 		bandwidthAnalyzer:   NewBandwidthAnalyzer(1000, verbose), // 1 second buckets
 		handshakeTimeout:    3 * time.Second,                     // Default 3 second timeout
@@ -257,6 +259,9 @@ func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.Analysis
 	p.ldapDetector.ProcessPacket(packet)
 	p.kerberosDetector.ProcessPacket(packet)
 
+	// LAN protocol detection (VRRP, CDP, LLDP, HSRP, STP)
+	p.lanProtocolAnalyzer.Analyze(packet, state, report)
+
 	// Stream reassembly and bandwidth tracking
 	p.streamReassembler.ProcessPacket(packet)
 	p.bandwidthAnalyzer.ProcessPacket(packet)
@@ -414,6 +419,9 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	report.SMBFlows = p.smbDetector.GetFlows()
 	report.LDAPFlows = p.ldapDetector.GetFlows()
 	report.KerberosFlows = p.kerberosDetector.GetFlows()
+
+	// Add LAN protocol findings (VRRP, CDP, LLDP, HSRP, STP)
+	report.LANProtocols = p.lanProtocolAnalyzer.GetFindings()
 
 	// Add stream reassembly data (top 50 streams by bytes)
 	topStreams := p.streamReassembler.GetTopStreams(50)
