@@ -98,6 +98,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="#lan-protocols" class="nav-link" data-section="lan-protocols">
+                            <i class="fas fa-sitemap nav-icon"></i>
+                            <span>LAN Protocols</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="#visualizations" class="nav-link" data-section="visualizations">
                             <i class="fas fa-project-diagram nav-icon"></i>
                             <span>Visualizations</span>
@@ -3656,6 +3662,285 @@
                     </div>
                 </div>
             </div>
+        </section>
+        
+        <!-- ====================================================================
+             LAN PROTOCOLS SECTION
+             ==================================================================== -->
+        <section id="lan-protocols" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-sitemap" style="color: var(--color-primary);"></i>
+                LAN Protocol Detection
+            </h2>
+            
+            {{if .HasLANProtocols}}
+            
+            <!-- VRRP Sessions -->
+            {{if .VRRPSessions}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-network-wired"></i>
+                        VRRP Sessions
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .VRRPSessions}} sessions</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Virtual Router Redundancy Protocol - High availability monitoring</p>
+                </div>
+                
+                <div style="background: rgba(124, 58, 237, 0.1); border-bottom: 1px solid rgba(124, 58, 237, 0.3); padding: 20px 24px;">
+                    <div style="display: flex; align-items: flex-start; gap: 16px;">
+                        <div style="background: #7c3aed; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin: 0 0 8px 0; color: #a78bfa; font-size: 1rem;">Understanding VRRP</h4>
+                            <p style="margin: 0; color: var(--color-text-secondary); font-size: 0.875rem; line-height: 1.6;">
+                                VRRP provides automatic assignment of available routers to participating hosts. <strong>Flapping detection</strong> identifies unstable failover conditions that may indicate network issues.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--color-surface); border-bottom: 2px solid var(--color-border);">
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">VRID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Priority</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">State</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Master IP</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Virtual IPs</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Interval</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Packets</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .VRRPSessions}}
+                            <tr style="border-bottom: 1px solid var(--color-border); {{if .IsFlapping}}background: rgba(239, 68, 68, 0.1);{{end}}">
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    <span style="background: #7c3aed; color: white; padding: 4px 10px; border-radius: 6px; font-weight: 600;">{{.VirtualRouterID}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.Priority}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    <span style="background: #10b981; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">{{.State}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.MasterIP}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.VirtualIPs}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.AdvertInterval}}s</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PacketCount}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    {{if .IsFlapping}}
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <span style="background: #ef4444; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                            <i class="fas fa-exclamation-triangle"></i> FLAPPING
+                                        </span>
+                                        <span style="font-size: 0.75rem; color: #ef4444;">{{.TransitionCount}} transitions</span>
+                                        <span style="font-size: 0.75rem; color: var(--color-text-secondary);">{{.FlappingReason}}</span>
+                                    </div>
+                                    {{else}}
+                                    <span style="background: #10b981; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fas fa-check-circle"></i> Stable
+                                    </span>
+                                    {{end}}
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- CDP Devices -->
+            {{if .CDPDevices}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-server"></i>
+                        CDP Devices
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .CDPDevices}} devices</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Cisco Discovery Protocol - Network device inventory</p>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--color-surface); border-bottom: 2px solid var(--color-border);">
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Device ID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">IP Address</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Platform</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Capabilities</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Software</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Port</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Packets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .CDPDevices}}
+                            <tr style="border-bottom: 1px solid var(--color-border);">
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-weight: 600;">{{.DeviceID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.IPAddress}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.Platform}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    <span style="background: #0891b2; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem;">{{.Capabilities}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 0.75rem; color: var(--color-text-secondary);">{{.SoftwareVer}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PortID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PacketCount}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- LLDP Devices -->
+            {{if .LLDPDevices}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-project-diagram"></i>
+                        LLDP Devices
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .LLDPDevices}} devices</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Link Layer Discovery Protocol - Multi-vendor device discovery</p>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--color-surface); border-bottom: 2px solid var(--color-border);">
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">System Name</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Chassis ID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Port ID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Management IP</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Capabilities</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Description</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Packets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .LLDPDevices}}
+                            <tr style="border-bottom: 1px solid var(--color-border);">
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-weight: 600;">{{.SystemName}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.ChassisID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PortID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.ManagementIP}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    <span style="background: #059669; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem;">{{.Capabilities}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 0.75rem; color: var(--color-text-secondary); max-width: 200px; overflow: hidden; text-overflow: ellipsis;">{{.SystemDesc}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PacketCount}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- HSRP Groups -->
+            {{if .HSRPGroups}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-exchange-alt"></i>
+                        HSRP Groups
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .HSRPGroups}} groups</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Hot Standby Router Protocol - Gateway redundancy tracking</p>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--color-surface); border-bottom: 2px solid var(--color-border);">
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Group</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">State</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Priority</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Virtual IP</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Active Router</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Standby Router</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Packets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .HSRPGroups}}
+                            <tr style="border-bottom: 1px solid var(--color-border);">
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    <span style="background: #dc2626; color: white; padding: 4px 10px; border-radius: 6px; font-weight: 600;">{{.GroupNumber}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">
+                                    <span style="background: #10b981; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">{{.State}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.Priority}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.VirtualIP}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.ActiveRouter}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.StandbyRouter}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PacketCount}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- STP Bridges -->
+            {{if .STPBridges}}
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-tree"></i>
+                        STP Bridges
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">{{len .STPBridges}} bridges</span>
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.875rem;">Spanning Tree Protocol - Layer 2 topology monitoring</p>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--color-surface); border-bottom: 2px solid var(--color-border);">
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Bridge ID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Root Bridge ID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Root Cost</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Port ID</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">First Seen</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Last Seen</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; font-size: 0.875rem; color: var(--color-text-secondary);">Packets</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .STPBridges}}
+                            <tr style="border-bottom: 1px solid var(--color-border);">
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.BridgeID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem; font-family: 'Courier New', monospace;">{{.RootBridgeID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.RootCost}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PortID}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.FirstSeen}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.LastSeen}}</td>
+                                <td style="padding: 12px 16px; font-size: 0.875rem;">{{.PacketCount}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {{end}}
+            
+            {{else}}
+            <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 32px; text-align: center;">
+                <i class="fas fa-info-circle" style="font-size: 3rem; color: #3b82f6; margin-bottom: 16px;"></i>
+                <h3 style="margin: 0 0 8px 0; color: var(--color-text); font-size: 1.25rem;">No LAN Protocol Traffic Detected</h3>
+                <p style="margin: 0; color: var(--color-text-secondary); font-size: 0.875rem;">
+                    This capture does not contain VRRP, CDP, LLDP, HSRP, or STP traffic.
+                </p>
+            </div>
+            {{end}}
         </section>
         
         <!-- ====================================================================

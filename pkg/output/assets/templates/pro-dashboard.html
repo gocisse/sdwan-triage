@@ -281,6 +281,230 @@
             {{end}}
         </section>
 
+        <!-- LAN PROTOCOLS SECTION -->
+        <section id="lan-protocols" class="section">
+            <div class="section-header"><h1 class="section-title"><i class="fas fa-sitemap"></i> LAN Protocol Detection</h1></div>
+            
+            {{if .HasLANProtocols}}
+            
+            <!-- VRRP Sessions -->
+            {{if .VRRPSessions}}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-network-wired"></i> VRRP Sessions</div>
+                    <span class="status-badge">{{len .VRRPSessions}} sessions</span>
+                </div>
+                <div class="card-body">
+                    <div class="edu-banner">
+                        <div class="edu-banner-header"><i class="fas fa-info-circle"></i> VRRP</div>
+                        <p>Virtual Router Redundancy Protocol provides automatic assignment of available routers. Flapping indicates unstable failover conditions.</p>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>VRID</th>
+                                    <th>Priority</th>
+                                    <th>State</th>
+                                    <th>Master IP</th>
+                                    <th>Virtual IPs</th>
+                                    <th>Packets</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .VRRPSessions}}
+                                <tr {{if .IsFlapping}}style="background: rgba(239, 68, 68, 0.1);"{{end}}>
+                                    <td><span class="status-badge">{{.VirtualRouterID}}</span></td>
+                                    <td>{{.Priority}}</td>
+                                    <td><span class="status-badge success">{{.State}}</span></td>
+                                    <td style="font-family: monospace;">{{.MasterIP}}</td>
+                                    <td style="font-family: monospace;">{{.VirtualIPs}}</td>
+                                    <td>{{.PacketCount}}</td>
+                                    <td>
+                                        {{if .IsFlapping}}
+                                        <span class="severity critical">FLAPPING</span>
+                                        <div style="font-size: 0.75rem; color: #ef4444;">{{.TransitionCount}} transitions</div>
+                                        {{else}}
+                                        <span class="status-badge success">Stable</span>
+                                        {{end}}
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- CDP Devices -->
+            {{if .CDPDevices}}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-server"></i> CDP Devices</div>
+                    <span class="status-badge">{{len .CDPDevices}} devices</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Device ID</th>
+                                    <th>IP Address</th>
+                                    <th>Platform</th>
+                                    <th>Capabilities</th>
+                                    <th>Port</th>
+                                    <th>Packets</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .CDPDevices}}
+                                <tr>
+                                    <td style="font-weight: 600;">{{.DeviceID}}</td>
+                                    <td style="font-family: monospace;">{{.IPAddress}}</td>
+                                    <td>{{.Platform}}</td>
+                                    <td><span class="status-badge">{{.Capabilities}}</span></td>
+                                    <td>{{.PortID}}</td>
+                                    <td>{{.PacketCount}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- LLDP Devices -->
+            {{if .LLDPDevices}}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-project-diagram"></i> LLDP Devices</div>
+                    <span class="status-badge">{{len .LLDPDevices}} devices</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>System Name</th>
+                                    <th>Chassis ID</th>
+                                    <th>Port ID</th>
+                                    <th>Management IP</th>
+                                    <th>Capabilities</th>
+                                    <th>Packets</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .LLDPDevices}}
+                                <tr>
+                                    <td style="font-weight: 600;">{{.SystemName}}</td>
+                                    <td style="font-family: monospace;">{{.ChassisID}}</td>
+                                    <td>{{.PortID}}</td>
+                                    <td style="font-family: monospace;">{{.ManagementIP}}</td>
+                                    <td><span class="status-badge">{{.Capabilities}}</span></td>
+                                    <td>{{.PacketCount}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- HSRP Groups -->
+            {{if .HSRPGroups}}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-exchange-alt"></i> HSRP Groups</div>
+                    <span class="status-badge">{{len .HSRPGroups}} groups</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Group</th>
+                                    <th>State</th>
+                                    <th>Priority</th>
+                                    <th>Virtual IP</th>
+                                    <th>Active Router</th>
+                                    <th>Standby Router</th>
+                                    <th>Packets</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .HSRPGroups}}
+                                <tr>
+                                    <td><span class="status-badge">{{.GroupNumber}}</span></td>
+                                    <td><span class="status-badge success">{{.State}}</span></td>
+                                    <td>{{.Priority}}</td>
+                                    <td style="font-family: monospace;">{{.VirtualIP}}</td>
+                                    <td style="font-family: monospace;">{{.ActiveRouter}}</td>
+                                    <td style="font-family: monospace;">{{.StandbyRouter}}</td>
+                                    <td>{{.PacketCount}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            <!-- STP Bridges -->
+            {{if .STPBridges}}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-tree"></i> STP Bridges</div>
+                    <span class="status-badge">{{len .STPBridges}} bridges</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Bridge ID</th>
+                                    <th>Root Bridge ID</th>
+                                    <th>Root Cost</th>
+                                    <th>Port ID</th>
+                                    <th>First Seen</th>
+                                    <th>Last Seen</th>
+                                    <th>Packets</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .STPBridges}}
+                                <tr>
+                                    <td style="font-family: monospace;">{{.BridgeID}}</td>
+                                    <td style="font-family: monospace;">{{.RootBridgeID}}</td>
+                                    <td>{{.RootCost}}</td>
+                                    <td>{{.PortID}}</td>
+                                    <td>{{.FirstSeen}}</td>
+                                    <td>{{.LastSeen}}</td>
+                                    <td>{{.PacketCount}}</td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            
+            {{else}}
+            <div class="card">
+                <div class="card-body" style="text-align: center; padding: 2rem;">
+                    <i class="fas fa-info-circle" style="font-size: 3rem; color: #3b82f6; margin-bottom: 1rem;"></i>
+                    <h3 style="margin: 0 0 0.5rem 0;">No LAN Protocol Traffic Detected</h3>
+                    <p style="margin: 0; color: #6b7280;">This capture does not contain VRRP, CDP, LLDP, HSRP, or STP traffic.</p>
+                </div>
+            </div>
+            {{end}}
+        </section>
+        
         <!-- DEVICES SECTION -->
         <section id="devices" class="section">
             <div class="section-header"><h1 class="section-title"><i class="fas fa-laptop"></i> Devices</h1></div>
