@@ -1,320 +1,626 @@
-# SD-WAN Network Triage
+# SD-WAN Network Triage v4.3.3
 
 [![Release](https://img.shields.io/github/v/release/gocisse/sdwan-triage)](https://github.com/gocisse/sdwan-triage/releases/latest)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20|%20Linux%20|%20Windows-lightgrey)](https://github.com/gocisse/sdwan-triage/releases)
 
-**Comprehensive PCAP analysis tool for SD-WAN networks** with advanced security detection, performance monitoring, and interactive D3.js visualizations. Designed for network engineers, security analysts, and NOC teams.
+**Unified single-binary PCAP analysis platform for SD-WAN networks.** 35+ parallel detectors, JWT-secured React dashboard, vendor-specific troubleshooting runbooks, and enterprise integrations (Prometheus, ServiceNow). One download, zero dependencies.
+
+<p align="center">
+  <img src="Pharaoh.svg.png" alt="SD-WAN Triage" width="120" />
+</p>
 
 ![SD-WAN Triage Dashboard](https://raw.githubusercontent.com/gocisse/sdwan-triage/main/docs/dashboard-preview.png)
 
-## 🚀 Quick Start
+---
+
+## Quick Start (Zero Install)
+
+**3 steps. No Node.js. No npm. No Docker. Just one binary.**
 
 ```bash
-# Download latest release (macOS Apple Silicon example)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-darwin-arm64.zip
-unzip sdwan-triage-darwin-arm64.zip
-chmod +x sdwan-triage-darwin-arm64
+# 1. Download (macOS Apple Silicon example)
+curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-darwin-arm64.tar.gz
+tar xzf sdwan-triage-v4.3.3-darwin-arm64.tar.gz
 
-# Analyze a PCAP file and generate HTML report
-./sdwan-triage-darwin-arm64 -html report.html capture.pcap
+# 2. Run
+./sdwan-triage-darwin-arm64 -web
 
-# Open the interactive report in your browser
-open report.html
+# 3. Open browser → http://127.0.0.1:8080
+#    Login: admin / admin (change password immediately)
 ```
 
-## ✨ Features
+That's it. The React dashboard, API server, and SQLite database are all embedded in the single binary.
 
-### 🔒 Security Analysis
-| Feature | Description |
-|---------|-------------|
-| **DDoS Detection** | SYN flood, UDP flood, ICMP flood with severity levels |
-| **Port Scanning** | Horizontal, vertical, and block scan detection |
-| **TLS Security** | Weak ciphers, outdated protocols, certificate analysis |
-| **Malware Indicators** | IOC checking with custom databases |
-| **BGP Hijack Heuristics** | Route anomaly detection |
-| **GeoIP Analysis** | Country-based traffic distribution with IP lists |
+### Download Links
 
-### 📊 Performance Monitoring
-| Feature | Description |
-|---------|-------------|
-| **TCP Handshake Analysis** | SYN → SYN-ACK → ACK tracking with color-coded states |
-| **Retransmission Analysis** | Identify packet loss and network congestion |
-| **RTT Distribution** | Latency histogram visualization |
-| **Bandwidth Tracking** | Per-flow and aggregate throughput |
-| **Jitter & Packet Loss** | VoIP/RTP quality metrics |
-| **Wireshark Filters** | Auto-generated filters for each flow |
+| Platform | Download |
+|---|---|
+| **macOS (Apple Silicon)** | [`sdwan-triage-v4.3.3-darwin-arm64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-darwin-arm64.tar.gz) |
+| **macOS (Intel)** | [`sdwan-triage-v4.3.3-darwin-amd64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-darwin-amd64.tar.gz) |
+| **Linux (x86_64)** | [`sdwan-triage-v4.3.3-linux-amd64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-linux-amd64.tar.gz) |
+| **Windows (x86_64)** | [`sdwan-triage-v4.3.3-windows-amd64.zip`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-windows-amd64.zip) |
 
-### 🌐 Protocol Analysis
-| Feature | Description |
-|---------|-------------|
-| **DNS Anomalies** | NXDOMAIN, timeouts, DGA detection |
-| **HTTP/HTTPS** | Status codes, errors, HTTP/2 & QUIC |
-| **VoIP/SIP** | Call tracking with codec identification |
-| **RTP/RTCP** | Media stream quality analysis |
+Verify downloads with [`checksums-v4.3.3.txt`](https://github.com/gocisse/sdwan-triage/releases/latest/download/checksums-v4.3.3.txt).
 
-### 🔗 Tunnel & Encapsulation Detection
-| Protocol | Details |
-|----------|---------|
-| **VXLAN** | VNI extraction, overlay detection |
-| **GRE/NVGRE/ERSPAN** | Tunnel identification |
-| **MPLS** | Label analysis |
-| **IPsec** | ESP/AH detection |
-| **GTP-U/GTP-C** | Mobile network tunnels |
-| **VPN** | L2TP, OpenVPN, WireGuard |
+---
 
-### 🏢 SD-WAN Vendor Detection
-Automatic identification with vendor-specific Wireshark filters:
+## Two Modes of Operation
 
-| Vendor | Ports | Protocol |
-|--------|-------|----------|
-| **Cisco Viptela** | UDP 12346 (data), UDP/TCP 23456 (control) | DTLS |
-| **VMware VeloCloud** | UDP 2426 | VCMP |
-| **Fortinet SD-WAN** | UDP/TCP 541 | Proprietary |
-| **Palo Alto Prisma** | UDP 4501 | IPsec |
-| **Silver Peak** | UDP 4163 | Proprietary |
-| **Aruba EdgeConnect** | UDP 4500/500 | IPsec NAT-T |
-| **Versa Networks** | UDP 4790 | Proprietary |
-| **Citrix SD-WAN** | UDP 4980 | Proprietary |
+The same binary supports two workflows. Choose the one that fits your role.
 
-### 📈 Interactive Visualizations (HTML Report)
-- **Timeline** - Event filtering with zoom
-- **Sankey Diagram** - Source → destination flow visualization
-- **RTT Histogram** - Latency distribution
-- **Protocol Breakdown** - Traffic composition charts
-- **Bandwidth Graphs** - Utilization over time
-- **Device Fingerprinting** - OS and device type detection
+### Web Mode — Interactive Dashboard
 
-## 📦 Installation
-
-### Pre-built Binaries
-
-Download from [Releases](https://github.com/gocisse/sdwan-triage/releases/latest):
+**Best for:** Junior engineers, visual triage, team collaboration, guided troubleshooting.
 
 ```bash
-# macOS (Apple Silicon)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-darwin-arm64.zip
-
-# macOS (Intel)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-darwin-amd64.zip
-
-# Linux (x86_64)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-linux-amd64.zip
-
-# Linux (ARM64)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-linux-arm64.zip
-
-# Windows (x86_64)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-windows-amd64.zip
+./sdwan-triage -web                    # Opens browser automatically
+./sdwan-triage -web -port 9090         # Custom port
+./sdwan-triage -web -no-browser        # Don't auto-open browser
 ```
 
-### Build from Source
+**What you get:**
+- Drag-and-drop PCAP upload with real-time progress
+- Executive summary with risk scoring
+- Interactive findings with the **Troubleshooting Wizard** (see below)
+- Topology visualization, flow tables, bandwidth charts
+- History of past analyses
+- JWT-secured login with role-based access
+
+### CLI Mode — Automation & Scripting
+
+**Best for:** Senior engineers, CI/CD pipelines, batch processing, automation.
 
 ```bash
-# Clone repository
-git clone https://github.com/gocisse/sdwan-triage.git
-cd sdwan-triage
+# Console output with executive summary
+./sdwan-triage capture.pcap
 
-# Build
-go build -o sdwan-triage ./cmd/sdwan-triage
+# Interactive HTML report (recommended for sharing)
+./sdwan-triage -html report.html capture.pcap
 
+# JSON output for automation pipelines
+./sdwan-triage -json capture.pcap > results.json
+
+# CSV export for spreadsheets
+./sdwan-triage -csv findings.csv capture.pcap
+
+# PDF report (requires wkhtmltopdf)
+./sdwan-triage -pdf report.pdf capture.pcap
+
+# Plain English report for non-technical stakeholders
+./sdwan-triage -simple capture.pcap
+
+# Compare two captures (before/after change window)
+./sdwan-triage -compare before.pcap after.pcap
+
+# Compare LAN vs WAN with tunnel decapsulation
+./sdwan-triage -compare lan-capture.pcap wan-capture.pcap
+```
+
+---
+
+## Forensic Workflow — LAN vs. WAN Comparison
+
+Version 4.3.3 introduces **tunnel-aware PCAP comparison** for forensic troubleshooting across SD-WAN devices. Place a capture on the LAN side and another on the WAN side of your SD-WAN appliance to determine exactly where packets are dropped, modified, or encrypted.
+
+### How It Works
+
+```
+   [LAN Capture]               [SD-WAN Device]              [WAN Capture]
+   (clear-text)          ┌─────────────────────┐          (encapsulated)
+  ────────────────────►   │  IPsec / VXLAN / GRE │   ────────────────────►
+   10.1.1.5:443 → ...    │  VCMP / Viptela DTLS │   Outer: WAN_A → WAN_B
+                          └─────────────────────┘   Inner: 10.1.1.5:443 → ...
+```
+
+1. **Upload two PCAPs** — File A (LAN-side, before SD-WAN) and File B (WAN-side, after SD-WAN)
+2. The comparator **auto-detects tunnel encapsulation** on the WAN capture:
+   - **Cisco Viptela** (UDP 12346–12426, DTLS)
+   - **VMware VeloCloud** VCMP (UDP 2426)
+   - **VXLAN** (UDP 4789)
+   - **GRE** (IP Protocol 47)
+   - **IPsec ESP** (IP Protocol 50)
+3. **Inner IP headers are extracted** from decapsulatable tunnels and matched against LAN-side packets using the 5-tuple (Src IP, Dst IP, Src Port, Dst Port, Protocol)
+4. Encrypted tunnels (ESP, DTLS) are flagged — the tool reports them separately since inner headers are hidden by encryption
+
+### CLI Usage
+
+```bash
+# Basic comparison
+./sdwan-triage -compare lan-side.pcap wan-side.pcap
+
+# With HTML report
+./sdwan-triage -compare -html comparison.html lan-side.pcap wan-side.pcap
+```
+
+### Example Output
+
+```
+  ╔══════════════════════════════════════════╗
+  ║  Path Integrity Score:  87.3% (Healthy)  ║
+  ╚══════════════════════════════════════════╝
+
+  ━━━ TUNNEL ENCAPSULATION DETECTED ━━━
+  ● Viptela: 5824 packets
+  Decapsulated (inner extracted): 4920
+  ⚠ 904 packets encrypted (ESP/DTLS) — inner flow hidden
+
+  ━━━ PACKET SUMMARY ━━━
+  Matched (PRESENT_BOTH):        8734
+  Missing from WAN (MISSING_B):  312  (dropped by device)
+  Modified (TTL/DSCP/NAT):       89
+```
+
+### Web Dashboard
+
+In the web UI, navigate to the **Compare** tab to upload two PCAPs and view an interactive comparison report with:
+
+- **Path Integrity Score** — percentage of packets successfully traversing the device
+- **Tunnel Encapsulation Banner** — detected tunnel types, decapsulation stats, encryption warnings
+- **Flow Table** — per-flow match rates with NAT and tunnel badges
+- **Flow Graph** — visual sequence diagrams (see below)
+- **Discrepancy List** — filterable list of dropped, modified, and asymmetric packets
+
+---
+
+## Flow Graph Visualization
+
+The **Flow Graph** renders a sequence diagram for any selected flow, making packet drops and modifications immediately obvious to non-packet-experts.
+
+<!-- Screenshot: docs/flow-graph-preview.png -->
+![Flow Graph Sequence Diagram](https://raw.githubusercontent.com/gocisse/sdwan-triage/main/docs/flow-graph-preview.png)
+
+### Visual Encoding
+
+| Arrow Style | Color | Meaning |
+|---|---|---|
+| **Solid →** | 🟢 Green | Packet matched — present in both LAN and WAN captures |
+| **Dashed ╌╌ ✕** | 🔴 Red | Packet dropped — present in LAN, missing from WAN (stops at SD-WAN device) |
+| **Solid →** | 🟡 Yellow | Packet modified — NAT translation, TTL decrement, or DSCP remarking detected |
+| **Dashed 🔒** | 🔵 Cyan | Encrypted tunnel packet — inner flow hidden by IPsec/DTLS |
+| **Dashed →** | 🟣 Purple | Asymmetric — packet in WAN but not LAN (injected or return-path traffic) |
+
+### How to Use
+
+1. Go to the **Compare** tab and run a comparison
+2. Switch to the **Flows** tab
+3. Click the **"Flow Graph"** button on any flow row
+4. A modal opens with the sequence diagram showing every packet event for that flow
+
+```
+  [LAN Client]              [SD-WAN Device]              [WAN Server]
+      |                          |                           |
+      |  ──[SYN]──────────►     |     ────────────────►     |  ✅ Matched
+      |                          |                           |
+      |  ◄──[SYN-ACK]────  ✕   |                           |  ❌ Dropped
+      |                          |                           |
+      |  ──[SYN]──────────►     |     ────────────────►     |  ✅ Retransmission Matched
+      |                          |                           |
+      |  ──[PSH,ACK]─────►     |     ──── 🔒 ────────►     |  🔐 Encrypted
+      |                          |                           |
+      |  ──[FIN,ACK]─────►     |     ────(NAT)────►        |  ⚠️  Modified (src IP changed)
+```
+
+---
+
+## Authentication
+
+All API endpoints require JWT authentication. On first startup, a default admin user is created:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ⚠  WARNING: Default admin user created.                     │
+│  Username: admin  |  Password: admin                         │
+│  PLEASE CHANGE THE PASSWORD IMMEDIATELY.                     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Change your password:** Click your username in the top-right corner → **Change Password**.
+
+### Roles
+
+| Role | Permissions |
+|---|---|
+| `admin` | Full access + user management (`/api/auth/users`) |
+| `analyst` | Upload PCAPs, run analysis, view results |
+| `viewer` | View results only |
+
+### API Authentication (for scripts)
+
+```bash
+# 1. Get a token
+TOKEN=$(curl -s -X POST http://127.0.0.1:8080/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' | jq -r '.token')
+
+# 2. Use the token
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/api/history
+```
+
+---
+
+## Troubleshooting Wizard
+
+The web dashboard includes a **guided troubleshooting wizard** that helps engineers diagnose findings step-by-step.
+
+### How It Works
+
+1. Click any finding card in the results page
+2. The wizard checks for **vendor-specific runbooks** first (e.g., VeloCloud `debug.py` commands)
+3. Falls back to **generic knowledge base** entries if no vendor runbook exists
+4. Every finding includes an **ELI5** (Explain Like I'm 5) explanation
+
+### VeloCloud Example
+
+When a VeloCloud tunnel flapping issue is detected, the wizard shows:
+
+```
+📋 Vendor Runbook: VMware VeloCloud — Tunnel Flapping
+
+CLI Steps:
+  1. debug.py --tunnel --status
+     → Shows current tunnel state and uptime
+  2. debug.py --path --list
+     → Lists all paths and their quality metrics
+  3. debug.py --tunnel --history
+     → Shows tunnel state change history
+
+⚠️  Safety: These commands are read-only but may increase CPU briefly.
+
+GUI Steps:
+  1. Navigate to Monitor → Edges → [Edge Name] → Paths
+  2. Check path quality metrics (latency, jitter, loss)
+  3. Review Events tab for tunnel state changes
+
+💡 ELI5: "The secure highway between your offices keeps closing and
+reopening. Every time it closes, traffic has to find another route."
+```
+
+Supported vendors: **VeloCloud**, Cisco Viptela, Fortinet, Palo Alto Prisma, Silver Peak, Aruba EdgeConnect, Versa Networks.
+
+---
+
+## Smart Insights for Junior Engineers
+
+Version 4.3.3 introduces a clear distinction between **Issues** (actionable problems) and **Insights** (passive observations). This helps junior engineers focus on what matters without being confused by informational findings.
+
+### Issues vs. Insights
+
+| Type | Badge | Meaning | Example |
+|------|-------|---------|---------|
+| **Issue** | `3` (solid badge) | Actionable problem requiring investigation | DDoS Attack, DHCP Rogue Server, TCP Retransmissions |
+| **Insight** | `+2` (subtle badge) | Passive observation — healthy, no action needed | CDP/LLDP Device Discovery, STP Topology, VRRP Sessions |
+
+### How It Appears in the Sidebar
+
+```
+Security        3         ← 3 actionable issues (red/amber)
+Performance     1         ← 1 actionable issue
+Infrastructure  +3        ← 3 healthy observations (subtle, no alarm)
+SD-WAN          +2        ← 2 informational detections
+```
+
+The sidebar also includes a helper legend:
+
+> **Insights (+N):** Passive observations about your network — not errors or issues. These help you understand what's running, but require no action.
+
+### Vendor-Specific Wireshark Filters
+
+Each tunnel finding now shows the **correct vendor-specific Wireshark filter**, so junior engineers can copy-paste directly into Wireshark without guessing ports:
+
+| Vendor | Wireshark Filter |
+|--------|-----------------|
+| **Cisco Viptela** | `udp.port == 12346 \|\| udp.port == 12366 \|\| udp.port == 23456 \|\| tcp.port == 23456` |
+| **VMware VeloCloud** | `udp.port == 2426` |
+| **Fortinet** | `udp.port == 541 \|\| tcp.port == 541` |
+| **Aruba EdgeConnect** | `udp.port == 4163 \|\| udp.port == 4980 \|\| udp.port == 4500 \|\| esp` |
+
+> **Tip:** Insights like CDP, LLDP, and STP help you map the network topology without triggering alarms for healthy redundancy protocols. Use them to build documentation and verify your physical/logical design.
+
+---
+
+## Enterprise Integration Setup
+
+### Prometheus Metrics
+
+Metrics are always enabled. Scrape the standard endpoint:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'sdwan-triage'
+    static_configs:
+      - targets: ['127.0.0.1:8080']
+    metrics_path: '/metrics'
+```
+
+```bash
 # Verify
-./sdwan-triage -help
+curl http://127.0.0.1:8080/metrics
 ```
 
-**Requirements:** Go 1.21+
+Exposed metrics include analysis counters, packet rates, risk scores, and finding type distributions.
 
-## 🎯 Usage
+### ServiceNow Ticketing
 
-### Basic Commands
+Automatically creates incidents for **Critical** risk findings.
 
 ```bash
-# Console output with summary
-sdwan-triage capture.pcap
-
-# Generate interactive HTML report (recommended)
-sdwan-triage -html report.html capture.pcap
-
-# Multi-page HTML report
-sdwan-triage -multi-page-html ./report-dir capture.pcap
-
-# Export to JSON for automation
-sdwan-triage -json capture.pcap > results.json
-
-# Export to CSV for spreadsheet analysis
-sdwan-triage -csv findings.csv capture.pcap
-
-# Generate PDF report (requires wkhtmltopdf)
-sdwan-triage -pdf report.pdf capture.pcap
-
-# Simple plain English report for non-technical users
-sdwan-triage -simple capture.pcap
+./sdwan-triage -web \
+  -servicenow-url https://your-instance.service-now.com \
+  -servicenow-user api_user \
+  -servicenow-password your_password
 ```
 
-### Filtering Options
+When a PCAP analysis produces a Critical risk score (>50), a ServiceNow incident is created with the finding details, recommended actions, and a link to the full report.
+
+### Automation Engine
+
+Built-in triggers fire on analysis events. Default triggers:
+- **Log** all detected issues
+- **Slack notification** on Critical findings (requires webhook URL)
+- **ServiceNow ticket** on Critical findings (requires credentials above)
+
+---
+
+## Security
+
+> **⚠️ IMPORTANT:** The web server binds to `127.0.0.1` (localhost only) by default. If you need remote access, use a reverse proxy (nginx, Caddy) with TLS termination.
+
+- **Authentication:** JWT tokens with 24-hour expiry, bcrypt-hashed passwords
+- **Database:** SQLite stored at `~/.sdwan-triage/sdwan.db`
+- **Secret:** JWT signing key is randomly generated per process start — all tokens invalidate on restart
+- **Default credentials:** `admin` / `admin` — **change immediately**
+- **HTTPS:** Not built-in. Use a reverse proxy for production deployments
+
+---
+
+## Detectors (35+)
+
+### Security Analysis
+
+| Detector | Description |
+|---|---|
+| **DDoS Detection** | SYN flood, UDP flood, ICMP flood with configurable thresholds |
+| **Port Scanning** | Horizontal, vertical, and block scan detection |
+| **TLS Security** | Weak ciphers, outdated protocols, certificate chain analysis |
+| **IOC Matching** | Indicator of Compromise checking with custom databases |
+| **BGP Hijack Heuristics** | Route anomaly detection + live RIPE stat API lookups |
+| **DNS Tunneling** | Shannon entropy, query length, subdomain count analysis |
+| **C2 Beaconing** | Interval regularity, payload consistency, outbound-only detection |
+| **DHCP Attacks** | Rogue server detection, starvation attacks, NAK storms |
+| **NTP Attacks** | Amplification, stratum changes, monlist responses |
+| **ICMP Anomalies** | Unusual ICMP patterns and covert channel detection |
+| **GeoIP Analysis** | Country/city-level traffic distribution (MaxMind MMDB or heuristic) |
+| **Suspicious Traffic** | Anomalous flow patterns and protocol misuse |
+
+### Performance Monitoring
+
+| Detector | Description |
+|---|---|
+| **TCP Handshake Analysis** | SYN/SYN-ACK/ACK tracking with color-coded states |
+| **TCP Retransmissions** | Packet loss and congestion identification |
+| **TCP Advanced** | Zero Window, Small Window, Out-of-Order detection |
+| **RTT Distribution** | Latency histogram with configurable thresholds |
+| **Bandwidth Tracking** | Per-flow and aggregate throughput with time series |
+| **Packet Loss** | Per-flow loss percentage and duplicate detection |
+| **Jitter & VoIP Quality** | SIP call tracking, RTP stream quality, codec identification |
+| **Wireshark Filters** | Auto-generated per-flow directional and bidirectional filters |
+
+### Protocol & Tunnel Detection
+
+| Category | Protocols |
+|---|---|
+| **DNS/HTTP** | NXDOMAIN, DGA, status codes, HTTP/2, QUIC |
+| **TLS/SSL** | Certificate extraction, cipher suite analysis |
+| **VoIP** | SIP call tracking, RTP/RTCP stream quality |
+| **ARP** | Conflict and spoofing detection |
+| **LAN** | VRRP, CDP, LLDP, HSRP, STP (with flapping detection) |
+| **Tunnels** | VXLAN, GRE, NVGRE, ERSPAN, MPLS, IPsec, GTP, L2TP |
+| **VPN** | OpenVPN, WireGuard |
+| **SD-WAN** | Cisco Viptela, VMware VeloCloud, Fortinet, Palo Alto Prisma, Silver Peak, Aruba, Versa, Citrix |
+
+---
+
+## CLI Reference
+
+### Filtering
 
 ```bash
-# Filter by source IP
-sdwan-triage -src-ip 192.168.1.100 capture.pcap
-
-# Filter by destination IP
-sdwan-triage -dst-ip 10.0.0.50 capture.pcap
-
-# Filter by service (port name or number)
-sdwan-triage -service https capture.pcap
-sdwan-triage -service 443 capture.pcap
-sdwan-triage -service dns capture.pcap
-
-# Filter by protocol
-sdwan-triage -protocol tcp capture.pcap
-sdwan-triage -protocol udp capture.pcap
+./sdwan-triage -src-ip 192.168.1.100 capture.pcap
+./sdwan-triage -dst-ip 10.0.0.50 capture.pcap
+./sdwan-triage -service https capture.pcap
+./sdwan-triage -protocol tcp capture.pcap
 ```
 
 ### Advanced Analysis
 
 ```bash
-# Enable QoS/DSCP analysis
-sdwan-triage -qos-analysis -html qos-report.html capture.pcap
-
-# Show detailed TCP handshake analysis
-sdwan-triage -show-handshakes capture.pcap
-
-# Show only failed handshakes for troubleshooting
-sdwan-triage -failed-only capture.pcap
-
-# Enable deep application identification
-sdwan-triage -app-identify capture.pcap
-
-# Verbose debug output
-sdwan-triage -verbose capture.pcap
+./sdwan-triage -qos-analysis -html qos.html capture.pcap   # QoS/DSCP
+./sdwan-triage -show-handshakes capture.pcap                # TCP handshakes
+./sdwan-triage -failed-only capture.pcap                    # Failed handshakes only
+./sdwan-triage -app-identify capture.pcap                   # Deep app identification
+./sdwan-triage -bgp-check capture.pcap                      # BGP via RIPE stat
+./sdwan-triage -trace-path capture.pcap                     # Traceroute anomalies
+./sdwan-triage -bgp-check -no-external-lookup capture.pcap  # Offline mode
 ```
 
-### Network Features (Require Internet)
+### All Flags
 
-```bash
-# Perform traceroute to discovered destinations
-sdwan-triage -trace-path capture.pcap
-
-# Check BGP routing for hijack indicators
-sdwan-triage -bgp-check capture.pcap
-```
-
-### Multi-File Comparison
-
-```bash
-# Compare multiple PCAP files
-sdwan-triage -compare before.pcap after.pcap
-```
-
-## 📋 Command Reference
-
-| Option | Description |
-|--------|-------------|
-| `-html <file>` | Generate interactive HTML report with D3.js visualizations |
-| `-multi-page-html <dir>` | Generate multi-page HTML report in directory |
-| `-json` | Output results in JSON format |
-| `-csv <file>` | Export findings to CSV files |
-| `-pdf <file>` | Export to PDF (requires wkhtmltopdf) |
-| `-simple` | Plain English report for non-technical users |
-| `-config <path>` | Use config: default, performance, security, or file path |
-| `-src-ip <ip>` | Filter by source IP address |
-| `-dst-ip <ip>` | Filter by destination IP address |
+| Flag | Description |
+|---|---|
+| `-web` | Start web server with embedded React dashboard |
+| `-port <N>` | Web server port (default: 8080) |
+| `-no-browser` | Don't auto-open browser in web mode |
+| `-servicenow-url <url>` | ServiceNow instance URL |
+| `-servicenow-user <user>` | ServiceNow API username |
+| `-servicenow-password <pw>` | ServiceNow API password |
+| `-html <file>` | Interactive HTML report |
+| `-multi-page-html <dir>` | Multi-page HTML report |
+| `-json` | JSON output for automation |
+| `-csv <file>` | CSV export |
+| `-pdf <file>` | PDF report (requires wkhtmltopdf) |
+| `-simple` | Plain English report |
+| `-config <path>` | Threshold config: `default`, `performance`, `security`, or YAML |
+| `-src-ip <ip>` | Filter by source IP |
+| `-dst-ip <ip>` | Filter by destination IP |
 | `-service <port>` | Filter by service port or name |
-| `-protocol <proto>` | Filter by protocol: tcp or udp |
-| `-qos-analysis` | Enable QoS/DSCP traffic class analysis |
-| `-show-handshakes` | Display detailed TCP handshake analysis |
-| `-handshake-timeout <N>` | Timeout for TCP handshake (default: 3s) |
-| `-failed-only` | Show only failed TCP handshakes |
-| `-app-identify` | Enable deep application identification |
-| `-trace-path` | Perform traceroute to destinations |
-| `-bgp-check` | Check BGP routing data |
-| `-compare` | Compare multiple PCAP files |
-| `-verbose` | Enable verbose/debug output |
-| `-debug-html` | Write raw HTML for troubleshooting |
-| `-help` | Show help message |
+| `-protocol <proto>` | Filter by protocol: `tcp` or `udp` |
+| `-qos-analysis` | QoS/DSCP traffic class analysis |
+| `-show-handshakes` | TCP handshake analysis |
+| `-failed-only` | Failed TCP handshakes only |
+| `-app-identify` | Deep application identification |
+| `-bgp-check` | BGP prefix lookup via RIPE stat |
+| `-no-external-lookup` | Disable all external network calls |
+| `-compare` | Compare LAN vs WAN PCAPs with tunnel-aware decapsulation |
+| `-verbose` | Debug output |
 
-## 📊 Example Output
+---
 
-### Console Summary
-```
-SD-WAN Network Triage v4.0.0
-Analyzing: capture.pcap
-Processed 78613 packets in 1.7s
+## Configuration
 
-═══════════════════════════════════════════════════════════════
-              SD-WAN NETWORK TRIAGE - EXECUTIVE SUMMARY
-═══════════════════════════════════════════════════════════════
+Override detection thresholds using `-config`:
 
-✗ NETWORK HEALTH: CRITICAL - Immediate attention required
-
-FINDINGS SUMMARY:
-  • DNS Anomalies:        43
-  • TCP Retransmissions:  1240
-  • Failed Handshakes:    31
-  • HTTP Errors:          6
-  • TLS Certificates:     1
-  • Suspicious Traffic:   8
-  • High RTT Flows:       254
-  • Devices Detected:     41
-
-TRAFFIC SUMMARY:
-  • Total Bytes:          30.3 MB
-  • TLS Connections:      618
-  • HTTP/2 Flows:         147
-  • QUIC Flows:           6
+```bash
+./sdwan-triage -config security capture.pcap    # Built-in preset
+./sdwan-triage -config thresholds.yaml capture.pcap  # Custom YAML
 ```
 
-### HTML Report Features
-The interactive HTML report includes:
-- **Executive Summary** with risk scoring
-- **Device Fingerprinting** table with OS detection
-- **Geographic Distribution** with country breakdown
-- **Top Traffic Flows** with bandwidth analysis
-- **Security Findings** with severity levels
-- **Wireshark Filters** for each finding
-- **Protocol Troubleshooting Guides**
+```yaml
+# thresholds.yaml
+ddos:
+  syn_threshold: 50
+  udp_threshold: 100
+  icmp_threshold: 50
 
-## 🏗️ Project Structure
+performance:
+  high_rtt_ms: 50.0
+  critical_rtt_ms: 100.0
+  packet_loss_warn: 0.5
+  jitter_warn_ms: 20.0
+
+analysis:
+  detection_window_sec: 10.0
+  max_flows_in_report: 500
+```
+
+---
+
+## GeoIP Database
+
+Optional. Enables country/city-level IP geolocation. Without it, the tool uses built-in IP range heuristics.
+
+```bash
+# Automatic setup
+export MAXMIND_LICENSE_KEY=your_key   # Free signup at maxmind.com
+make setup-geoip
+
+# Manual: place GeoLite2-City.mmdb in ./data/ or any standard path
+make check-geoip   # Verify
+```
+
+---
+
+## Performance
+
+Tested on Apple M2 Pro (12-core, 32GB RAM):
+
+| PCAP Size | Packets | Time | Memory | Flows |
+|---|---|---|---|---|
+| 10 MB | ~15K | 0.3s | 45 MB | ~200 |
+| 100 MB | ~150K | 1.8s | 120 MB | ~2,500 |
+| 500 MB | ~750K | 8.2s | 380 MB | ~12,000 |
+| 1 GB | ~1.5M | 16.5s | 650 MB | ~25,000 |
+
+~90K packets/sec sustained. HTML reports render in <500ms. Frontend handles 100K+ rows via virtualized tables.
+
+---
+
+## Build from Source
+
+```bash
+git clone https://github.com/gocisse/sdwan-triage.git
+cd sdwan-triage
+
+make build          # Frontend + backend → single binary
+make test           # Run all tests
+make release        # Cross-compile all platforms + checksums
+make run-web        # Dev: run web mode
+make frontend-dev   # Dev: Vite dev server with HMR
+make help           # Show all targets
+```
+
+**Requirements:** Go 1.24+, Node.js 18+ (build only — not needed to run the binary).
+
+---
+
+## Project Structure
 
 ```
 sdwan-triage/
-├── cmd/sdwan-triage/     # Main application entry point
+├── cmd/sdwan-triage/              # Unified entry point
+│   ├── main.go                    # CLI flags, mode dispatch
+│   ├── webserver.go               # Gin server, auth middleware, routes
+│   ├── auth_handlers.go           # Login, user management endpoints
+│   ├── embed.go                   # //go:embed for React dist/
+│   └── dist/                      # Embedded frontend (build artifact)
 ├── pkg/
-│   ├── analyzer/         # PCAP processing and analysis
-│   ├── detector/         # Protocol and security detectors
-│   ├── models/           # Data structures
-│   ├── output/           # Report generators (HTML, JSON, CSV, PDF)
-│   └── safety/           # Validation and safety checks
-├── releases/             # Pre-built binaries
-└── templates/            # HTML report templates
+│   ├── analyzer/                  # Packet processing engine (35+ detectors) + PCAP comparator
+│   ├── database/                  # SQLite user DB (modernc.org/sqlite)
+│   ├── middleware/                # JWT auth middleware
+│   ├── detector/                  # All protocol & security detectors
+│   ├── integration/               # ServiceNow, Automation engine
+│   ├── intelligence/              # Customer intelligence DB
+│   ├── metrics/                   # Prometheus collector
+│   ├── models/                    # TriageReport, finding structs
+│   ├── output/                    # HTML, CSV, PDF, JSON report generators
+│   ├── web/handlers/              # API handlers (upload, analyze, results)
+│   └── web/storage/               # Embedded Redis for job state
+├── web/frontend/                  # React + Vite + TailwindCSS
+│   └── src/
+│       ├── auth/                  # AuthContext, token management
+│       ├── pages/                 # Login, Home, Analysis, Results, History
+│       ├── components/            # ComparisonView, FlowGraphView, HexViewer, StreamModal
+│       ├── components/dashboard/  # ExecutiveSummary, WizardModal, FindingCard
+│       ├── data/                  # knowledgeBase, vendorRunbooks
+│       └── hooks/                 # useAnalysis, useWebSocket, useFileUpload
+├── Makefile                       # build, release, test, frontend targets
+└── README.md
 ```
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Run tests (`make test`)
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
-## 📄 License
+---
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## License
 
-## 🙏 Acknowledgments
+MIT License — see [LICENSE](LICENSE).
 
-- [gopacket](https://github.com/google/gopacket) - Packet processing library
-- [D3.js](https://d3js.org/) - Interactive visualizations
-- SD-WAN vendor communities for port and protocol documentation
+## Acknowledgments
 
-## 📞 Support
+- [gopacket](https://github.com/google/gopacket) — Packet processing
+- [maxminddb-golang](https://github.com/oschwald/maxminddb-golang) — GeoIP database reader
+- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) — Pure Go SQLite
+- [golang-jwt](https://github.com/golang-jwt/jwt) — JWT authentication
+- [D3.js](https://d3js.org/) — Interactive visualizations
+- [React](https://react.dev/) + [Vite](https://vitejs.dev/) + [TailwindCSS](https://tailwindcss.com/) — Frontend stack
+- [RIPE stat](https://stat.ripe.net/) — BGP prefix lookup API
+
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/gocisse/sdwan-triage/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/gocisse/sdwan-triage/discussions)
 
 ---
 
-**Made with ❤️ for the network engineering community**
+**Made with care for the network engineering community**

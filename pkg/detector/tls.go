@@ -66,9 +66,9 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		}
 	}
 
-	// Extract SNI from ClientHello
+	// Extract SNI from ClientHello (using bounded cache)
 	if sni := extractSNI(payload); sni != "" {
-		state.TLSSNICache[flowKey] = sni
+		state.SetTLSSNI(flowKey, sni)
 	}
 
 	// Extract ALPN protocols and detect HTTP/2
@@ -113,7 +113,7 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				Timestamp:    timestamp,
 				ServerIP:     srcIP,
 				ServerPort:   srcPort,
-				ServerName:   state.TLSSNICache[flowKey],
+				ServerName:   getTLSSNI(state, flowKey),
 				Issuer:       cert.Issuer.String(),
 				Subject:      cert.Subject.String(),
 				NotBefore:    cert.NotBefore.Format(time.RFC3339),
@@ -414,4 +414,12 @@ func extractCertificates(data []byte) []*x509.Certificate {
 	}
 
 	return certs
+}
+
+// getTLSSNI retrieves the TLS SNI from the bounded cache, returning empty string if not found
+func getTLSSNI(state *models.AnalysisState, flowKey string) string {
+	if sni, ok := state.GetTLSSNI(flowKey); ok {
+		return sni
+	}
+	return ""
 }

@@ -1,7 +1,19 @@
 package analyzer
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/gocisse/sdwan-triage/pkg/models"
+)
+
+// Viptela AAR detection thresholds
+const (
+	ViptelaAARLossThreshold   = 0.05  // >5% loss on primary path = SLA violation
+	ViptelaAARLatencyThreshMs = 150.0 // >150ms RTT = latency SLA violation
+	ViptelaAARJitterThreshMs  = 30.0  // >30ms jitter = jitter SLA violation
+	ViptelaAARMinSegments     = 5     // minimum segments to evaluate AAR
+	ViptelaAARBFDGapSec       = 1.0   // gap > 1s on BFD port = BFD down indicator
 )
 
 // Cisco Viptela-specific ports and protocols
@@ -429,7 +441,308 @@ func (vid *ViptelaIssueDetector) detectVBondIssues(stream *models.StreamData) []
 
 // detectAARIssues detects Application-Aware Routing problems
 func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []DetectedIssue {
-	// AAR issues are detected through traffic patterns, not specific ports
-	// This would require deeper packet inspection
-	return nil
+	issues := []DetectedIssue{}
+
+	if len(stream.Segments) < ViptelaAARMinSegments {
+		return issues
+	}
+
+	// AAR operates on data-plane traffic (not just control ports).
+	// We detect SLA violations by analyzing the stream's health metrics,
+	// and path selection failures by correlating BFD state with traffic patterns.
+
+	// --- Detection 1: SLA Violation — high loss on primary path, no switchover ---
+	// Measure loss rate via retransmit ratio
+	retransmitCount := 0
+	oooCount := 0
+	for _, seg := range stream.Segments {
+		if seg.IsRetransmit {
+			retransmitCount++
+		}
+		if seg.IsOutOfOrder {
+			oooCount++
+		}
+	}
+	lossRate := float64(retransmitCount) / float64(len(stream.Segments))
+
+	// Measure latency via inter-segment gaps (proxy for RTT on data flows)
+	var totalGap float64
+	var gapCount int
+	var maxGap float64
+	for i := 1; i < len(stream.Segments); i++ {
+		gap := stream.Segments[i].GapFromPrev
+		if gap > 0 && gap < 10.0 { // exclude gaps > 10s (idle periods)
+			totalGap += gap
+			gapCount++
+			if gap > maxGap {
+				maxGap = gap
+			}
+		}
+	}
+	avgGapMs := 0.0
+	if gapCount > 0 {
+		avgGapMs = (totalGap / float64(gapCount)) * 1000.0
+	}
+
+	// SLA violation: loss > 5% AND stream duration > 10s (long enough to have triggered AAR)
+	if lossRate > ViptelaAARLossThreshold && stream.Duration > 10.0 {
+		severity := SeverityHigh
+		if lossRate > 0.10 {
+			severity = SeverityCritical
+		}
+		issues = append(issues, DetectedIssue{
+			ID:              "VIPTELA-AAR-001",
+			Title:           "AAR SLA Violation — High Loss, No Path Switchover",
+			TechnicalDesc:   fmt.Sprintf("%.1f%% packet loss on flow %s:%d→%s:%d over %.1fs — AAR SLA threshold (5%%) exceeded but traffic remains on degraded path", lossRate*100, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort, stream.Duration),
+			BusinessImpact:  "Business-critical application traffic experiencing packet loss; AAR policy not steering to backup path as configured",
+			Severity:        severity,
+			Confidence:      0.85,
+			Category:        CategorySDWANData,
+			RootCause:       "AAR SLA class not applied to this flow, no backup path available, or BFD not detecting path degradation fast enough",
+			AffectedService: "Cisco Viptela Application-Aware Routing",
+			BaseFilter:      buildStreamFilter(stream),
+			ExpandedFilter:  buildExpandedFilter(stream) + " && tcp.analysis.retransmission",
+			OptimizedFilter: buildOptimizedFilter(stream),
+			InvestigationSteps: []InvestigationStep{
+				{
+					Order:          1,
+					Purpose:        "Confirm packet loss on primary path",
+					DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.retransmission",
+					ExpectedNormal: "< 1% retransmission rate",
+					AbnormalSign:   fmt.Sprintf("> 5%% retransmission — currently %.1f%%", lossRate*100),
+					CustomColumns:  []string{"tcp.analysis.retransmission", "frame.time_delta", "ip.dsfield.dscp"},
+				},
+				{
+					Order:          2,
+					Purpose:        "Verify AAR SLA class assignment for this flow",
+					DisplayFilter:  fmt.Sprintf("ip.addr == %s && ip.addr == %s", stream.SrcIP, stream.DstIP),
+					ExpectedNormal: "Traffic classified into correct SLA class with backup path",
+					AbnormalSign:   "Traffic in default (best-effort) class or no backup path defined",
+				},
+				{
+					Order:          3,
+					Purpose:        "Check BFD state on primary path",
+					DisplayFilter:  "udp.port == 3784",
+					ExpectedNormal: "BFD sessions up with regular echo intervals",
+					AbnormalSign:   "BFD session down or missing — path degradation not detected",
+				},
+			},
+			ImmediateActions: []RemediationAction{
+				{
+					Description:    "Check AAR SLA class status and path selection",
+					Commands:       []string{"show sdwan app-route sla-class", "show sdwan app-route stats", "show sdwan policy from-vsmart"},
+					Verification:   "SLA class applied to affected application, backup path available",
+					EstimatedTime:  "3 minutes",
+					RequiresChange: false,
+					SuccessRate:    0.85,
+				},
+				{
+					Description:    "Verify BFD sessions on all transport colors",
+					Commands:       []string{"show sdwan bfd sessions", "show sdwan bfd history"},
+					Verification:   "BFD sessions up on all configured transports",
+					EstimatedTime:  "2 minutes",
+					RequiresChange: false,
+					SuccessRate:    0.80,
+				},
+			},
+			ShortTermFixes: []RemediationAction{
+				{
+					Description:    "Tighten BFD timers to detect path degradation faster",
+					Commands:       []string{"bfd color <color> hello-interval 300 multiplier 3", "commit"},
+					Verification:   "BFD detects path degradation within 1 second",
+					EstimatedTime:  "10 minutes",
+					RequiresChange: true,
+					SuccessRate:    0.80,
+					RollbackSteps:  []string{"bfd color <color> hello-interval 1000 multiplier 6", "commit"},
+				},
+				{
+					Description:    "Verify AAR policy applied from vSmart",
+					Commands:       []string{"show sdwan policy from-vsmart", "show sdwan omp routes | include " + stream.DstIP},
+					Verification:   "AAR policy active and backup TLOC available",
+					EstimatedTime:  "5 minutes",
+					RequiresChange: false,
+					SuccessRate:    0.85,
+				},
+			},
+			LongTermSolutions: []RemediationAction{
+				{
+					Description:     "Add redundant transport color for AAR failover",
+					Verification:    "AAR switches to backup path within BFD detection time",
+					EstimatedTime:   "1-2 weeks",
+					RequiresChange:  true,
+					SuccessRate:     0.95,
+					EscalationPoint: "Engage Cisco TAC if AAR not switching despite BFD detecting path failure",
+				},
+			},
+			KnowledgeBaseRef: "KB-VIPTELA-AAR-001",
+		})
+	}
+
+	// --- Detection 2: AAR latency SLA violation ---
+	if avgGapMs > ViptelaAARLatencyThreshMs && stream.Duration > 5.0 {
+		issues = append(issues, DetectedIssue{
+			ID:              "VIPTELA-AAR-002",
+			Title:           "AAR Latency SLA Violation — Traffic on High-Latency Path",
+			TechnicalDesc:   fmt.Sprintf("Average inter-packet gap %.1fms exceeds AAR latency threshold (%.0fms) for flow %s:%d→%s:%d — traffic not moved to lower-latency path", avgGapMs, ViptelaAARLatencyThreshMs, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort),
+			BusinessImpact:  "Latency-sensitive applications (voice, video, interactive) experiencing degraded performance; AAR not enforcing latency SLA",
+			Severity:        SeverityHigh,
+			Confidence:      0.75,
+			Category:        CategorySDWANData,
+			RootCause:       "No lower-latency path available, AAR latency SLA class not configured for this application, or BFD probe interval too long to detect latency change",
+			AffectedService: "Cisco Viptela Application-Aware Routing",
+			BaseFilter:      buildStreamFilter(stream),
+			ExpandedFilter:  buildExpandedFilter(stream),
+			OptimizedFilter: buildOptimizedFilter(stream),
+			InvestigationSteps: []InvestigationStep{
+				{
+					Order:          1,
+					Purpose:        "Compare latency across available transport colors",
+					DisplayFilter:  "udp.port == 3784",
+					ExpectedNormal: "BFD probes showing < 150ms RTT on at least one path",
+					AbnormalSign:   "All paths showing > 150ms RTT",
+					CustomColumns:  []string{"frame.time_delta", "ip.src", "ip.dst"},
+				},
+				{
+					Order:          2,
+					Purpose:        "Verify AAR SLA class latency threshold",
+					DisplayFilter:  buildStreamFilter(stream),
+					ExpectedNormal: "Traffic in SLA class with latency threshold configured",
+					AbnormalSign:   "Traffic in default class with no latency SLA",
+				},
+			},
+			ImmediateActions: []RemediationAction{
+				{
+					Description:    "Check per-path latency metrics",
+					Commands:       []string{"show sdwan app-route stats", "show sdwan bfd sessions | include latency"},
+					Verification:   "Identify lowest-latency available path",
+					EstimatedTime:  "3 minutes",
+					RequiresChange: false,
+					SuccessRate:    0.80,
+				},
+			},
+			ShortTermFixes: []RemediationAction{
+				{
+					Description:    "Update AAR SLA class to include latency threshold and assign to application",
+					Commands:       []string{"vManage: Configuration > Policies > Application-Aware Routing > SLA Class > Add latency threshold", "Assign SLA class to affected application in data policy"},
+					Verification:   "Traffic moves to lower-latency path",
+					EstimatedTime:  "20 minutes",
+					RequiresChange: true,
+					SuccessRate:    0.85,
+					RollbackSteps:  []string{"Revert policy to previous version from vManage"},
+				},
+			},
+			KnowledgeBaseRef: "KB-VIPTELA-AAR-002",
+		})
+	}
+
+	// --- Detection 3: BFD down but traffic still sent to path ---
+	// Detect via large gaps on BFD port (BFD echo missing = path down)
+	if stream.DstPort == ViptelaBFDPort || stream.SrcPort == ViptelaBFDPort {
+		bfdGapCount := 0
+		for i := 1; i < len(stream.Segments); i++ {
+			if stream.Segments[i].GapFromPrev > ViptelaAARBFDGapSec {
+				bfdGapCount++
+			}
+		}
+		if bfdGapCount >= 3 {
+			issues = append(issues, DetectedIssue{
+				ID:              "VIPTELA-AAR-003",
+				Title:           "BFD Path Failure — AAR May Not Reroute",
+				TechnicalDesc:   fmt.Sprintf("BFD session showing %d gaps > %.0fs — path declared down, but AAR may not have rerouted if no backup path configured", bfdGapCount, ViptelaAARBFDGapSec),
+				BusinessImpact:  "Traffic may be blackholed if AAR has no backup path; BFD failure triggers tunnel teardown",
+				Severity:        SeverityCritical,
+				Confidence:      0.90,
+				Category:        CategorySDWANData,
+				RootCause:       "WAN link quality degraded below BFD threshold; AAR needs backup TLOC to reroute",
+				AffectedService: "Cisco Viptela BFD / AAR",
+				BaseFilter:      buildStreamFilter(stream),
+				ExpandedFilter:  buildExpandedFilter(stream),
+				OptimizedFilter: buildOptimizedFilter(stream),
+				InvestigationSteps: []InvestigationStep{
+					{
+						Order:          1,
+						Purpose:        "Confirm BFD session state",
+						DisplayFilter:  "udp.port == 3784",
+						ExpectedNormal: "Regular BFD echo packets every 300ms",
+						AbnormalSign:   fmt.Sprintf("Gaps > 1s in BFD echo — %d detected", bfdGapCount),
+						CustomColumns:  []string{"frame.time_delta", "ip.src", "ip.dst"},
+					},
+				},
+				ImmediateActions: []RemediationAction{
+					{
+						Description:    "Check BFD session history and AAR path selection",
+						Commands:       []string{"show sdwan bfd sessions", "show sdwan bfd history", "show sdwan app-route stats"},
+						Verification:   "BFD session re-established or traffic rerouted to backup path",
+						EstimatedTime:  "2 minutes",
+						RequiresChange: false,
+						SuccessRate:    0.85,
+					},
+				},
+				ShortTermFixes: []RemediationAction{
+					{
+						Description:    "Ensure backup TLOC configured for AAR failover",
+						Commands:       []string{"show sdwan omp tlocs", "vManage: Configuration > Policies > AAR > Verify backup TLOC assigned"},
+						Verification:   "Backup TLOC available and AAR policy references it",
+						EstimatedTime:  "15 minutes",
+						RequiresChange: true,
+						SuccessRate:    0.85,
+					},
+				},
+				KnowledgeBaseRef: "KB-VIPTELA-AAR-003",
+			})
+		}
+	}
+
+	// --- Detection 4: AAR policy mismatch — DSCP not matching expected SLA class ---
+	// Real-time traffic (RTP/SIP) should have DSCP EF; if AnomalyReason mentions DSCP, flag it
+	dscpAnomalyCount := 0
+	for _, seg := range stream.Segments {
+		if strings.Contains(seg.AnomalyReason, "dscp") || strings.Contains(seg.AnomalyReason, "DSCP") {
+			dscpAnomalyCount++
+		}
+	}
+	isRealTimePort := (stream.DstPort >= 16384 && stream.DstPort <= 32767) ||
+		(stream.SrcPort >= 16384 && stream.SrcPort <= 32767) ||
+		stream.DstPort == 5060 || stream.SrcPort == 5060
+
+	if dscpAnomalyCount > 0 && isRealTimePort {
+		issues = append(issues, DetectedIssue{
+			ID:              "VIPTELA-AAR-004",
+			Title:           "AAR Policy Mismatch — DSCP Not Matching SLA Class",
+			TechnicalDesc:   fmt.Sprintf("Real-time traffic (port %d/%d) has %d DSCP marking anomalies — traffic may be matched to wrong AAR SLA class", stream.SrcPort, stream.DstPort, dscpAnomalyCount),
+			BusinessImpact:  "Voice/video traffic not receiving correct path selection; may be routed via high-latency path instead of real-time optimized path",
+			Severity:        SeverityHigh,
+			Confidence:      0.75,
+			Category:        CategoryVoIPIssues,
+			RootCause:       "AAR policy matching on DSCP value that has been remarked by upstream device, or application not setting correct DSCP",
+			AffectedService: "Cisco Viptela Application-Aware Routing",
+			BaseFilter:      buildStreamFilter(stream),
+			ExpandedFilter:  buildExpandedFilter(stream),
+			OptimizedFilter: buildOptimizedFilter(stream),
+			ImmediateActions: []RemediationAction{
+				{
+					Description:    "Verify AAR policy matching criteria",
+					Commands:       []string{"show sdwan policy from-vsmart", "show sdwan app-route stats | include " + fmt.Sprintf("%d", stream.DstPort)},
+					Verification:   "AAR policy matching on correct criteria (app-id, not just DSCP)",
+					EstimatedTime:  "5 minutes",
+					RequiresChange: false,
+					SuccessRate:    0.80,
+				},
+			},
+			ShortTermFixes: []RemediationAction{
+				{
+					Description:    "Update AAR policy to match on application ID instead of DSCP",
+					Commands:       []string{"vManage: Configuration > Policies > Application-Aware Routing > Match: Application (not DSCP)", "Re-push policy"},
+					Verification:   "Real-time traffic correctly classified and routed",
+					EstimatedTime:  "20 minutes",
+					RequiresChange: true,
+					SuccessRate:    0.85,
+					RollbackSteps:  []string{"Revert policy to previous version from vManage"},
+				},
+			},
+			KnowledgeBaseRef: "KB-VIPTELA-AAR-004",
+		})
+	}
+
+	return issues
 }

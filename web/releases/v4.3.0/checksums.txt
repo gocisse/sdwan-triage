@@ -1,0 +1,5 @@
+0bee25795965d21add6595efdef943ca085b15aafd6b23dbff1df9be6f6d2cbc  sdwan-triage-web-darwin-amd64.zip
+03e86aebb28c587eb25ed8ad2651a08780ac8df4d3347e33280696fa34b14fd2  sdwan-triage-web-darwin-arm64.zip
+8b6633b652edff64002e607107723eed457327d27df70853d364b73882b90a78  sdwan-triage-web-linux-amd64.zip
+d8493edfa658fd82c1173a32afc68449f29a2c7923e8c1b8170c93dd90330cc7  sdwan-triage-web-linux-arm64.zip
+ad319a5d1f6eb5eaea5f2bdd222c954a0f456851e6d4c5cb65ec12591727922b  sdwan-triage-web-windows-amd64.exe.zip

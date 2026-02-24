@@ -106,6 +106,9 @@ func (d *DDoSAnalyzer) AnalyzeICMP(packet gopacket.Packet, state *models.Analysi
 
 func (d *DDoSAnalyzer) trackSYNPacket(srcIP, dstIP string, timestamp time.Time, state *models.AnalysisState, report *models.TriageReport) {
 	secState := state.SecurityState
+	secState.Lock()
+	defer secState.Unlock()
+
 	d.maybeResetCounters(timestamp, secState)
 
 	counter, exists := secState.SYNCountPerIP[srcIP]
@@ -126,6 +129,9 @@ func (d *DDoSAnalyzer) trackSYNPacket(srcIP, dstIP string, timestamp time.Time, 
 
 func (d *DDoSAnalyzer) trackUDPPacket(srcIP, dstIP string, timestamp time.Time, state *models.AnalysisState, report *models.TriageReport) {
 	secState := state.SecurityState
+	secState.Lock()
+	defer secState.Unlock()
+
 	d.maybeResetCounters(timestamp, secState)
 
 	counter, exists := secState.UDPCountPerIP[srcIP]
@@ -146,6 +152,9 @@ func (d *DDoSAnalyzer) trackUDPPacket(srcIP, dstIP string, timestamp time.Time, 
 
 func (d *DDoSAnalyzer) trackICMPPacket(srcIP, dstIP string, timestamp time.Time, state *models.AnalysisState, report *models.TriageReport) {
 	secState := state.SecurityState
+	secState.Lock()
+	defer secState.Unlock()
+
 	d.maybeResetCounters(timestamp, secState)
 
 	counter, exists := secState.ICMPCountPerIP[srcIP]
@@ -237,4 +246,19 @@ func (d *DDoSAnalyzer) getThreshold(attackType string) int {
 	default:
 		return 100
 	}
+}
+
+// SetSYNThreshold sets the SYN flood detection threshold
+func (d *DDoSAnalyzer) SetSYNThreshold(threshold int) {
+	d.synThreshold = threshold
+}
+
+// SetUDPThreshold sets the UDP flood detection threshold
+func (d *DDoSAnalyzer) SetUDPThreshold(threshold int) {
+	d.udpThreshold = threshold
+}
+
+// SetICMPThreshold sets the ICMP flood detection threshold
+func (d *DDoSAnalyzer) SetICMPThreshold(threshold int) {
+	d.icmpThreshold = threshold
 }

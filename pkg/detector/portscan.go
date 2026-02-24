@@ -32,6 +32,16 @@ func NewPortScanAnalyzer() *PortScanAnalyzer {
 	}
 }
 
+// SetHorizontalThreshold sets the horizontal scan detection threshold
+func (p *PortScanAnalyzer) SetHorizontalThreshold(threshold int) {
+	p.horizontalThreshold = threshold
+}
+
+// SetVerticalThreshold sets the vertical scan detection threshold
+func (p *PortScanAnalyzer) SetVerticalThreshold(threshold int) {
+	p.verticalThreshold = threshold
+}
+
 // Analyze processes TCP SYN packets for port scan detection
 func (p *PortScanAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
 	tcpLayer := packet.Layer(layers.LayerTypeTCP)
@@ -64,6 +74,8 @@ func (p *PortScanAnalyzer) Analyze(packet gopacket.Packet, state *models.Analysi
 
 func (p *PortScanAnalyzer) trackConnectionAttempt(srcIP, dstIP string, dstPort uint16, timestamp time.Time, state *models.AnalysisState, report *models.TriageReport) {
 	secState := state.SecurityState
+	secState.Lock()
+	defer secState.Unlock()
 
 	// Initialize nested maps if needed
 	if secState.ScannedPortsPerIP[srcIP] == nil {

@@ -121,20 +121,17 @@ func (sp *StreamingProcessor) performFinalCleanup(state *models.AnalysisState) {
 }
 
 // cleanupOldFlows removes stale flow entries to free memory
+// Note: With bounded LRU caches, cleanup is automatic via eviction
+// This method now focuses on cleaning up internal flow state
 func (sp *StreamingProcessor) cleanupOldFlows(state *models.AnalysisState) {
-	// Clean up TCP flows with no data
-	for key, flow := range state.TCPFlows {
-		if flow.TotalBytes == 0 {
-			delete(state.TCPFlows, key)
-		}
-	}
-
-	// Clean up old sent times to prevent memory bloat
-	for _, flow := range state.TCPFlows {
+	// Clean up old sent times to prevent memory bloat within flows
+	// Using bounded cache iterator
+	state.ForEachTCPFlow(func(_ string, flow *models.TCPFlowState) bool {
 		if len(flow.SentTimes) > 1000 {
 			flow.SentTimes = make(map[uint32]time.Time)
 		}
-	}
+		return true // continue iteration
+	})
 
-	sp.logDebug("Cleaned up flow state (TCP flows: %d)", len(state.TCPFlows))
+	sp.logDebug("Cleaned up flow state (TCP flows: %d)", state.TCPFlowCount())
 }

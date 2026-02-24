@@ -152,10 +152,10 @@ func (t *TLSSecurityAnalyzer) analyzeServerHello(data []byte, srcIP, dstIP strin
 	}
 	t.checkedConnections[connKey] = true
 
-	// Get server name from SNI cache if available
+	// Get server name from SNI cache if available (using bounded cache)
 	serverName := ""
 	reverseKey := fmt.Sprintf("%s:%d->%s:%d", dstIP, dstPort, srcIP, srcPort)
-	if sni, ok := state.TLSSNICache[reverseKey]; ok {
+	if sni, ok := state.GetTLSSNI(reverseKey); ok {
 		serverName = sni
 	}
 

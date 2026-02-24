@@ -12,12 +12,13 @@ func TestNewAnalysisState(t *testing.T) {
 		t.Fatal("NewAnalysisState() returned nil")
 	}
 
-	if state.TCPFlows == nil {
-		t.Error("TCPFlows map is nil")
+	// Test bounded caches are initialized via accessor methods
+	if state.TCPFlowCount() != 0 {
+		t.Error("TCPFlows cache should be empty initially")
 	}
 
-	if state.UDPFlows == nil {
-		t.Error("UDPFlows map is nil")
+	if state.UDPFlowCount() != 0 {
+		t.Error("UDPFlows cache should be empty initially")
 	}
 
 	if state.DNSQueries == nil {
@@ -28,11 +29,12 @@ func TestNewAnalysisState(t *testing.T) {
 		t.Error("HTTPRequests map is nil")
 	}
 
-	if state.SynSent == nil {
-		t.Error("SynSent map is nil")
+	// Test SynSent cache via accessor
+	if _, ok := state.GetSynSent("test"); ok {
+		t.Error("SynSent cache should be empty initially")
 	}
 
-	if state.SynAckReceived == nil {
+	if state.synAckReceived == nil {
 		t.Error("SynAckReceived map is nil")
 	}
 
@@ -40,12 +42,14 @@ func TestNewAnalysisState(t *testing.T) {
 		t.Error("ARPIPToMAC map is nil")
 	}
 
-	if state.TLSSNICache == nil {
-		t.Error("TLSSNICache map is nil")
+	// Test SNI cache via accessor
+	if _, ok := state.GetTLSSNI("test"); ok {
+		t.Error("TLSSNICache should be empty initially")
 	}
 
-	if state.DeviceFingerprints == nil {
-		t.Error("DeviceFingerprints map is nil")
+	// Test device fingerprint cache via accessor
+	if fp := state.GetDeviceFingerprint("test"); fp != nil {
+		t.Error("DeviceFingerprints cache should be empty initially")
 	}
 
 	if state.AppStats == nil {

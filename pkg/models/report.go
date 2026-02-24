@@ -1,9 +1,14 @@
 package models
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // TriageReport contains all detected network anomalies and analysis results
+// The Mu field protects concurrent slice/map appends from parallel detectors.
 type TriageReport struct {
+	Mu                          sync.Mutex                   `json:"-"` // Protects concurrent writes from parallel detectors
 	DNSAnomalies                []DNSAnomaly                 `json:"dns_anomalies"`
 	TCPRetransmissions          []TCPFlow                    `json:"tcp_retransmissions"`
 	FailedHandshakes            []TCPFlow                    `json:"failed_handshakes"`
@@ -64,6 +69,9 @@ type TriageReport struct {
 	// Baseline Comparison
 	BaselineComparison *BaselineComparison `json:"baseline_comparison,omitempty"`
 
+	// Vendor-Specific DPI Issues
+	VendorDPIIssues []VendorDPIIssue `json:"vendor_dpi_issues,omitempty"`
+
 	// Stream Reassembly (Follow TCP/UDP Stream)
 	Streams    []StreamViewData `json:"streams,omitempty"`
 	RawStreams []*StreamData    `json:"-"` // Raw stream data for actionable analysis
@@ -76,6 +84,25 @@ type TriageReport struct {
 
 	// Traffic Gaps
 	TrafficGaps []TrafficGapInfo `json:"traffic_gaps,omitempty"`
+
+	// DHCP Analysis
+	DHCPFindings []DHCPFinding `json:"dhcp_findings,omitempty"`
+
+	// NTP Analysis
+	NTPFindings []NTPFinding `json:"ntp_findings,omitempty"`
+
+	// DNS Tunneling Detection
+	DNSTunnelingFindings []DNSTunnelingFinding `json:"dns_tunneling_findings,omitempty"`
+
+	// C2 Beaconing Detection
+	C2BeaconingFindings []C2BeaconingFinding `json:"c2_beaconing_findings,omitempty"`
+
+	// TCP Advanced Analysis (window issues, out-of-order)
+	TCPWindowFindings  []TCPWindowFinding  `json:"tcp_window_findings,omitempty"`
+	TCPOutOfOrderFlows []TCPOutOfOrderFlow `json:"tcp_out_of_order_flows,omitempty"`
+
+	// Underlay/Overlay Correlation
+	RootCauseChains []RootCauseChain `json:"root_cause_chains,omitempty"`
 
 	// PCAP Export Info
 	SourcePCAPPath string `json:"source_pcap_path,omitempty"`
@@ -187,6 +214,21 @@ type BandwidthReport struct {
 	TopConversationsByBytes   []TrafficFlowSummary `json:"top_conversations_by_bytes"`
 	TopConversationsByPackets []TrafficFlowSummary `json:"top_conversations_by_packets"`
 	TimeSeriesData            []TimeBucket         `json:"time_series_data"`
+}
+
+// RootCauseChain represents a correlated underlay/overlay event chain.
+// For example, a BGP route withdrawal (underlay) causing TCP retransmission spikes (overlay).
+type RootCauseChain struct {
+	Timestamp      float64  `json:"timestamp"`
+	UnderlayEvent  string   `json:"underlay_event"`           // e.g., "BGP Route Withdrawal"
+	UnderlayDetail string   `json:"underlay_detail"`          // e.g., "Peer 10.0.0.1 withdrew 192.168.0.0/16"
+	OverlayEffect  string   `json:"overlay_effect"`           // e.g., "TCP Retransmission Spike"
+	OverlayDetail  string   `json:"overlay_detail"`           // e.g., "14 retransmissions in 5s window"
+	AffectedFlows  []string `json:"affected_flows,omitempty"` // Flow keys impacted
+	CorrelationGap float64  `json:"correlation_gap_sec"`      // Seconds between underlay event and overlay effect
+	Confidence     string   `json:"confidence"`               // "High", "Medium", "Low"
+	Severity       string   `json:"severity"`                 // "Critical", "High", "Medium", "Low"
+	Recommendation string   `json:"recommendation"`
 }
 
 // BGPIndicator represents a BGP hijack indicator
@@ -673,4 +715,103 @@ type STPFinding struct {
 	FirstSeen    string `json:"first_seen"`
 	LastSeen     string `json:"last_seen"`
 	PacketCount  uint64 `json:"packet_count"`
+}
+
+// DHCPFinding represents a DHCP-related finding
+type DHCPFinding struct {
+	Timestamp    float64  `json:"timestamp"`
+	Type         string   `json:"type"` // "Rogue Server", "Starvation", "NAK Storm", "Lease Exhaustion"
+	ServerIP     string   `json:"server_ip,omitempty"`
+	ClientMAC    string   `json:"client_mac,omitempty"`
+	OfferedIP    string   `json:"offered_ip,omitempty"`
+	Severity     string   `json:"severity"`
+	Description  string   `json:"description"`
+	PacketCount  int      `json:"packet_count"`
+	ServerMAC    string   `json:"server_mac,omitempty"`
+	KnownServers []string `json:"known_servers,omitempty"`
+}
+
+// NTPFinding represents an NTP-related finding
+type NTPFinding struct {
+	Timestamp    float64 `json:"timestamp"`
+	Type         string  `json:"type"` // "Amplification", "Stratum Change", "Time Drift", "Monlist Response"
+	SourceIP     string  `json:"source_ip"`
+	DestIP       string  `json:"dest_ip,omitempty"`
+	Stratum      uint8   `json:"stratum,omitempty"`
+	Severity     string  `json:"severity"`
+	Description  string  `json:"description"`
+	PacketCount  int     `json:"packet_count"`
+	ResponseSize int     `json:"response_size,omitempty"`
+}
+
+// DNSTunnelingFinding represents suspected DNS tunneling activity
+type DNSTunnelingFinding struct {
+	Timestamp        float64  `json:"timestamp"`
+	SourceIP         string   `json:"source_ip"`
+	ServerIP         string   `json:"server_ip"`
+	Domain           string   `json:"domain"`
+	Severity         string   `json:"severity"`
+	Description      string   `json:"description"`
+	AvgQueryLength   float64  `json:"avg_query_length"`
+	QueryCount       int      `json:"query_count"`
+	UniqueSubdomains int      `json:"unique_subdomains"`
+	EntropyScore     float64  `json:"entropy_score"`
+	SampleQueries    []string `json:"sample_queries,omitempty"`
+}
+
+// C2BeaconingFinding represents suspected C2 beaconing activity
+type C2BeaconingFinding struct {
+	Timestamp       float64 `json:"timestamp"`
+	SourceIP        string  `json:"source_ip"`
+	DestIP          string  `json:"dest_ip"`
+	DestPort        uint16  `json:"dest_port"`
+	Protocol        string  `json:"protocol"`
+	Severity        string  `json:"severity"`
+	Description     string  `json:"description"`
+	BeaconInterval  float64 `json:"beacon_interval_sec"`
+	IntervalJitter  float64 `json:"interval_jitter_pct"`
+	ConnectionCount int     `json:"connection_count"`
+	AvgPayloadSize  int     `json:"avg_payload_size"`
+	PayloadVariance float64 `json:"payload_variance"`
+	Confidence      string  `json:"confidence"`
+}
+
+// TCPWindowFinding represents a TCP window size issue
+type TCPWindowFinding struct {
+	Timestamp   float64 `json:"timestamp"`
+	SrcIP       string  `json:"src_ip"`
+	DstIP       string  `json:"dst_ip"`
+	SrcPort     uint16  `json:"src_port"`
+	DstPort     uint16  `json:"dst_port"`
+	Type        string  `json:"type"` // "Zero Window", "Small Window", "Window Full"
+	WindowSize  uint16  `json:"window_size"`
+	Severity    string  `json:"severity"`
+	Description string  `json:"description"`
+	Count       int     `json:"count"`
+}
+
+// TCPOutOfOrderFlow represents a flow with significant out-of-order packets
+type TCPOutOfOrderFlow struct {
+	SrcIP           string  `json:"src_ip"`
+	DstIP           string  `json:"dst_ip"`
+	SrcPort         uint16  `json:"src_port"`
+	DstPort         uint16  `json:"dst_port"`
+	OutOfOrderCount int     `json:"out_of_order_count"`
+	TotalPackets    int     `json:"total_packets"`
+	Percentage      float64 `json:"percentage"`
+	Severity        string  `json:"severity"`
+}
+
+// VendorDPIIssue represents a vendor-specific issue detected via deep packet inspection
+type VendorDPIIssue struct {
+	Vendor          string  `json:"vendor"`
+	IssueID         string  `json:"issue_id"`
+	Title           string  `json:"title"`
+	Description     string  `json:"description"`
+	BusinessImpact  string  `json:"business_impact"`
+	Severity        string  `json:"severity"`
+	Confidence      float64 `json:"confidence"`
+	Category        string  `json:"category"`
+	RootCause       string  `json:"root_cause"`
+	WiresharkFilter string  `json:"wireshark_filter,omitempty"`
 }

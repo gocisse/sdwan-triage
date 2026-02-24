@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -20,6 +22,7 @@ type StreamReassembler struct {
 	verbose         bool
 	lastSeqNum      map[string]uint32 // Track last sequence number per flow for retransmit detection
 	lastTimestamp   map[string]int64  // Track last timestamp per flow for gap detection
+	mu              sync.RWMutex      // Protects state and maps for concurrent access
 }
 
 // NewStreamReassembler creates a new stream reassembler
@@ -37,6 +40,46 @@ func NewStreamReassembler(verbose bool) *StreamReassembler {
 func (sr *StreamReassembler) SetMaxBytesPerFlow(maxBytes int) {
 	sr.maxBytesPerFlow = maxBytes
 	sr.state.MaxBytesPerFlow = maxBytes
+}
+
+// CleanupStaleFlows removes streams that haven't been seen for the specified duration
+// This should be called periodically (e.g., every 10,000 packets) to prevent memory bloat
+func (sr *StreamReassembler) CleanupStaleFlows(maxAge time.Duration) int {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+
+	now := time.Now()
+	evicted := 0
+
+	for flowID, stream := range sr.state.Streams {
+		if now.Sub(stream.LastSeen) > maxAge {
+			delete(sr.state.Streams, flowID)
+			delete(sr.lastSeqNum, flowID)
+			delete(sr.lastTimestamp, flowID)
+			evicted++
+		}
+	}
+
+	// Also clean up direction-specific entries in tracking maps
+	for dirFlowKey := range sr.lastSeqNum {
+		// Extract base flowID (remove direction suffix)
+		baseFlowID := dirFlowKey
+		if idx := strings.LastIndex(dirFlowKey, "/"); idx > 0 {
+			baseFlowID = dirFlowKey[:idx]
+		}
+		if _, exists := sr.state.Streams[baseFlowID]; !exists {
+			delete(sr.lastSeqNum, dirFlowKey)
+		}
+	}
+
+	return evicted
+}
+
+// GetStreamCount returns the number of streams currently being tracked
+func (sr *StreamReassembler) GetStreamCount() int {
+	sr.mu.RLock()
+	defer sr.mu.RUnlock()
+	return len(sr.state.Streams)
 }
 
 // ProcessPacket processes a packet for stream reassembly

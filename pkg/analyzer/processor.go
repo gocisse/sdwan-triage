@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gocisse/sdwan-triage/pkg/config"
 	"github.com/gocisse/sdwan-triage/pkg/detector"
 	"github.com/gocisse/sdwan-triage/pkg/detectors"
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -19,39 +20,49 @@ import (
 
 // Processor handles PCAP file processing
 type Processor struct {
-	dnsAnalyzer         *detector.DNSAnalyzer
-	tcpAnalyzer         *detector.TCPAnalyzer
-	arpAnalyzer         *detector.ARPAnalyzer
-	httpAnalyzer        *detector.HTTPAnalyzer
-	tlsAnalyzer         *detector.TLSAnalyzer
-	trafficAnalyzer     *detector.TrafficAnalyzer
-	quicAnalyzer        *detector.QUICAnalyzer
-	qosAnalyzer         *detector.QoSAnalyzer
-	ddosAnalyzer        *detector.DDoSAnalyzer
-	portScanAnalyzer    *detector.PortScanAnalyzer
-	iocAnalyzer         *detector.IOCAnalyzer
-	tlsSecurityAnalyzer *detector.TLSSecurityAnalyzer
-	icmpAnalyzer        *detector.ICMPAnalyzer
-	icmpv6Analyzer      *detector.ICMPv6Analyzer
-	geoipAnalyzer       *detector.GeoIPAnalyzer
-	sdwanAnalyzer       *detector.SDWANVendorAnalyzer
-	sipAnalyzer         *detector.SIPAnalyzer
-	rtpAnalyzer         *detector.RTPAnalyzer
-	tunnelAnalyzer      *detector.TunnelAnalyzer
-	bgpAnalyzer         *detector.BGPAnalyzer
-	handshakeTracker    *detector.TCPHandshakeTracker
-	packetLossDetector  *detectors.PacketLossDetector
-	smbDetector         *detectors.SMBDetector
-	ldapDetector        *detectors.LDAPDetector
-	kerberosDetector    *detectors.KerberosDetector
-	lanProtocolAnalyzer *detector.LANProtocolAnalyzer
-	streamReassembler   *StreamReassembler
-	bandwidthAnalyzer   *BandwidthAnalyzer
-	handshakeTimeout    time.Duration
-	qosEnabled          bool
-	verbose             bool
-	skippedPackets      int
-	errorCount          int
+	dnsAnalyzer          *detector.DNSAnalyzer
+	tcpAnalyzer          *detector.TCPAnalyzer
+	arpAnalyzer          *detector.ARPAnalyzer
+	httpAnalyzer         *detector.HTTPAnalyzer
+	tlsAnalyzer          *detector.TLSAnalyzer
+	trafficAnalyzer      *detector.TrafficAnalyzer
+	quicAnalyzer         *detector.QUICAnalyzer
+	qosAnalyzer          *detector.QoSAnalyzer
+	ddosAnalyzer         *detector.DDoSAnalyzer
+	portScanAnalyzer     *detector.PortScanAnalyzer
+	iocAnalyzer          *detector.IOCAnalyzer
+	tlsSecurityAnalyzer  *detector.TLSSecurityAnalyzer
+	icmpAnalyzer         *detector.ICMPAnalyzer
+	icmpv6Analyzer       *detector.ICMPv6Analyzer
+	geoipAnalyzer        *detector.GeoIPAnalyzer
+	sdwanAnalyzer        *detector.SDWANVendorAnalyzer
+	sipAnalyzer          *detector.SIPAnalyzer
+	rtpAnalyzer          *detector.RTPAnalyzer
+	tunnelAnalyzer       *detector.TunnelAnalyzer
+	bgpAnalyzer          *detector.BGPAnalyzer
+	handshakeTracker     *detector.TCPHandshakeTracker
+	packetLossDetector   *detectors.PacketLossDetector
+	smbDetector          *detectors.SMBDetector
+	ldapDetector         *detectors.LDAPDetector
+	kerberosDetector     *detectors.KerberosDetector
+	lanProtocolAnalyzer  *detector.LANProtocolAnalyzer
+	dhcpAnalyzer         *detector.DHCPAnalyzer
+	ntpAnalyzer          *detector.NTPAnalyzer
+	dnsTunnelingAnalyzer *detector.DNSTunnelingAnalyzer
+	c2BeaconingAnalyzer  *detector.C2BeaconingAnalyzer
+	tcpAdvancedAnalyzer  *detector.TCPAdvancedAnalyzer
+	arubaDetector        *ArubaIssueDetector
+	viptelaDetector      *ViptelaIssueDetector
+	veloCloudDetector    *VeloCloudIssueDetector
+	streamReassembler    *StreamReassembler
+	bandwidthAnalyzer    *BandwidthAnalyzer
+	correlator           *UnderlayOverlayCorrelator // Underlay/overlay event correlation
+	registry             *DetectorRegistry          // Parallel detector execution engine
+	handshakeTimeout     time.Duration
+	qosEnabled           bool
+	verbose              bool
+	skippedPackets       int
+	errorCount           int
 }
 
 // NewProcessor creates a new PCAP processor with all analyzers
@@ -61,46 +72,99 @@ func NewProcessor() *Processor {
 
 // NewProcessorWithOptions creates a processor with configurable options
 func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
-	return &Processor{
-		dnsAnalyzer:         detector.NewDNSAnalyzer(),
-		tcpAnalyzer:         detector.NewTCPAnalyzer(),
-		arpAnalyzer:         detector.NewARPAnalyzer(),
-		httpAnalyzer:        detector.NewHTTPAnalyzer(),
-		tlsAnalyzer:         detector.NewTLSAnalyzer(),
-		trafficAnalyzer:     detector.NewTrafficAnalyzer(),
-		quicAnalyzer:        detector.NewQUICAnalyzer(),
-		qosAnalyzer:         detector.NewQoSAnalyzer(qosEnabled),
-		ddosAnalyzer:        detector.NewDDoSAnalyzer(),
-		portScanAnalyzer:    detector.NewPortScanAnalyzer(),
-		iocAnalyzer:         detector.NewIOCAnalyzer(),
-		tlsSecurityAnalyzer: detector.NewTLSSecurityAnalyzer(),
-		icmpAnalyzer:        detector.NewICMPAnalyzer(),
-		icmpv6Analyzer:      detector.NewICMPv6Analyzer(),
-		geoipAnalyzer:       detector.NewGeoIPAnalyzer(),
-		sdwanAnalyzer:       detector.NewSDWANVendorAnalyzer(),
-		sipAnalyzer:         detector.NewSIPAnalyzer(),
-		rtpAnalyzer:         detector.NewRTPAnalyzer(),
-		tunnelAnalyzer:      detector.NewTunnelAnalyzer(),
-		bgpAnalyzer:         detector.NewBGPAnalyzer(),
-		handshakeTracker:    detector.NewTCPHandshakeTracker(),
-		packetLossDetector:  detectors.NewPacketLossDetector(),
-		smbDetector:         detectors.NewSMBDetector(),
-		ldapDetector:        detectors.NewLDAPDetector(),
-		kerberosDetector:    detectors.NewKerberosDetector(),
-		lanProtocolAnalyzer: detector.NewLANProtocolAnalyzer(),
-		streamReassembler:   NewStreamReassembler(verbose),
-		bandwidthAnalyzer:   NewBandwidthAnalyzer(1000, verbose), // 1 second buckets
-		handshakeTimeout:    3 * time.Second,                     // Default 3 second timeout
-		qosEnabled:          qosEnabled,
-		verbose:             verbose,
-		skippedPackets:      0,
-		errorCount:          0,
+	p := &Processor{
+		dnsAnalyzer:          detector.NewDNSAnalyzer(),
+		tcpAnalyzer:          detector.NewTCPAnalyzer(),
+		arpAnalyzer:          detector.NewARPAnalyzer(),
+		httpAnalyzer:         detector.NewHTTPAnalyzer(),
+		tlsAnalyzer:          detector.NewTLSAnalyzer(),
+		trafficAnalyzer:      detector.NewTrafficAnalyzer(),
+		quicAnalyzer:         detector.NewQUICAnalyzer(),
+		qosAnalyzer:          detector.NewQoSAnalyzer(qosEnabled),
+		ddosAnalyzer:         detector.NewDDoSAnalyzer(),
+		portScanAnalyzer:     detector.NewPortScanAnalyzer(),
+		iocAnalyzer:          detector.NewIOCAnalyzer(),
+		tlsSecurityAnalyzer:  detector.NewTLSSecurityAnalyzer(),
+		icmpAnalyzer:         detector.NewICMPAnalyzer(),
+		icmpv6Analyzer:       detector.NewICMPv6Analyzer(),
+		geoipAnalyzer:        detector.NewGeoIPAnalyzer(),
+		sdwanAnalyzer:        detector.NewSDWANVendorAnalyzer(),
+		sipAnalyzer:          detector.NewSIPAnalyzer(),
+		rtpAnalyzer:          detector.NewRTPAnalyzer(),
+		tunnelAnalyzer:       detector.NewTunnelAnalyzer(),
+		bgpAnalyzer:          detector.NewBGPAnalyzer(),
+		handshakeTracker:     detector.NewTCPHandshakeTracker(),
+		packetLossDetector:   detectors.NewPacketLossDetector(),
+		smbDetector:          detectors.NewSMBDetector(),
+		ldapDetector:         detectors.NewLDAPDetector(),
+		kerberosDetector:     detectors.NewKerberosDetector(),
+		lanProtocolAnalyzer:  detector.NewLANProtocolAnalyzer(),
+		dhcpAnalyzer:         detector.NewDHCPAnalyzer(),
+		ntpAnalyzer:          detector.NewNTPAnalyzer(),
+		dnsTunnelingAnalyzer: detector.NewDNSTunnelingAnalyzer(),
+		c2BeaconingAnalyzer:  detector.NewC2BeaconingAnalyzer(),
+		tcpAdvancedAnalyzer:  detector.NewTCPAdvancedAnalyzer(),
+		arubaDetector:        NewArubaIssueDetector(),
+		viptelaDetector:      NewViptelaIssueDetector(),
+		veloCloudDetector:    NewVeloCloudIssueDetector(),
+		streamReassembler:    NewStreamReassembler(verbose),
+		bandwidthAnalyzer:    NewBandwidthAnalyzer(1000, verbose), // 1 second buckets
+		correlator:           NewUnderlayOverlayCorrelator(),
+		handshakeTimeout:     3 * time.Second, // Default 3 second timeout
+		qosEnabled:           qosEnabled,
+		verbose:              verbose,
+		skippedPackets:       0,
+		errorCount:           0,
 	}
+
+	// Wire correlator callbacks into BGP and TCP analyzers
+	p.bgpAnalyzer.OnBGPEvent = p.correlator.RecordBGPEvent
+	p.tcpAnalyzer.OnRetransmission = p.correlator.RecordRetransmission
+	p.tcpAnalyzer.OnRTTSpike = p.correlator.RecordRTTSpike
+
+	// Build the parallel detector registry
+	p.registry = p.buildDetectorRegistry()
+
+	return p
 }
 
 // SetHandshakeTimeout sets the timeout for TCP handshake completion
 func (p *Processor) SetHandshakeTimeout(timeout time.Duration) {
 	p.handshakeTimeout = timeout
+}
+
+// ApplyThresholds applies custom detection thresholds from configuration
+func (p *Processor) ApplyThresholds(cfg *config.ThresholdsConfig) {
+	if cfg == nil {
+		return
+	}
+
+	// Apply DDoS thresholds
+	if cfg.DDoS.SYNThreshold > 0 {
+		p.ddosAnalyzer.SetSYNThreshold(cfg.DDoS.SYNThreshold)
+	}
+	if cfg.DDoS.UDPThreshold > 0 {
+		p.ddosAnalyzer.SetUDPThreshold(cfg.DDoS.UDPThreshold)
+	}
+	if cfg.DDoS.ICMPThreshold > 0 {
+		p.ddosAnalyzer.SetICMPThreshold(cfg.DDoS.ICMPThreshold)
+	}
+
+	// Apply port scan thresholds
+	if cfg.PortScan.HorizontalThreshold > 0 {
+		p.portScanAnalyzer.SetHorizontalThreshold(cfg.PortScan.HorizontalThreshold)
+	}
+	if cfg.PortScan.VerticalThreshold > 0 {
+		p.portScanAnalyzer.SetVerticalThreshold(cfg.PortScan.VerticalThreshold)
+	}
+
+	// Apply performance thresholds
+	if cfg.Performance.HighRTTMs > 0 {
+		p.tcpAnalyzer.SetHighRTTThreshold(cfg.Performance.HighRTTMs)
+	}
+	if cfg.Performance.RetransmitWarn > 0 {
+		p.tcpAnalyzer.SetRetransmitThreshold(cfg.Performance.RetransmitWarn)
+	}
 }
 
 // logDebug logs a debug message if verbose mode is enabled
@@ -173,6 +237,15 @@ func (p *Processor) Process(reader *pcapgo.Reader, state *models.AnalysisState, 
 		if packetCount%10000 == 0 {
 			elapsed := time.Since(startTime)
 			fmt.Printf("\rProcessed %d packets (%.0f pps)...", packetCount, float64(packetCount)/elapsed.Seconds())
+
+			// Periodic cleanup of stale stream data to prevent memory bloat
+			// Evict streams that haven't been seen for 30+ seconds
+			if p.streamReassembler != nil {
+				evicted := p.streamReassembler.CleanupStaleFlows(30 * time.Second)
+				if evicted > 0 && p.verbose {
+					p.logDebug("Evicted %d stale streams", evicted)
+				}
+			}
 		}
 	}
 
@@ -205,66 +278,89 @@ func (p *Processor) safeAnalyzePacket(packet gopacket.Packet, state *models.Anal
 	p.analyzePacket(packet, state, report)
 }
 
-// analyzePacket runs all protocol analyzers on a packet
+// buildDetectorRegistry classifies all detectors into independent (parallel) and stateful (sequential) groups.
+func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
+	reg := NewDetectorRegistry(p.verbose)
+
+	// ── Independent Analyzers (safe to run in parallel) ──
+	// These detectors read packet layers and write to report slices.
+	// Report writes are serialized by report.Mu in the registry.
+	// AnalysisState LRU caches are internally thread-safe.
+	reg.RegisterIndependent(
+		// Protocol parsers
+		NewAnalyzerFunc("DNS", p.dnsAnalyzer.Analyze),
+		NewAnalyzerFunc("ARP", p.arpAnalyzer.Analyze),
+		NewAnalyzerFunc("HTTP", p.httpAnalyzer.Analyze),
+		NewAnalyzerFunc("TLS", p.tlsAnalyzer.Analyze),
+		NewAnalyzerFunc("QUIC", p.quicAnalyzer.Analyze),
+		NewAnalyzerFunc("QoS", p.qosAnalyzer.Analyze),
+		NewAnalyzerFunc("TLS-Security", p.tlsSecurityAnalyzer.Analyze),
+		NewAnalyzerFunc("ICMP", p.icmpAnalyzer.Analyze),
+		NewAnalyzerFunc("ICMPv6", p.icmpv6Analyzer.Analyze),
+
+		// Advanced network analysis
+		NewAnalyzerFunc("GeoIP", p.geoipAnalyzer.Analyze),
+		NewAnalyzerFunc("SDWAN-Vendor", p.sdwanAnalyzer.Analyze),
+		NewAnalyzerFunc("SIP", p.sipAnalyzer.Analyze),
+		NewAnalyzerFunc("RTP", p.rtpAnalyzer.Analyze),
+		NewAnalyzerFunc("Tunnel", p.tunnelAnalyzer.Analyze),
+		NewAnalyzerFunc("BGP", p.bgpAnalyzer.Analyze),
+
+		// LAN protocol detection
+		NewAnalyzerFunc("LAN-Protocols", p.lanProtocolAnalyzer.Analyze),
+
+		// DHCP / NTP / DNS Tunneling
+		NewAnalyzerFunc("DHCP", p.dhcpAnalyzer.Analyze),
+		NewAnalyzerFunc("NTP", p.ntpAnalyzer.Analyze),
+		NewAnalyzerFunc("DNS-Tunneling", p.dnsTunnelingAnalyzer.Analyze),
+
+		// IOC matching
+		NewAnalyzerFunc("IOC-IP", p.iocAnalyzer.AnalyzeIP),
+		NewAnalyzerFunc("IOC-DNS", p.iocAnalyzer.AnalyzeDNS),
+
+		// TCP advanced (window issues, out-of-order)
+		NewAnalyzerFunc("TCP-Advanced", p.tcpAdvancedAnalyzer.Analyze),
+
+		// Packet-only detectors (no state/report dependency)
+		NewPacketOnlyAnalyzer("PacketLoss", p.packetLossDetector.ProcessPacket),
+		NewPacketOnlyAnalyzer("SMB", p.smbDetector.ProcessPacket),
+		NewPacketOnlyAnalyzer("LDAP", p.ldapDetector.ProcessPacket),
+		NewPacketOnlyAnalyzer("Kerberos", p.kerberosDetector.ProcessPacket),
+
+		// Stream reassembly and bandwidth (packet-only)
+		NewPacketOnlyAnalyzer("StreamReassembly", p.streamReassembler.ProcessPacket),
+		NewPacketOnlyAnalyzer("Bandwidth", p.bandwidthAnalyzer.ProcessPacket),
+	)
+
+	// ── Stateful Analyzers (must run sequentially) ──
+	// These detectors write to shared SecurityState maps (DDoS counters, port scan tracking)
+	// or maintain ordering-dependent state (TCP flow tracking, handshake correlation).
+	// SecurityState maps are protected by SecurityState.mu.
+	reg.RegisterStateful(
+		// TCP flow tracking (writes to TCPFlowState, handshake state)
+		NewAnalyzerFunc("TCP", p.tcpAnalyzer.Analyze),
+		NewAnalyzerFunc("TCP-Handshake", p.handshakeTracker.TrackHandshake),
+
+		// Traffic analysis (writes to UDPFlowState, AppStats)
+		NewAnalyzerFunc("Traffic", p.trafficAnalyzer.Analyze),
+
+		// Security detectors (write to SecurityState maps)
+		NewAnalyzerFunc("DDoS-TCP", p.ddosAnalyzer.AnalyzeTCP),
+		NewAnalyzerFunc("DDoS-UDP", p.ddosAnalyzer.AnalyzeUDP),
+		NewAnalyzerFunc("DDoS-ICMP", p.ddosAnalyzer.AnalyzeICMP),
+		NewAnalyzerFunc("PortScan", p.portScanAnalyzer.Analyze),
+
+		// C2 beaconing (maintains internal interval tracking state)
+		NewAnalyzerFunc("C2-TCP", p.c2BeaconingAnalyzer.AnalyzeTCP),
+		NewAnalyzerFunc("C2-UDP", p.c2BeaconingAnalyzer.AnalyzeUDP),
+	)
+
+	return reg
+}
+
+// analyzePacket runs all protocol analyzers on a packet via the parallel detector registry.
 func (p *Processor) analyzePacket(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
-	// DNS analysis
-	p.dnsAnalyzer.Analyze(packet, state, report)
-
-	// TCP analysis (includes handshake, retransmission, RTT, fingerprinting)
-	p.tcpAnalyzer.Analyze(packet, state, report)
-
-	// TCP handshake tracking
-	p.handshakeTracker.TrackHandshake(packet, state, report)
-
-	// ARP analysis
-	p.arpAnalyzer.Analyze(packet, state, report)
-
-	// HTTP analysis
-	p.httpAnalyzer.Analyze(packet, state, report)
-
-	// TLS analysis
-	p.tlsAnalyzer.Analyze(packet, state, report)
-
-	// QUIC analysis
-	p.quicAnalyzer.Analyze(packet, state, report)
-
-	// QoS/DSCP analysis
-	p.qosAnalyzer.Analyze(packet, state, report)
-
-	// Traffic analysis (app stats, suspicious ports)
-	p.trafficAnalyzer.Analyze(packet, state, report)
-
-	// Security analysis
-	p.ddosAnalyzer.AnalyzeTCP(packet, state, report)
-	p.ddosAnalyzer.AnalyzeUDP(packet, state, report)
-	p.ddosAnalyzer.AnalyzeICMP(packet, state, report)
-	p.portScanAnalyzer.Analyze(packet, state, report)
-	p.iocAnalyzer.AnalyzeIP(packet, state, report)
-	p.iocAnalyzer.AnalyzeDNS(packet, state, report)
-	p.tlsSecurityAnalyzer.Analyze(packet, state, report)
-	p.icmpAnalyzer.Analyze(packet, state, report)
-	p.icmpv6Analyzer.Analyze(packet, state, report)
-
-	// Advanced network analysis
-	p.geoipAnalyzer.Analyze(packet, state, report)
-	p.sdwanAnalyzer.Analyze(packet, state, report)
-	p.sipAnalyzer.Analyze(packet, state, report)
-	p.rtpAnalyzer.Analyze(packet, state, report)
-	p.tunnelAnalyzer.Analyze(packet, state, report)
-	p.bgpAnalyzer.Analyze(packet, state, report)
-
-	// New protocol detectors
-	p.packetLossDetector.ProcessPacket(packet)
-	p.smbDetector.ProcessPacket(packet)
-	p.ldapDetector.ProcessPacket(packet)
-	p.kerberosDetector.ProcessPacket(packet)
-
-	// LAN protocol detection (VRRP, CDP, LLDP, HSRP, STP)
-	p.lanProtocolAnalyzer.Analyze(packet, state, report)
-
-	// Stream reassembly and bandwidth tracking
-	p.streamReassembler.ProcessPacket(packet)
-	p.bandwidthAnalyzer.ProcessPacket(packet)
+	p.registry.AnalyzePacket(packet, state, report)
 }
 
 // quickFilterCheck performs a fast pre-filter check on raw packet data
@@ -343,8 +439,8 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Build correlated TCP handshake flows for visualization
 	p.buildTCPHandshakeCorrelatedFlows(report)
 
-	// Calculate RTT statistics from TCP flows
-	for flowKey, flowState := range state.TCPFlows {
+	// Calculate RTT statistics from TCP flows (using bounded cache iterator)
+	state.ForEachTCPFlow(func(flowKey string, flowState *models.TCPFlowState) bool {
 		if len(flowState.RTTSamples) > 0 {
 			var minRTT, maxRTT, sumRTT float64
 			minRTT = flowState.RTTSamples[0]
@@ -394,7 +490,8 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 				report.RTTAnalysis = append(report.RTTAnalysis, rttFlow)
 			}
 		}
-	}
+		return true // continue iteration
+	})
 
 	// Build application breakdown from stats
 	if report.ApplicationBreakdown == nil {
@@ -423,6 +520,9 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Add LAN protocol findings (VRRP, CDP, LLDP, HSRP, STP)
 	report.LANProtocols = p.lanProtocolAnalyzer.GetFindings()
 
+	// Finalize TCP advanced analysis (out-of-order flows)
+	p.tcpAdvancedAnalyzer.Finalize(report)
+
 	// Add stream reassembly data (top 50 streams by bytes)
 	topStreams := p.streamReassembler.GetTopStreams(50)
 	report.RawStreams = topStreams // Store raw streams for actionable analysis
@@ -430,6 +530,31 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 		viewData := p.streamReassembler.FormatStreamForDisplay(stream)
 		report.Streams = append(report.Streams, viewData)
 	}
+
+	// Run vendor-specific DPI detectors on reassembled streams
+	for _, stream := range topStreams {
+		var vendorIssues []DetectedIssue
+		vendorIssues = append(vendorIssues, p.arubaDetector.DetectArubaIssues(stream)...)
+		vendorIssues = append(vendorIssues, p.viptelaDetector.DetectViptelaIssues(stream)...)
+		vendorIssues = append(vendorIssues, p.veloCloudDetector.DetectVeloCloudIssues(stream)...)
+		for _, issue := range vendorIssues {
+			report.VendorDPIIssues = append(report.VendorDPIIssues, models.VendorDPIIssue{
+				Vendor:          string(issue.Category),
+				IssueID:         issue.ID,
+				Title:           issue.Title,
+				Description:     issue.TechnicalDesc,
+				BusinessImpact:  issue.BusinessImpact,
+				Severity:        string(issue.Severity),
+				Confidence:      issue.Confidence,
+				Category:        string(issue.Category),
+				RootCause:       issue.RootCause,
+				WiresharkFilter: issue.BaseFilter,
+			})
+		}
+	}
+
+	// Correlate underlay/overlay events (BGP → TCP retransmissions/RTT spikes)
+	p.correlator.Finalize(report)
 
 	// Add bandwidth time series data
 	report.BandwidthTimeSeries = p.bandwidthAnalyzer.GetTimeSeries()
@@ -514,6 +639,44 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 		issues["HTTP Errors"] = len(report.HTTPErrors)
 	}
 
+	// New detector findings
+	if len(report.DHCPFindings) > 0 {
+		for _, f := range report.DHCPFindings {
+			if f.Type == "Rogue Server" || f.Type == "Starvation" {
+				score += 15
+			} else {
+				score += 5
+			}
+		}
+		issues["DHCP Issues"] = len(report.DHCPFindings)
+	}
+	if len(report.NTPFindings) > 0 {
+		for _, f := range report.NTPFindings {
+			if f.Type == "Amplification" {
+				score += 10
+			} else {
+				score += 3
+			}
+		}
+		issues["NTP Issues"] = len(report.NTPFindings)
+	}
+	if len(report.DNSTunnelingFindings) > 0 {
+		score += len(report.DNSTunnelingFindings) * 15
+		issues["DNS Tunneling"] = len(report.DNSTunnelingFindings)
+	}
+	if len(report.C2BeaconingFindings) > 0 {
+		score += len(report.C2BeaconingFindings) * 15
+		issues["C2 Beaconing"] = len(report.C2BeaconingFindings)
+	}
+	if len(report.TCPWindowFindings) > 0 {
+		score += len(report.TCPWindowFindings) * 3
+		issues["TCP Window Issues"] = len(report.TCPWindowFindings)
+	}
+	if len(report.TCPOutOfOrderFlows) > 0 {
+		score += len(report.TCPOutOfOrderFlows) * 3
+		issues["TCP Out-of-Order"] = len(report.TCPOutOfOrderFlows)
+	}
+
 	// Set risk level based on score
 	report.RiskScore = score
 	switch {
@@ -584,6 +747,24 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 	if issues["High RTT Flows"] > 0 {
 		actions = append(actions, "LOW: High latency flows detected. Check for network congestion or routing issues.")
 	}
+	if issues["DHCP Issues"] > 0 {
+		actions = append(actions, "CRITICAL: DHCP anomalies detected. Check for rogue DHCP servers or starvation attacks. Run 'show ip dhcp server statistics' on your router.")
+	}
+	if issues["NTP Issues"] > 0 {
+		actions = append(actions, "HIGH: NTP anomalies detected. Check for NTP amplification attacks and verify NTP server configuration.")
+	}
+	if issues["DNS Tunneling"] > 0 {
+		actions = append(actions, "CRITICAL: DNS tunneling suspected. Investigate the source host for malware. Block suspicious domains and enable DNS security.")
+	}
+	if issues["C2 Beaconing"] > 0 {
+		actions = append(actions, "CRITICAL: C2 beaconing pattern detected. Isolate the source host immediately and perform forensic analysis.")
+	}
+	if issues["TCP Window Issues"] > 0 {
+		actions = append(actions, "MEDIUM: TCP window size issues detected. Check receiver host for memory/CPU pressure or application bottlenecks.")
+	}
+	if issues["TCP Out-of-Order"] > 0 {
+		actions = append(actions, "MEDIUM: TCP out-of-order packets detected. Check for asymmetric routing, load balancer issues, or link problems.")
+	}
 
 	// Limit to top 5 actions
 	if len(actions) > 5 {
@@ -607,15 +788,17 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 	}
 	flowData := make(map[string]flowInfo)
 
-	// Add TCP flows
-	for flowKey, flowState := range state.TCPFlows {
+	// Add TCP flows (using bounded cache iterator)
+	state.ForEachTCPFlow(func(flowKey string, flowState *models.TCPFlowState) bool {
 		flowData[flowKey] = flowInfo{bytes: flowState.TotalBytes, protocol: "TCP"}
-	}
+		return true
+	})
 
-	// Add UDP flows
-	for flowKey, flowState := range state.UDPFlows {
+	// Add UDP flows (using bounded cache iterator)
+	state.ForEachUDPFlow(func(flowKey string, flowState *models.UDPFlowState) bool {
 		flowData[flowKey] = flowInfo{bytes: flowState.TotalBytes, protocol: "UDP"}
-	}
+		return true
+	})
 
 	// Convert to TrafficFlow slice and sort by bytes
 	var flows []models.TrafficFlow
@@ -778,6 +961,8 @@ func (p *Processor) finalizeTunnelAnalysis(report *models.TriageReport) {
 
 // finalizeSDWANAnalysis populates SD-WAN vendor detection results
 func (p *Processor) finalizeSDWANAnalysis(report *models.TriageReport) {
+	// Prune vendors detected only by weak evidence (shared ports like 443)
+	p.sdwanAnalyzer.Finalize()
 	vendors := p.sdwanAnalyzer.GetDetectedVendors()
 
 	for _, vendor := range vendors {
@@ -810,8 +995,8 @@ func (p *Processor) buildRTTHistogram(state *models.AnalysisState, report *model
 		histogram[bucket] = 0
 	}
 
-	// Collect all RTT samples from TCP flows
-	for _, flowState := range state.TCPFlows {
+	// Collect all RTT samples from TCP flows (using bounded cache iterator)
+	state.ForEachTCPFlow(func(_ string, flowState *models.TCPFlowState) bool {
 		for _, rtt := range flowState.RTTSamples {
 			// Categorize RTT into buckets
 			switch {
@@ -831,7 +1016,8 @@ func (p *Processor) buildRTTHistogram(state *models.AnalysisState, report *model
 				histogram["1000ms+"]++
 			}
 		}
-	}
+		return true
+	})
 
 	report.RTTHistogram = histogram
 }

@@ -1,21 +1,56 @@
 package detector
 
 import (
+	"fmt"
 	"net"
+	"os"
 	"sync"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
+	"github.com/oschwald/maxminddb-golang"
 )
 
+// Common paths where the GeoIP MMDB database may be located
+var geoIPSearchPaths = []string{
+	"./data/GeoLite2-City.mmdb",
+	"./GeoLite2-City.mmdb",
+	"../data/GeoLite2-City.mmdb",
+	"/usr/share/GeoIP/GeoLite2-City.mmdb",
+	"/usr/local/share/GeoIP/GeoLite2-City.mmdb",
+	"/var/lib/GeoIP/GeoLite2-City.mmdb",
+	os.Getenv("HOME") + "/.local/share/GeoIP/GeoLite2-City.mmdb",
+}
+
+// mmdbRecord is the struct used to read MaxMind MMDB entries
+type mmdbRecord struct {
+	Country struct {
+		ISOCode string            `maxminddb:"iso_code"`
+		Names   map[string]string `maxminddb:"names"`
+	} `maxminddb:"country"`
+	City struct {
+		Names map[string]string `maxminddb:"names"`
+	} `maxminddb:"city"`
+	Subdivisions []struct {
+		Names map[string]string `maxminddb:"names"`
+	} `maxminddb:"subdivisions"`
+	Location struct {
+		Latitude  float64 `maxminddb:"latitude"`
+		Longitude float64 `maxminddb:"longitude"`
+	} `maxminddb:"location"`
+}
+
 // GeoIPAnalyzer handles geographic IP analysis
-// Note: For full functionality, integrate with MaxMind GeoIP database
+// Supports MaxMind GeoLite2/GeoIP2 MMDB databases for accurate lookups,
+// with a built-in heuristic fallback when no database is available.
 type GeoIPAnalyzer struct {
 	mu              sync.RWMutex
 	ipLocationCache map[string]*GeoLocation
 	countryCounts   map[string]int
 	countryIPs      map[string][]string // Track IPs per country
 	enabled         bool
+	mmdb            *maxminddb.Reader // MaxMind database reader (nil if unavailable)
+	mmdbPath        string            // Path to loaded database
 }
 
 // GeoLocation represents geographic location data for an IP
@@ -31,13 +66,71 @@ type GeoLocation struct {
 	IsPrivate   bool
 }
 
-// NewGeoIPAnalyzer creates a new GeoIP analyzer
+// NewGeoIPAnalyzer creates a new GeoIP analyzer.
+// It automatically searches common paths for a MaxMind MMDB database.
+// If no database is found, it falls back to built-in IP range heuristics.
 func NewGeoIPAnalyzer() *GeoIPAnalyzer {
-	return &GeoIPAnalyzer{
+	g := &GeoIPAnalyzer{
 		ipLocationCache: make(map[string]*GeoLocation),
 		countryCounts:   make(map[string]int),
 		countryIPs:      make(map[string][]string),
 		enabled:         true,
+	}
+
+	// Try to load MMDB from common paths
+	g.tryLoadMMDB()
+
+	return g
+}
+
+// tryLoadMMDB searches common paths for a MaxMind MMDB database
+func (g *GeoIPAnalyzer) tryLoadMMDB() {
+	for _, path := range geoIPSearchPaths {
+		if path == "" {
+			continue
+		}
+		if _, err := os.Stat(path); err == nil {
+			db, err := maxminddb.Open(path)
+			if err == nil {
+				g.mmdb = db
+				g.mmdbPath = path
+				return
+			}
+		}
+	}
+}
+
+// LoadMMDB loads a MaxMind MMDB database from a specific path
+func (g *GeoIPAnalyzer) LoadMMDB(path string) error {
+	db, err := maxminddb.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open GeoIP database %s: %w", path, err)
+	}
+	g.mu.Lock()
+	if g.mmdb != nil {
+		g.mmdb.Close()
+	}
+	g.mmdb = db
+	g.mmdbPath = path
+	g.mu.Unlock()
+	return nil
+}
+
+// HasMMDB returns true if a MaxMind database is loaded
+func (g *GeoIPAnalyzer) HasMMDB() bool {
+	return g.mmdb != nil
+}
+
+// MMDBPath returns the path to the loaded database, or empty string
+func (g *GeoIPAnalyzer) MMDBPath() string {
+	return g.mmdbPath
+}
+
+// Close releases the MMDB database resources
+func (g *GeoIPAnalyzer) Close() {
+	if g.mmdb != nil {
+		g.mmdb.Close()
+		g.mmdb = nil
 	}
 }
 
@@ -107,12 +200,39 @@ func (g *GeoIPAnalyzer) analyzeIP(ipStr string) *GeoLocation {
 	return loc
 }
 
-// lookupIP performs GeoIP lookup using known IP ranges
+// lookupIP performs GeoIP lookup.
+// Uses MaxMind MMDB database if available, otherwise falls back to IP range heuristics.
 func (g *GeoIPAnalyzer) lookupIP(ip net.IP) *GeoLocation {
 	loc := &GeoLocation{
 		IsPrivate: false,
 	}
 
+	// Try MMDB lookup first (most accurate)
+	if g.mmdb != nil {
+		var record mmdbRecord
+		err := g.mmdb.Lookup(ip, &record)
+		if err == nil && record.Country.ISOCode != "" {
+			loc.CountryCode = record.Country.ISOCode
+			if name, ok := record.Country.Names["en"]; ok {
+				loc.Country = name
+			} else {
+				loc.Country = record.Country.ISOCode
+			}
+			if name, ok := record.City.Names["en"]; ok {
+				loc.City = name
+			}
+			if len(record.Subdivisions) > 0 {
+				if name, ok := record.Subdivisions[0].Names["en"]; ok {
+					loc.Region = name
+				}
+			}
+			loc.Latitude = record.Location.Latitude
+			loc.Longitude = record.Location.Longitude
+			return loc
+		}
+	}
+
+	// Fallback to heuristic lookup
 	if ip.To4() == nil {
 		loc.Country = "Unknown (IPv6)"
 		loc.CountryCode = "??"

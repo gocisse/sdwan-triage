@@ -9,12 +9,36 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+// TCPRetransmitCallback is called when a retransmission is detected.
+type TCPRetransmitCallback func(timestamp time.Time, flowKey, srcIP, dstIP string)
+
+// TCPRTTSpikeCallback is called when an RTT spike is detected.
+type TCPRTTSpikeCallback func(timestamp time.Time, flowKey, srcIP, dstIP string, rttMs float64)
+
 // TCPAnalyzer handles TCP packet analysis
-type TCPAnalyzer struct{}
+type TCPAnalyzer struct {
+	OnRetransmission TCPRetransmitCallback // Optional callback for correlation
+	OnRTTSpike       TCPRTTSpikeCallback   // Optional callback for correlation
+	rttSpikeThreshMs float64               // RTT threshold to trigger spike callback
+}
 
 // NewTCPAnalyzer creates a new TCP analyzer
 func NewTCPAnalyzer() *TCPAnalyzer {
-	return &TCPAnalyzer{}
+	return &TCPAnalyzer{
+		rttSpikeThreshMs: 200.0, // 200ms default threshold
+	}
+}
+
+// SetHighRTTThreshold sets the RTT spike threshold in milliseconds
+func (t *TCPAnalyzer) SetHighRTTThreshold(thresholdMs float64) {
+	t.rttSpikeThreshMs = thresholdMs
+}
+
+// SetRetransmitThreshold is a placeholder for retransmit threshold configuration
+// (TCPAnalyzer currently detects all retransmissions; threshold is applied during reporting)
+func (t *TCPAnalyzer) SetRetransmitThreshold(threshold int) {
+	// Stored for future use in filtering retransmission reports
+	_ = threshold
 }
 
 // Analyze processes a TCP packet and updates the report
@@ -44,14 +68,15 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	reverseFlowKey := fmt.Sprintf("%s:%d->%s:%d", dstIP, dstPort, srcIP, srcPort)
 	timestamp := packet.Metadata().Timestamp
 
-	// Initialize flow state if needed
-	if state.TCPFlows[flowKey] == nil {
-		state.TCPFlows[flowKey] = &models.TCPFlowState{
+	// Initialize flow state if needed (using bounded cache)
+	flowState := state.GetTCPFlow(flowKey)
+	if flowState == nil {
+		flowState = &models.TCPFlowState{
 			SeqSeen:   make(map[uint32]bool),
 			SentTimes: make(map[uint32]time.Time),
 		}
+		state.SetTCPFlow(flowKey, flowState)
 	}
-	flowState := state.TCPFlows[flowKey]
 
 	// Track handshakes
 	t.analyzeHandshake(tcp, srcIP, dstIP, srcPort, dstPort, flowKey, reverseFlowKey, timestamp, state, report)
@@ -85,7 +110,7 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 
 	// SYN packet (connection initiation)
 	if tcp.SYN && !tcp.ACK {
-		state.SynSent[flowKey] = nil // We don't need to store the packet, just track the key
+		state.MarkSynSent(flowKey, timestamp) // Store timestamp only, not the full packet
 
 		// Add to handshake analysis
 		handshake := models.TCPHandshakeFlow{
@@ -116,8 +141,8 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 
 	// SYN-ACK packet (connection response)
 	if tcp.SYN && tcp.ACK {
-		if _, exists := state.SynSent[reverseFlowKey]; exists {
-			state.SynAckReceived[reverseFlowKey] = true
+		if _, exists := state.GetSynSent(reverseFlowKey); exists {
+			state.MarkSynAckReceived(reverseFlowKey)
 
 			handshake := models.TCPHandshakeFlow{
 				SrcIP:     srcIP,
@@ -133,7 +158,7 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 
 	// ACK packet completing handshake
 	if tcp.ACK && !tcp.SYN && !tcp.FIN && !tcp.RST {
-		if state.SynAckReceived[flowKey] {
+		if state.HasSynAckReceived(flowKey) {
 			handshake := models.TCPHandshakeFlow{
 				SrcIP:     srcIP,
 				SrcPort:   srcPort,
@@ -143,14 +168,14 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 				Count:     1,
 			}
 			report.TCPHandshakes.SuccessfulHandshakes = append(report.TCPHandshakes.SuccessfulHandshakes, handshake)
-			delete(state.SynAckReceived, flowKey)
-			delete(state.SynSent, flowKey)
+			state.DeleteSynAckReceived(flowKey)
+			state.DeleteSynSent(flowKey)
 		}
 	}
 
 	// RST packet (connection reset - potential failed handshake)
 	if tcp.RST {
-		if _, exists := state.SynSent[reverseFlowKey]; exists {
+		if _, exists := state.GetSynSent(reverseFlowKey); exists {
 			handshake := models.TCPHandshakeFlow{
 				SrcIP:     dstIP,
 				SrcPort:   dstPort,
@@ -169,7 +194,7 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 				DstPort: srcPort,
 			}
 			report.FailedHandshakes = append(report.FailedHandshakes, flow)
-			delete(state.SynSent, reverseFlowKey)
+			state.DeleteSynSent(reverseFlowKey)
 		}
 	}
 }
@@ -183,6 +208,15 @@ func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string
 			SrcPort: srcPort,
 			DstIP:   dstIP,
 			DstPort: dstPort,
+		}
+
+		// Notify correlator of retransmission event
+		if t.OnRetransmission != nil {
+			ts := flowState.SentTimes[tcp.Seq]
+			if ts.IsZero() {
+				ts = time.Now()
+			}
+			t.OnRetransmission(ts, flowKey, srcIP, dstIP)
 		}
 
 		// Check if this flow is already in retransmissions
@@ -207,12 +241,18 @@ func (t *TCPAnalyzer) calculateRTT(tcp *layers.TCP, reverseFlowKey string, times
 		return
 	}
 
-	// Look for the original packet this ACK is responding to
-	if reverseState, exists := state.TCPFlows[reverseFlowKey]; exists {
+	// Look for the original packet this ACK is responding to (using bounded cache)
+	reverseState := state.GetTCPFlow(reverseFlowKey)
+	if reverseState != nil {
 		if sentTime, ok := reverseState.SentTimes[tcp.Ack-1]; ok {
 			rtt := timestamp.Sub(sentTime).Seconds() * 1000 // Convert to milliseconds
 			if rtt > 0 && rtt < 10000 {                     // Sanity check: RTT should be < 10 seconds
 				reverseState.RTTSamples = append(reverseState.RTTSamples, rtt)
+
+				// Notify correlator of RTT spike
+				if t.OnRTTSpike != nil && rtt >= t.rttSpikeThreshMs {
+					t.OnRTTSpike(timestamp, reverseFlowKey, "", "", rtt)
+				}
 			}
 		}
 	}
@@ -241,8 +281,8 @@ func (t *TCPAnalyzer) fingerprintDevice(tcp *layers.TCP, srcIP string, ttl uint8
 		}
 	}
 
-	// Store fingerprint
-	state.DeviceFingerprints[srcIP] = fp
+	// Store fingerprint (using bounded cache)
+	state.SetDeviceFingerprint(srcIP, fp)
 
 	// Guess OS from fingerprint
 	deviceType, osGuess, confidence := guessOSFromFingerprint(fp)

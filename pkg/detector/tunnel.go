@@ -395,16 +395,20 @@ func (t *TunnelAnalyzer) analyzeSDWANTunnel(vendor, tunnelFunction string, ipInf
 	}
 }
 
-// generateSDWANWiresharkFilter generates a Wireshark filter for the SD-WAN tunnel
+// generateSDWANWiresharkFilter generates a vendor-specific Wireshark display filter for SD-WAN tunnels.
+// Each vendor uses distinct control/data plane ports — this ensures junior engineers get the correct filter.
 func (t *TunnelAnalyzer) generateSDWANWiresharkFilter(vendor string, srcPort, dstPort uint16) string {
 	switch vendor {
 	case SDWANVendorCisco:
-		return fmt.Sprintf("udp.port == %d || udp.port == %d || tcp.port == %d", CiscoSDWANDataPort, CiscoSDWANControlPort, CiscoSDWANControlPort)
+		return fmt.Sprintf("udp.port == %d || udp.port == %d || udp.port == %d || tcp.port == %d",
+			CiscoSDWANDataPort, CiscoSDWANNATPort, CiscoSDWANControlPort, CiscoSDWANControlPort)
 	case SDWANVendorVelocloud:
 		return fmt.Sprintf("udp.port == %d", VelocloudVCMPPort)
 	case SDWANVendorFortinet:
 		return fmt.Sprintf("udp.port == %d || tcp.port == %d", FortinetSDWANPort, FortinetSDWANPort)
-	case SDWANVendorAruba, SDWANVendorPaloAlto, SDWANVendorZscaler, SDWANVendorGeneric:
+	case SDWANVendorAruba:
+		return "udp.port == 4163 || udp.port == 4980 || udp.port == 4500 || esp"
+	case SDWANVendorPaloAlto, SDWANVendorZscaler, SDWANVendorGeneric:
 		return "udp.port == 4500 || udp.port == 500 || esp"
 	default:
 		return fmt.Sprintf("udp.port == %d", dstPort)

@@ -42,10 +42,12 @@ func (t *TrafficAnalyzer) Analyze(packet gopacket.Packet, state *models.Analysis
 	// Track UDP flows for byte counting (TCP is tracked in tcp.go)
 	if protocol == "UDP" {
 		flowKey := fmt.Sprintf("%s:%d->%s:%d", srcIP, srcPort, dstIP, dstPort)
-		if state.UDPFlows[flowKey] == nil {
-			state.UDPFlows[flowKey] = &models.UDPFlowState{}
+		udpFlow := state.GetUDPFlow(flowKey)
+		if udpFlow == nil {
+			udpFlow = &models.UDPFlowState{}
+			state.SetUDPFlow(flowKey, udpFlow)
 		}
-		state.UDPFlows[flowKey].TotalBytes += payloadLen
+		udpFlow.TotalBytes += payloadLen
 		report.TotalBytes += payloadLen
 	} else if protocol == "" {
 		// Non-TCP/UDP traffic (ICMP, etc.) - still count bytes

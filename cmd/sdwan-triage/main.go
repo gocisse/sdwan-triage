@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,12 +13,18 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/gocisse/sdwan-triage/pkg/analyzer"
+	"github.com/gocisse/sdwan-triage/pkg/config"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/gocisse/sdwan-triage/pkg/output"
 	"github.com/google/gopacket/pcapgo"
 )
 
-const version = "4.3.0.0"
+// Build-time variables — stamped via -ldflags "-X main.version=... -X main.buildCommit=... -X main.buildDate=..."
+var (
+	version     = "4.3.3"
+	buildCommit = "unknown"
+	buildDate   = "unknown"
+)
 
 // Global verbose flag for debug logging
 var verbose *bool
@@ -31,6 +38,7 @@ performance monitoring, and interactive D3.js visualizations.
 
 USAGE:
     sdwan-triage [OPTIONS] <pcap_file>
+    sdwan-triage -web [-port PORT] [-no-browser]
 
 OPTIONS:
   Output Formats:
@@ -62,6 +70,16 @@ OPTIONS:
 
   Multi-File Analysis:
     -compare               Compare multiple PCAP files (provide multiple files as arguments)
+
+  Web Application Mode:
+    -web                   Start the interactive web application instead of CLI mode
+    -port <N>              HTTP server port for web mode (default: 8080, auto-retries if busy)
+    -no-browser            Do not auto-open browser when starting web mode
+
+  Enterprise Integrations (web mode only):
+    -servicenow-url <url>       ServiceNow instance URL for auto-ticket creation
+    -servicenow-user <user>     ServiceNow username
+    -servicenow-password <pass> ServiceNow password
 
   Debug Options:
     -debug-html            Write raw HTML to debug_report.html for troubleshooting
@@ -209,6 +227,13 @@ EXAMPLES:
     # Check HSRP failover events
     sdwan-triage analyze capture.pcap | jq '.timeline[] | select(.protocol == "HSRP")'
 
+  Web Application Mode:
+    # Start the interactive web UI (opens browser automatically)
+    sdwan-triage -web
+
+    # Start web UI on a custom port without auto-opening browser
+    sdwan-triage -web -port 9090 -no-browser
+
   Advanced Usage:
     # Multiple output formats simultaneously
     sdwan-triage -html report.html -json -csv findings.csv capture.pcap
@@ -258,11 +283,32 @@ For more information and documentation:
 	appIdentify := flag.Bool("app-identify", false, "Enable deep application identification using heuristics")
 	tracePath := flag.Bool("trace-path", false, "Perform traceroute to discovered destinations")
 	bgpCheck := flag.Bool("bgp-check", false, "Check BGP routing data for potential hijack indicators")
+	noExternalLookup := flag.Bool("no-external-lookup", false, "Disable all external network lookups (BGP, traceroute)")
 	compareMode := flag.Bool("compare", false, "Compare multiple PCAP files")
 	debugHTML := flag.Bool("debug-html", false, "Write raw HTML to debug_report.html")
 	verbose = flag.Bool("verbose", false, "Enable verbose/debug output")
 	showHelp := flag.Bool("help", false, "Show help message")
+	webMode := flag.Bool("web", false, "Start the interactive web application")
+	webPort := flag.Int("port", 8080, "HTTP server port for web mode (auto-retries if busy)")
+	noBrowser := flag.Bool("no-browser", false, "Do not auto-open browser in web mode")
+
+	// Enterprise integration flags
+	serviceNowURL := flag.String("servicenow-url", "", "ServiceNow instance URL (e.g. https://instance.service-now.com)")
+	serviceNowUser := flag.String("servicenow-user", "", "ServiceNow username for ticket creation")
+	serviceNowPassword := flag.String("servicenow-password", "", "ServiceNow password for ticket creation")
+
 	flag.Parse()
+
+	// Web application mode — start server and return
+	if *webMode {
+		intOpts := &IntegrationOptions{
+			ServiceNowURL:      *serviceNowURL,
+			ServiceNowUser:     *serviceNowUser,
+			ServiceNowPassword: *serviceNowPassword,
+		}
+		runWebServer(*webPort, *noBrowser, intOpts)
+		return
+	}
 
 	// Show help if requested or no arguments provided
 	if *showHelp || flag.NArg() < 1 {
@@ -373,6 +419,13 @@ For more information and documentation:
 	}
 	state := models.NewAnalysisState()
 
+	// Load threshold configuration if specified
+	thresholds, err := config.LoadThresholds(*configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Create processor and analyze
 	var processor *analyzer.Processor
 	if *qosAnalysis {
@@ -380,6 +433,9 @@ For more information and documentation:
 	} else {
 		processor = analyzer.NewProcessorWithOptions(false, *verbose)
 	}
+
+	// Apply custom thresholds from config
+	processor.ApplyThresholds(thresholds)
 
 	// Set handshake timeout if specified
 	if *handshakeTimeout > 0 {
@@ -475,8 +531,12 @@ For more information and documentation:
 		}
 	}
 
-	// Note: configPath is reserved for future template customization
-	_ = configPath
+	// Config was loaded earlier for threshold customization
+	if *verbose && *configPath != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Loaded config from: %s\n", *configPath)
+		fmt.Fprintf(os.Stderr, "[DEBUG] DDoS SYN threshold: %d\n", thresholds.DDoS.SYNThreshold)
+		fmt.Fprintf(os.Stderr, "[DEBUG] High RTT threshold: %.1fms\n", thresholds.Performance.HighRTTMs)
+	}
 
 	// Debug HTML output
 	if *debugHTML {
@@ -493,19 +553,27 @@ For more information and documentation:
 
 	// Trace path to discovered destinations (requires network access)
 	if *tracePath {
-		color.Cyan("\n━━━ NETWORK PATH DISCOVERY ━━━")
-		if err := performTracePath(report, *verbose); err != nil {
-			color.Yellow("⚠ Trace path failed: %v", err)
-			color.Yellow("  This feature requires network access and may need elevated privileges")
+		if *noExternalLookup {
+			color.Yellow("⚠ Trace path skipped (--no-external-lookup is set)")
+		} else {
+			color.Cyan("\n━━━ NETWORK PATH DISCOVERY ━━━")
+			if err := performTracePath(report, *verbose); err != nil {
+				color.Yellow("⚠ Trace path failed: %v", err)
+				color.Yellow("  This feature requires network access and may need elevated privileges")
+			}
 		}
 	}
 
 	// BGP check for hijack indicators (requires internet)
 	if *bgpCheck {
-		color.Cyan("\n━━━ BGP ROUTING CHECK ━━━")
-		if err := performBGPCheck(report, *verbose); err != nil {
-			color.Yellow("⚠ BGP check failed: %v", err)
-			color.Yellow("  This feature requires internet access to query BGP routing databases")
+		if *noExternalLookup {
+			color.Yellow("⚠ BGP check skipped (--no-external-lookup is set)")
+		} else {
+			color.Cyan("\n━━━ BGP ROUTING CHECK ━━━")
+			if err := performBGPCheck(report, *verbose); err != nil {
+				color.Yellow("⚠ BGP check failed: %v", err)
+				color.Yellow("  This feature requires internet access to query BGP routing databases")
+			}
 		}
 	}
 
@@ -517,13 +585,178 @@ For more information and documentation:
 	// Compare mode - handled separately with multiple files
 	if *compareMode {
 		if flag.NArg() < 2 {
-			color.Yellow("⚠ Compare mode requires at least 2 PCAP files")
-			color.Yellow("  Usage: sdwan-triage -compare file1.pcap file2.pcap [file3.pcap ...]")
+			color.Yellow("⚠ Compare mode requires 2 PCAP files (LAN-side and WAN-side)")
+			color.Yellow("  Usage: sdwan-triage -compare lan.pcap wan.pcap")
 		} else {
-			color.Cyan("\n━━━ MULTI-FILE COMPARISON ━━━")
-			compareMultiplePCAPs(flag.Args(), *verbose)
+			color.Cyan("\n━━━ PCAP COMPARISON MODE ━━━")
+			runPCAPComparison(flag.Arg(0), flag.Arg(1), *verbose, *jsonOutput, *htmlOutput)
 		}
 	}
+}
+
+// runPCAPComparison performs a deep packet-level comparison between two PCAP files.
+func runPCAPComparison(fileA, fileB string, verboseMode bool, jsonOut bool, htmlFile string) {
+	comp := analyzer.NewComparator(verboseMode)
+
+	color.White("  LAN-side (A): %s", fileA)
+	color.White("  WAN-side (B): %s", fileB)
+	fmt.Println()
+
+	report, err := comp.Compare(fileA, fileB)
+	if err != nil {
+		color.Red("  ✗ Comparison failed: %v", err)
+		os.Exit(1)
+	}
+
+	// Print results
+	printComparisonReport(report)
+
+	// JSON output
+	if jsonOut {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(report); err != nil {
+			fmt.Fprintf(os.Stderr, "Error encoding JSON: %v\n", err)
+		}
+	}
+}
+
+// printComparisonReport displays the comparison results in the terminal.
+func printComparisonReport(report *analyzer.ComparisonReport) {
+	// Path Integrity Score — large banner
+	scoreColor := color.New(color.FgGreen, color.Bold)
+	if report.PathIntegrityScore < 80 {
+		scoreColor = color.New(color.FgYellow, color.Bold)
+	}
+	if report.PathIntegrityScore < 50 {
+		scoreColor = color.New(color.FgRed, color.Bold)
+	}
+
+	fmt.Println()
+	color.Cyan("  ╔══════════════════════════════════════════╗")
+	scoreColor.Fprintf(os.Stdout, "  ║  Path Integrity Score: %5.1f%% (%s)  \n", report.PathIntegrityScore, report.IntegrityRating)
+	color.Cyan("  ╚══════════════════════════════════════════╝")
+	fmt.Println()
+
+	// Tunnel detection banner
+	if report.TunnelDetected {
+		color.Cyan("  ━━━ TUNNEL ENCAPSULATION DETECTED ━━━")
+		for _, t := range report.TunnelTypes {
+			cnt := report.TunnelBreakdown[t]
+			color.Cyan("  ● %s: %d packets", t, cnt)
+		}
+		if report.EncapsulatedCount > 0 {
+			decapOK := report.EncapsulatedCount - report.EncryptedCount
+			fmt.Printf("  Decapsulated (inner extracted): %d\n", decapOK)
+		}
+		if report.EncryptedCount > 0 {
+			color.Yellow("  ⚠ %d packets encrypted (ESP/DTLS) — inner flow hidden by encryption", report.EncryptedCount)
+			color.Yellow("    Matching based on outer header correlation for encrypted packets")
+		}
+		fmt.Println()
+	}
+
+	// Summary stats
+	color.White("  ━━━ PACKET SUMMARY ━━━")
+	fmt.Printf("  %-30s %d\n", "Packets in LAN capture (A):", report.TotalPacketsA)
+	fmt.Printf("  %-30s %d\n", "Packets in WAN capture (B):", report.TotalPacketsB)
+	color.Green("  %-30s %d", "Matched (PRESENT_BOTH):", report.MatchedCount)
+	if report.MissingBCount > 0 {
+		color.Red("  %-30s %d (dropped by device)", "Missing from WAN (MISSING_B):", report.MissingBCount)
+	} else {
+		fmt.Printf("  %-30s %d\n", "Missing from WAN (MISSING_B):", report.MissingBCount)
+	}
+	if report.MissingACount > 0 {
+		color.Yellow("  %-30s %d (asymmetric/injected)", "Missing from LAN (MISSING_A):", report.MissingACount)
+	} else {
+		fmt.Printf("  %-30s %d\n", "Missing from LAN (MISSING_A):", report.MissingACount)
+	}
+	if report.ModifiedCount > 0 {
+		color.Yellow("  %-30s %d", "Modified (TTL/DSCP/NAT):", report.ModifiedCount)
+	} else {
+		fmt.Printf("  %-30s %d\n", "Modified:", report.ModifiedCount)
+	}
+	if report.EncryptedCount > 0 {
+		color.Cyan("  %-30s %d (inner flow hidden)", "Encrypted tunnel packets:", report.EncryptedCount)
+	}
+	fmt.Println()
+
+	// Modification details
+	if report.ModifiedCount > 0 {
+		color.White("  ━━━ MODIFICATION DETAILS ━━━")
+		if report.NATDetected {
+			color.Yellow("  ⚠ NAT translation detected between LAN and WAN")
+		}
+		if report.TTLChanges > 0 {
+			fmt.Printf("  TTL changes: %d (expected — each hop decrements TTL)\n", report.TTLChanges)
+		}
+		if report.DSCPChanges > 0 {
+			color.Yellow("  DSCP/QoS remarking: %d packets (QoS policy applied)", report.DSCPChanges)
+		}
+		fmt.Println()
+	}
+
+	// Per-flow summary (top 20 worst flows)
+	if len(report.FlowSummaries) > 0 {
+		color.White("  ━━━ FLOW COMPARISON (sorted by match rate, worst first) ━━━")
+		fmt.Printf("\n  %-42s %6s %6s %6s %6s %6s %7s\n",
+			"Flow", "PktsA", "PktsB", "Match", "DropB", "DropA", "Rate")
+		fmt.Printf("  %s\n", strings.Repeat("─", 88))
+
+		limit := 20
+		if len(report.FlowSummaries) < limit {
+			limit = len(report.FlowSummaries)
+		}
+		for i := 0; i < limit; i++ {
+			fs := report.FlowSummaries[i]
+			flowStr := fmt.Sprintf("%s:%d→%s:%d/%s", fs.SrcIP, fs.SrcPort, fs.DstIP, fs.DstPort, fs.Protocol)
+			if len(flowStr) > 42 {
+				flowStr = flowStr[:39] + "..."
+			}
+
+			rateStr := fmt.Sprintf("%.0f%%", fs.MatchRate*100)
+			if fs.MatchRate < 0.5 {
+				color.Red("  %-42s %6d %6d %6d %6d %6d %7s", flowStr, fs.PacketsA, fs.PacketsB, fs.Matched, fs.MissingB, fs.MissingA, rateStr)
+			} else if fs.MatchRate < 0.95 {
+				color.Yellow("  %-42s %6d %6d %6d %6d %6d %7s", flowStr, fs.PacketsA, fs.PacketsB, fs.Matched, fs.MissingB, fs.MissingA, rateStr)
+			} else {
+				fmt.Printf("  %-42s %6d %6d %6d %6d %6d %7s\n", flowStr, fs.PacketsA, fs.PacketsB, fs.Matched, fs.MissingB, fs.MissingA, rateStr)
+			}
+		}
+		if len(report.FlowSummaries) > limit {
+			fmt.Printf("  ... and %d more flows\n", len(report.FlowSummaries)-limit)
+		}
+		fmt.Println()
+	}
+
+	// Top discrepancies (first 10)
+	if len(report.Discrepancies) > 0 {
+		color.White("  ━━━ TOP DISCREPANCIES ━━━")
+		limit := 10
+		if len(report.Discrepancies) < limit {
+			limit = len(report.Discrepancies)
+		}
+		for i := 0; i < limit; i++ {
+			d := report.Discrepancies[i]
+			switch d.State {
+			case analyzer.StateMissingB:
+				color.Red("  [MISSING_B] #%d %s %s:%d→%s:%d %s — %s",
+					d.PacketIndex, d.Timestamp, d.SrcIP, d.SrcPort, d.DstIP, d.DstPort, d.Protocol, d.Detail)
+			case analyzer.StateMissingA:
+				color.Yellow("  [MISSING_A] #%d %s %s:%d→%s:%d %s — %s",
+					d.PacketIndex, d.Timestamp, d.SrcIP, d.SrcPort, d.DstIP, d.DstPort, d.Protocol, d.Detail)
+			case analyzer.StateModified:
+				color.Yellow("  [MODIFIED]  #%d %s %s:%d→%s:%d %s — %s",
+					d.PacketIndex, d.Timestamp, d.SrcIP, d.SrcPort, d.DstIP, d.DstPort, d.Protocol, d.Detail)
+			}
+		}
+		if len(report.Discrepancies) > limit {
+			fmt.Printf("  ... and %d more discrepancies\n", len(report.Discrepancies)-limit)
+		}
+	}
+
+	fmt.Println()
+	color.Cyan("  Analysis completed in %v", report.AnalysisDuration)
 }
 
 // performTracePath performs traceroute to top destinations with anomalies
@@ -606,14 +839,38 @@ func checkConnectivity(ip string, verbose bool) error {
 	return fmt.Errorf("no response on common ports")
 }
 
-// performBGPCheck checks BGP routing for potential hijack indicators
-func performBGPCheck(report *models.TriageReport, verbose bool) error {
-	// Check if we have any BGP indicators from the analysis
-	if len(report.BGPHijackIndicators) == 0 {
-		color.White("  No BGP sessions detected in capture")
-		color.White("  Checking external IPs against known BGP data...")
-	}
+// bgpPrefixResponse represents the RIPE stat API response for prefix overview
+type bgpPrefixResponse struct {
+	Status     string `json:"status"`
+	StatusCode int    `json:"status_code"`
+	Data       struct {
+		Resource string `json:"resource"`
+		ASNs     []struct {
+			ASN    int    `json:"asn"`
+			Holder string `json:"holder"`
+		} `json:"asns"`
+		Block struct {
+			Resource string `json:"resource"`
+			Desc     string `json:"desc"`
+			Name     string `json:"name"`
+		} `json:"block"`
+		Announced bool   `json:"announced"`
+		IsLess    string `json:"is_less_specific"`
+	} `json:"data"`
+}
 
+// bgpLookupResult holds the result of a single BGP prefix lookup
+type bgpLookupResult struct {
+	IP        string
+	ASN       int
+	ASHolder  string
+	Prefix    string
+	Announced bool
+	Error     error
+}
+
+// performBGPCheck queries RIPE stat API for BGP prefix information on external IPs
+func performBGPCheck(report *models.TriageReport, verbose bool) error {
 	// Collect external IPs to check
 	externalIPs := make(map[string]bool)
 	for _, flow := range report.TrafficAnalysis {
@@ -625,35 +882,124 @@ func performBGPCheck(report *models.TriageReport, verbose bool) error {
 		}
 	}
 
+	// Also check IPs from security findings
+	for _, finding := range report.Security.DDoSFindings {
+		if finding.SourceIP != "" && !isPrivateIP(finding.SourceIP) {
+			externalIPs[finding.SourceIP] = true
+		}
+	}
+
 	if len(externalIPs) == 0 {
 		color.Yellow("  No external IPs found to check")
 		return nil
 	}
 
-	// Check connectivity to BGP data sources
-	color.White("  Checking %d external IPs for BGP anomalies...", len(externalIPs))
-
-	// Note: Full BGP checking would require API access to services like RIPE RIS, BGPStream, etc.
-	// For now, we provide a framework and indicate the feature is available
-	checkedCount := 0
-	for ip := range externalIPs {
-		if checkedCount >= 10 {
-			color.White("  ... and %d more IPs (limited to 10 for performance)", len(externalIPs)-10)
-			break
-		}
-		if verbose {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Would check BGP data for: %s\n", ip)
-		}
-		color.White("  • %s - BGP lookup pending (requires API integration)", ip)
-		checkedCount++
+	// Limit to top 10 IPs to avoid API abuse
+	limit := 10
+	if len(externalIPs) < limit {
+		limit = len(externalIPs)
 	}
 
-	color.Yellow("\n  ℹ Full BGP hijack detection requires integration with:")
-	color.Yellow("    • RIPE RIS (https://ris.ripe.net/)")
-	color.Yellow("    • BGPStream (https://bgpstream.com/)")
-	color.Yellow("    • Team Cymru IP-to-ASN mapping")
+	color.White("  Querying RIPE stat API for %d external IPs (of %d total)...\n", limit, len(externalIPs))
+
+	// HTTP client with 5s timeout
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	checked := 0
+	var anomalies []string
+	asnMap := make(map[int]string) // ASN -> holder name
+
+	for ip := range externalIPs {
+		if checked >= limit {
+			break
+		}
+		checked++
+
+		result := queryRIPEstat(client, ip, verbose)
+		if result.Error != nil {
+			if verbose {
+				fmt.Fprintf(os.Stderr, "[DEBUG] BGP lookup failed for %s: %v\n", ip, result.Error)
+			}
+			color.Yellow("  • %s — lookup failed: %v", ip, result.Error)
+			continue
+		}
+
+		if !result.Announced {
+			anomalies = append(anomalies, fmt.Sprintf("%s (not announced in BGP)", ip))
+			color.Red("  ✗ %s — NOT ANNOUNCED in BGP (potential bogon or hijack)", ip)
+		} else {
+			asnMap[result.ASN] = result.ASHolder
+			if verbose {
+				color.Green("  ✓ %s — AS%d (%s)", ip, result.ASN, result.ASHolder)
+			} else {
+				color.White("  • %s — AS%d (%s)", ip, result.ASN, result.ASHolder)
+			}
+		}
+	}
+
+	if len(externalIPs) > limit {
+		color.White("  ... and %d more IPs not checked (limited to %d)", len(externalIPs)-limit, limit)
+	}
+
+	// Summary
+	fmt.Println()
+	color.White("  BGP Summary:")
+	color.White("    Unique ASNs observed: %d", len(asnMap))
+	for asn, holder := range asnMap {
+		color.White("    • AS%d — %s", asn, holder)
+	}
+
+	if len(anomalies) > 0 {
+		color.Red("\n  ⚠ %d IP(s) with BGP anomalies:", len(anomalies))
+		for _, a := range anomalies {
+			color.Red("    • %s", a)
+		}
+	} else {
+		color.Green("\n  ✓ No BGP anomalies detected")
+	}
 
 	return nil
+}
+
+// queryRIPEstat queries the RIPE stat API for prefix overview of an IP
+func queryRIPEstat(client *http.Client, ip string, verbose bool) bgpLookupResult {
+	result := bgpLookupResult{IP: ip}
+
+	url := fmt.Sprintf("https://stat.ripe.net/data/prefix-overview/data.json?resource=%s&sourceapp=sdwan-triage", ip)
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[DEBUG] BGP query: %s\n", url)
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		result.Error = fmt.Errorf("API request failed: %w", err)
+		return result
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		result.Error = fmt.Errorf("API returned status %d", resp.StatusCode)
+		return result
+	}
+
+	var apiResp bgpPrefixResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		result.Error = fmt.Errorf("failed to parse response: %w", err)
+		return result
+	}
+
+	result.Announced = apiResp.Data.Announced
+	result.Prefix = apiResp.Data.Resource
+
+	if len(apiResp.Data.ASNs) > 0 {
+		result.ASN = apiResp.Data.ASNs[0].ASN
+		result.ASHolder = apiResp.Data.ASNs[0].Holder
+	}
+
+	return result
 }
 
 // isPrivateIP checks if an IP is in private address space
@@ -752,93 +1098,4 @@ func enhanceApplicationIdentification(report *models.TriageReport, verbose bool)
 		color.Green("  ✓ Identified %d applications via port heuristics", enhancedCount)
 		color.Green("  ✓ %d applications identified via SNI/DNS", sniCount)
 	}
-}
-
-// compareMultiplePCAPs compares multiple PCAP files
-func compareMultiplePCAPs(files []string, verbose bool) {
-	color.White("  Comparing %d PCAP files:\n", len(files))
-
-	type pcapStats struct {
-		File       string
-		Packets    int
-		Bytes      uint64
-		TCPFlows   int
-		UDPFlows   int
-		DNSQueries int
-		TLSConns   int
-		Anomalies  int
-		Duration   float64
-		Error      error
-	}
-
-	var stats []pcapStats
-
-	for _, file := range files {
-		color.Cyan("  Analyzing: %s", file)
-
-		// Open and analyze each file
-		f, err := os.Open(file)
-		if err != nil {
-			stats = append(stats, pcapStats{File: file, Error: err})
-			color.Red("    ✗ Error: %v", err)
-			continue
-		}
-
-		reader, err := pcapgo.NewReader(f)
-		if err != nil {
-			f.Close()
-			stats = append(stats, pcapStats{File: file, Error: err})
-			color.Red("    ✗ Error: %v", err)
-			continue
-		}
-
-		// Create fresh report and state for each file
-		fileReport := &models.TriageReport{
-			ApplicationBreakdown: make(map[string]models.AppCategory),
-		}
-		fileState := models.NewAnalysisState()
-		processor := analyzer.NewProcessorWithOptions(false, verbose)
-
-		if err := processor.Process(reader, fileState, fileReport, nil); err != nil {
-			f.Close()
-			stats = append(stats, pcapStats{File: file, Error: err})
-			color.Red("    ✗ Error: %v", err)
-			continue
-		}
-		f.Close()
-
-		// Collect stats
-		anomalyCount := len(fileReport.DNSAnomalies) + len(fileReport.Security.DDoSFindings) +
-			len(fileReport.Security.PortScanFindings) + len(fileReport.Security.TLSSecurityFindings)
-
-		s := pcapStats{
-			File:       filepath.Base(file),
-			Packets:    len(fileReport.TrafficAnalysis),
-			Bytes:      fileReport.TotalBytes,
-			TCPFlows:   len(fileReport.TCPRetransmissions),
-			UDPFlows:   len(fileReport.QUICFlows),
-			DNSQueries: len(fileReport.DNSDetails),
-			TLSConns:   len(fileReport.TLSCerts),
-			Anomalies:  anomalyCount,
-			Duration:   0,
-		}
-		stats = append(stats, s)
-		color.Green("    ✓ %d packets, %d flows", s.Packets, s.TCPFlows+s.UDPFlows)
-	}
-
-	// Print comparison table
-	color.Cyan("\n  ━━━ COMPARISON SUMMARY ━━━")
-	fmt.Printf("\n  %-25s %10s %12s %8s %8s %10s\n",
-		"File", "Packets", "Bytes", "TCP", "UDP", "Anomalies")
-	fmt.Printf("  %s\n", strings.Repeat("─", 80))
-
-	for _, s := range stats {
-		if s.Error != nil {
-			fmt.Printf("  %-25s %s\n", s.File, color.RedString("ERROR: %v", s.Error))
-		} else {
-			fmt.Printf("  %-25s %10d %12d %8d %8d %10d\n",
-				s.File, s.Packets, s.Bytes, s.TCPFlows, s.UDPFlows, s.Anomalies)
-		}
-	}
-	fmt.Println()
 }

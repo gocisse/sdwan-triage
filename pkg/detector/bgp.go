@@ -4,15 +4,21 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
+// BGPEventCallback is called when a BGP event is detected, allowing external
+// components (e.g., the underlay/overlay correlator) to record the event.
+type BGPEventCallback func(timestamp time.Time, peerIP, prefix, eventType, detail string)
+
 // BGPAnalyzer handles BGP protocol analysis and hijack detection
 type BGPAnalyzer struct {
 	bgpSessions map[string]*BGPSession
+	OnBGPEvent  BGPEventCallback // Optional callback for correlation
 }
 
 // BGPSession tracks BGP session state
@@ -183,6 +189,19 @@ func (b *BGPAnalyzer) handleBGPUpdate(msg *BGPMessage, session *BGPSession, ipIn
 		return
 	}
 
+	// Determine event type: withdrawal vs. update
+	eventType := "Update"
+	if withdrawnLen > 0 {
+		eventType = "Withdrawal"
+	}
+
+	// Notify correlator of BGP event
+	if b.OnBGPEvent != nil {
+		ts := time.Unix(0, int64(timestamp*1e9))
+		detail := fmt.Sprintf("Peer %s: BGP %s (withdrawn_len=%d)", ipInfo.SrcIP, eventType, withdrawnLen)
+		b.OnBGPEvent(ts, ipInfo.SrcIP, ipInfo.DstIP, eventType, detail)
+	}
+
 	// Skip withdrawn routes
 	pos := 2 + withdrawnLen
 
@@ -323,8 +342,14 @@ func (b *BGPAnalyzer) handleBGPNotification(msg *BGPMessage, session *BGPSession
 
 	session.State = "Idle"
 
-	b.reportBGPAnomaly(report, "BGP Session Error", ipInfo, timestamp,
-		fmt.Sprintf("BGP NOTIFICATION: Error %d/%d from %s", errorCode, errorSubcode, ipInfo.SrcIP))
+	detail := fmt.Sprintf("BGP NOTIFICATION: Error %d/%d from %s", errorCode, errorSubcode, ipInfo.SrcIP)
+	b.reportBGPAnomaly(report, "BGP Session Error", ipInfo, timestamp, detail)
+
+	// Notify correlator of BGP session reset
+	if b.OnBGPEvent != nil {
+		ts := time.Unix(0, int64(timestamp*1e9))
+		b.OnBGPEvent(ts, ipInfo.SrcIP, ipInfo.DstIP, "Notification", detail)
+	}
 }
 
 // reportBGPAnomaly adds a BGP anomaly to the report
