@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gocisse/sdwan-triage/pkg/analyzer"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/gocisse/sdwan-triage/pkg/web/storage"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcapgo"
 )
 
 // PacketInspectionHandlers provides endpoints for packet inspection
@@ -337,16 +337,12 @@ type StreamInfo struct {
 
 // loadPacketsFromPCAP loads packets from a PCAP file into the store
 func (h *PacketInspectionHandlers) loadPacketsFromPCAP(filePath string) error {
-	file, err := os.Open(filePath)
+	capHandle, err := analyzer.OpenCapture(filePath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-
-	reader, err := pcapgo.NewReader(file)
-	if err != nil {
-		return err
-	}
+	defer capHandle.Close()
+	reader := capHandle.Reader
 
 	index := 0
 	for {

@@ -12,7 +12,6 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 )
 
 // AdvancedStreamingConfig configures the streaming processor
@@ -142,23 +141,18 @@ func (sp *AdvancedStreamingProcessor) ProcessFile(ctx context.Context, filename 
 	}
 	fileSize := fileInfo.Size()
 
-	// Open PCAP file
-	file, err := os.Open(filename)
+	// Open capture file (auto-detects pcap vs pcapng)
+	capHandle, err := OpenCapture(filename)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-
-	handle, err := pcapgo.NewReader(file)
-	if err != nil {
-		return nil, err
-	}
+	defer capHandle.Close()
 
 	// Start worker pool
 	sp.startWorkers(ctx)
 
 	// Process packets
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	packetSource := gopacket.NewPacketSource(capHandle.Reader, capHandle.Reader.LinkType())
 	packetSource.NoCopy = true
 
 	var bytesRead int64

@@ -131,6 +131,9 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 	// Wire up comparison handlers
 	comparisonHandlers := handlers.NewComparisonHandlers(store.GetUploadsDir())
 
+	// Wire up export/annotation handlers
+	exportHandlers := handlers.NewExportPCAPHandlers(packetHandlers)
+
 	api := router.Group("/api")
 
 	// ── Public endpoints (no auth required) ────────────────────
@@ -163,6 +166,12 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 		protected.GET("/packet/:jobID/:packetIndex", packetHandlers.GetPacket)
 		protected.GET("/streams/:jobID", packetHandlers.ListStreams)
 		protected.GET("/stream/:jobID/:streamID", packetHandlers.GetStream)
+
+		// ── PCAP Export & Annotation endpoints ──────────────────
+		protected.POST("/export-pcap/:jobID", exportHandlers.PostExportPCAP)
+		protected.GET("/annotations/:jobID", exportHandlers.GetAnnotations)
+		protected.POST("/annotations/:jobID", exportHandlers.PostAnnotation)
+		protected.DELETE("/annotations/:jobID/:annotationID", exportHandlers.DeleteAnnotation)
 
 		// ── Auth management endpoints ────────────────────────
 		protected.GET("/auth/me", handleMe(authCfg))
@@ -352,6 +361,16 @@ func mountFrontend(router *gin.Engine) {
 			return
 		}
 		c.Data(http.StatusOK, "image/svg+xml", data)
+	})
+
+	// Serve logo
+	router.GET("/logo.png", func(c *gin.Context) {
+		data, err := fs.ReadFile(distFS, "logo.png")
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Data(http.StatusOK, "image/png", data)
 	})
 
 	// Read index.html once at startup for SPA serving

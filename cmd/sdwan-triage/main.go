@@ -16,12 +16,11 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/config"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/gocisse/sdwan-triage/pkg/output"
-	"github.com/google/gopacket/pcapgo"
 )
 
 // Build-time variables — stamped via -ldflags "-X main.version=... -X main.buildCommit=... -X main.buildDate=..."
 var (
-	version     = "4.3.3"
+	version     = "4.5.0"
 	buildCommit = "unknown"
 	buildDate   = "unknown"
 )
@@ -390,27 +389,21 @@ For more information and documentation:
 		fmt.Fprintf(os.Stderr, "[DEBUG] Opening PCAP file: %s (size: %d bytes)\n", absPath, fileInfo.Size())
 	}
 
-	// Open PCAP file
-	file, err := os.Open(absPath)
+	// Open capture file (auto-detects pcap vs pcapng)
+	capHandle, err := analyzer.OpenCapture(absPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening file '%s': %v\n", absPath, err)
-		os.Exit(1)
-	}
-	defer file.Close()
-
-	reader, err := pcapgo.NewReader(file)
-	if err != nil {
-		// Try to provide more helpful error message
-		fmt.Fprintf(os.Stderr, "Error: Failed to read PCAP file '%s'\n", filepath.Base(absPath))
-		fmt.Fprintf(os.Stderr, "       This may not be a valid PCAP file or it may be corrupted.\n")
+		fmt.Fprintf(os.Stderr, "Error: Failed to read capture file '%s'\n", filepath.Base(absPath))
+		fmt.Fprintf(os.Stderr, "       Supported formats: .pcap and .pcapng\n")
 		if *verbose {
-			fmt.Fprintf(os.Stderr, "[DEBUG] pcapgo.NewReader error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[DEBUG] OpenCapture error: %v\n", err)
 		}
 		os.Exit(1)
 	}
+	defer capHandle.Close()
+	reader := capHandle.Reader
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "[DEBUG] PCAP file opened successfully, link type: %v\n", reader.LinkType())
+		fmt.Fprintf(os.Stderr, "[DEBUG] Capture file opened successfully (format: %s, link type: %v)\n", capHandle.Format, reader.LinkType())
 	}
 
 	// Initialize report and state

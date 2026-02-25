@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -26,6 +27,9 @@ var proDashboardCSSContent string
 
 //go:embed assets/js/visualizations.js
 var jsContent string
+
+//go:embed assets/logo.png
+var logoPNG []byte
 
 //go:embed assets/templates/report.html
 var templateContent embed.FS
@@ -181,12 +185,17 @@ type ReportData struct {
 	HSRPGroups      []HSRPGroupView
 	STPBridges      []STPBridgeView
 
+	// Interface Stability / Flapping Detection
+	HasStabilityFindings bool
+	StabilityFindings    []StabilityFindingView
+
 	// Protocol Troubleshooting Guides
 	ProtocolGuidesHTML template.HTML
 
 	// Embedded assets
-	CSS template.CSS
-	JS  template.JS
+	CSS        template.CSS
+	JS         template.JS
+	LogoBase64 string
 
 	// Visualization data (JSON strings)
 	NetworkDataJSON   template.JS
@@ -635,7 +644,7 @@ type LLDPDeviceView struct {
 }
 
 type HSRPGroupView struct {
-	GroupNumber   uint8
+	GroupNumber   uint16
 	State         string
 	Priority      uint8
 	VirtualIP     string
@@ -654,6 +663,21 @@ type STPBridgeView struct {
 	FirstSeen    string
 	LastSeen     string
 	PacketCount  uint64
+}
+
+type StabilityFindingView struct {
+	Type          string
+	Severity      string
+	Identifier    string
+	Description   string
+	StateChanges  int
+	WindowSeconds string
+	FirstSeen     string
+	LastSeen      string
+	SourceIP      string
+	PeerIP        string
+	Protocol      string
+	RootCauseHint string
 }
 
 // GenerateHTMLReport generates a professional HTML report using templates
@@ -784,6 +808,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 		Year:        time.Now().Year(),
 		CSS:         template.CSS(cssContent),
 		JS:          template.JS(jsContent),
+		LogoBase64:  base64.StdEncoding.EncodeToString(logoPNG),
 	}
 
 	// Use risk score from model (calculated in processor)
@@ -909,6 +934,27 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 		data.LLDPDevices = convertLLDPDevices(r.LANProtocols.LLDPDevices)
 		data.HSRPGroups = convertHSRPGroups(r.LANProtocols.HSRPGroups)
 		data.STPBridges = convertSTPBridges(r.LANProtocols.STPBridges)
+	}
+
+	// Interface Stability / Flapping Detection
+	if len(r.StabilityFindings) > 0 {
+		data.HasStabilityFindings = true
+		for _, sf := range r.StabilityFindings {
+			data.StabilityFindings = append(data.StabilityFindings, StabilityFindingView{
+				Type:          html.EscapeString(sf.Type),
+				Severity:      html.EscapeString(sf.Severity),
+				Identifier:    html.EscapeString(sf.Identifier),
+				Description:   html.EscapeString(sf.Description),
+				StateChanges:  sf.StateChanges,
+				WindowSeconds: fmt.Sprintf("%.1f", sf.WindowSeconds),
+				FirstSeen:     html.EscapeString(sf.FirstSeen),
+				LastSeen:      html.EscapeString(sf.LastSeen),
+				SourceIP:      html.EscapeString(sf.SourceIP),
+				PeerIP:        html.EscapeString(sf.PeerIP),
+				Protocol:      html.EscapeString(sf.Protocol),
+				RootCauseHint: html.EscapeString(sf.RootCauseHint),
+			})
+		}
 	}
 
 	// Generate visualization data

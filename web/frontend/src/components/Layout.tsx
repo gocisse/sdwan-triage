@@ -6,7 +6,6 @@ import {
   History, 
   Menu, 
   X,
-  Network,
   LogOut,
   Lock,
   User,
@@ -60,9 +59,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <Network className="w-6 h-6 text-white" />
-              </div>
+              <img src="/logo.png" alt="SD-WAN Triage" className="w-10 h-10 rounded-lg object-contain" />
               <div className="hidden sm:block">
                 <h1 className="text-lg font-bold text-white">SD-WAN Triage</h1>
                 <p className="text-xs text-slate-400">Network Analysis Tool</p>

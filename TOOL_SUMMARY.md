@@ -1,6 +1,6 @@
 # SD-WAN Triage Tool - Complete Summary
 
-**Current Version**: v4.3.0.0  
+**Current Version**: v4.5.0  
 **Repository**: https://github.com/gocisse/sdwan-triage  
 **Language**: Go  
 **Purpose**: Comprehensive PCAP analysis tool for SD-WAN networks with advanced security detection, performance monitoring, and interactive visualizations

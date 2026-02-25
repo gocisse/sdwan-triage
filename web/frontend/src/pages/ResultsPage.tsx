@@ -14,13 +14,15 @@ import {
   HelpCircle,
   X,
   ArrowRightLeft,
+  Info,
 } from 'lucide-react';
 import { useAnalysis } from '../hooks';
+import { parseFilter, applyFilter, ForensicFilterContext, type ForensicFilterContextValue } from '../hooks';
 import { downloadFile } from '../api/client';
 import { formatDate } from '../utils';
 import type { AnalysisResults } from '../types';
 import { ExecutiveSummary, FindingCard, IssueSidebar, type CategoryId, WizardModal, EmergencyBanner, NetworkTopology, VendorIndicator, VirtualizedFlowTable, type Column } from '../components/dashboard';
-import { StreamModal, HexViewer } from '../components';
+import { StreamModal, HexViewer, FilterBar, ProtocolStats, ConversationsView, ExpertInfo, IOGraphView, ExportButton, QosDashboard, LatencyMatrix } from '../components';
 import { issueKnowledgeBase, getSeverityConfig } from '../data/knowledgeBase';
 import { getActiveFindings, wizardSymptoms } from '../data/wizardData';
 
@@ -40,6 +42,32 @@ export function ResultsPage() {
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
   const [hexViewerOpen, setHexViewerOpen] = useState(false);
   const [selectedPacketIndex, setSelectedPacketIndex] = useState<number>(-1);
+
+  // Forensic drill-down state
+  const [forensicTab, setForensicTab] = useState<'findings' | 'forensic'>('findings');
+  const [forensicSubTab, setForensicSubTab] = useState<'iograph' | 'protocols' | 'conversations' | 'expert' | 'qos' | 'latency'>('iograph');
+  const [filterText, setFilterText] = useState('');
+
+  // Parse filter and compute filtered results
+  const parsedFilter = useMemo(() => parseFilter(filterText), [filterText]);
+  const filteredResults = useMemo(
+    () => results ? applyFilter(results, parsedFilter) : null,
+    [results, parsedFilter]
+  );
+  const isFiltered = parsedFilter.valid && parsedFilter.tokens.length > 0;
+
+  // Filter context value
+  const filterCtxValue = useMemo<ForensicFilterContextValue | null>(() => {
+    if (!results || !filteredResults) return null;
+    return {
+      filterText,
+      parsedFilter,
+      setFilterText,
+      filteredResults,
+      isFiltered,
+      clearFilter: () => setFilterText(''),
+    };
+  }, [filterText, parsedFilter, filteredResults, isFiltered, results]);
 
   // Extract detected vendor names for runbook integration
   const detectedVendors = useMemo(() => {
@@ -261,7 +289,133 @@ export function ResultsPage() {
         </button>
       )}
 
-      {/* Main Content: Sidebar + Findings */}
+      {/* ─── Display Filter Bar + Export Button ─────────────────── */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <FilterBar value={filterText} onChange={setFilterText} parsedFilter={parsedFilter} />
+        </div>
+        {id && (
+          <ExportButton
+            jobId={id}
+            filterText={filterText}
+            parsedFilter={parsedFilter}
+            isFiltered={isFiltered}
+          />
+        )}
+      </div>
+
+      {/* Filter active indicator */}
+      {isFiltered && filteredResults && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-xs text-green-400">
+          <span className="font-medium">Filter active</span>
+          <span className="text-green-500/70">—</span>
+          <span>{filteredResults.traffic_analysis?.length ?? 0} flows, {filteredResults.timeline?.length ?? 0} events match</span>
+          <button onClick={() => setFilterText('')} className="ml-auto text-green-500 hover:text-green-300 transition-colors underline">Clear</button>
+        </div>
+      )}
+
+      {/* ─── View Mode Tabs: Findings | Forensic ───────────────── */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-800/60 border border-slate-700/50 w-fit">
+        <button
+          onClick={() => setForensicTab('findings')}
+          className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+            forensicTab === 'findings'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`}
+        >
+          Findings
+        </button>
+        <button
+          onClick={() => setForensicTab('forensic')}
+          className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
+            forensicTab === 'forensic'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`}
+        >
+          Forensic Drill-Down
+        </button>
+      </div>
+
+      {/* ─── Forensic Drill-Down Panel ─────────────────────────── */}
+      {forensicTab === 'forensic' && (
+        <ForensicFilterContext.Provider value={filterCtxValue!}>
+          <div className="space-y-4">
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-1 border-b border-slate-700/50 pb-0">
+              {([
+                { key: 'iograph' as const, label: 'IO Graph' },
+                { key: 'protocols' as const, label: 'Protocol Hierarchy' },
+                { key: 'conversations' as const, label: 'Conversations' },
+                { key: 'expert' as const, label: 'Expert Info' },
+                { key: 'qos' as const, label: 'QoS Analysis' },
+                { key: 'latency' as const, label: 'Latency Matrix' },
+              ]).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setForensicSubTab(tab.key)}
+                  className={`px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-[1px] ${
+                    forensicSubTab === tab.key
+                      ? 'border-purple-500 text-purple-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sub-tab content */}
+            {forensicSubTab === 'iograph' && (
+              <IOGraphView
+                results={isFiltered && filteredResults ? filteredResults : results}
+                onTimeDrillDown={(startEpoch, endEpoch) => {
+                  setFilterText(`frame.time_epoch > ${startEpoch.toFixed(1)} && frame.time_epoch < ${endEpoch.toFixed(1)}`);
+                }}
+              />
+            )}
+            {forensicSubTab === 'protocols' && (
+              <ProtocolStats results={isFiltered && filteredResults ? filteredResults : results} />
+            )}
+            {forensicSubTab === 'conversations' && (
+              <ConversationsView
+                results={isFiltered && filteredResults ? filteredResults : results}
+                onFilterConversation={(srcIp, dstIp) => {
+                  setFilterText(`ip.addr == ${srcIp} && ip.addr == ${dstIp}`);
+                }}
+              />
+            )}
+            {forensicSubTab === 'expert' && (
+              <ExpertInfo
+                results={isFiltered && filteredResults ? filteredResults : results}
+                onJumpToPacket={(packetIndex) => {
+                  setSelectedPacketIndex(packetIndex);
+                  setHexViewerOpen(true);
+                }}
+                onFollowStream={(streamId) => {
+                  setSelectedStreamId(streamId);
+                  setStreamModalOpen(true);
+                }}
+              />
+            )}
+            {forensicSubTab === 'qos' && (
+              <QosDashboard
+                results={isFiltered && filteredResults ? filteredResults : results}
+              />
+            )}
+            {forensicSubTab === 'latency' && (
+              <LatencyMatrix
+                results={isFiltered && filteredResults ? filteredResults : results}
+                onFilterApply={(expr) => setFilterText(expr)}
+              />
+            )}
+          </div>
+        </ForensicFilterContext.Provider>
+      )}
+
+      {/* ─── Findings Panel (original view) ────────────────────── */}
+      {forensicTab === 'findings' && (
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Mobile Sidebar Toggle */}
         <button
@@ -286,7 +440,7 @@ export function ResultsPage() {
         {/* Findings List */}
         <div className="flex-1 min-w-0 space-y-4">
           <FindingsPanel
-            results={results}
+            results={isFiltered && filteredResults ? filteredResults : results}
             category={activeCategory}
             eli5Mode={eli5Mode}
             detectedVendors={detectedVendors}
@@ -297,6 +451,7 @@ export function ResultsPage() {
           />
         </div>
       </div>
+      )}
 
       {/* Wizard Modal */}
       <WizardModal
@@ -1322,6 +1477,63 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
 
   // ─── STABILITY FINDINGS ────────────────────────────────────
   if (category === 'all' || category === 'stability') {
+    // Interface Stability / Flapping findings (BFD, IKE, STP TCN, HSRP, VRRP)
+    const stabilityFindings = results.stability_findings || [];
+    if (stabilityFindings.length > 0) {
+      // Map finding type to knowledge base key
+      const typeToKB: Record<string, string> = {
+        'BFD Flapping': 'bfd_flapping',
+        'IKE Tunnel Rebuild': 'ike_tunnel_rebuild',
+        'STP TCN Storm': 'stp_tcn_storm',
+        'HSRP Flapping': 'interface_flapping',
+        'VRRP Flapping': 'interface_flapping',
+      };
+
+      stabilityFindings.forEach((sf, idx) => {
+        const kbKey = typeToKB[sf.type] || 'interface_flapping';
+        findings.push(
+          <FindingCard
+            key={`stability-${idx}`}
+            title={`Interface Instability: ${sf.type}`}
+            severity={sf.severity === 'Critical' ? 'Critical' : sf.severity === 'High' ? 'Warning' : 'Info'}
+            findingKey={kbKey}
+            detectedVendors={detectedVendors}
+            count={sf.state_changes}
+            description={sf.description}
+            knowledge={issueKnowledgeBase[kbKey]}
+            eli5Mode={eli5Mode}
+            details={
+              <div className="space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-800/60 rounded-lg p-2">
+                    <span className="text-slate-500">Protocol</span>
+                    <div className="text-white font-medium">{sf.protocol}</div>
+                  </div>
+                  <div className="bg-slate-800/60 rounded-lg p-2">
+                    <span className="text-slate-500">State Changes</span>
+                    <div className="text-red-400 font-medium">{sf.state_changes}</div>
+                  </div>
+                  <div className="bg-slate-800/60 rounded-lg p-2">
+                    <span className="text-slate-500">Identifier</span>
+                    <div className="text-white font-mono">{sf.identifier}</div>
+                  </div>
+                  <div className="bg-slate-800/60 rounded-lg p-2">
+                    <span className="text-slate-500">Window</span>
+                    <div className="text-slate-300">{sf.window_seconds.toFixed(1)}s</div>
+                  </div>
+                </div>
+                {sf.root_cause_hint && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 text-amber-300">
+                    <span className="font-semibold">Root Cause Hint:</span> {sf.root_cause_hint}
+                  </div>
+                )}
+              </div>
+            }
+          />
+        );
+      });
+    }
+
     // VRRP Flapping
     const vrrpFlapping = results.lan_protocols?.vrrp_sessions?.filter(s => s.is_flapping) || [];
     if (vrrpFlapping.length > 0) {
@@ -1466,117 +1678,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
 
   // ─── INFRASTRUCTURE FINDINGS ───────────────────────────────
   if (category === 'all' || category === 'infrastructure') {
-    // CDP Devices
-    const cdp = results.lan_protocols?.cdp_devices || [];
-    if (cdp.length > 0) {
-      findings.push(
-        <FindingCard
-          key="cdp"
-          title="CDP Device Discovery"
-          severity="Info"
-          count={cdp.length}
-          description={`Healthy: ${cdp.length} Cisco device${cdp.length > 1 ? 's' : ''} discovered via CDP — useful for topology mapping. No action required.`}
-          knowledge={issueKnowledgeBase.network_discovery}
-          eli5Mode={eli5Mode}
-          details={
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-700/50">
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Device</th>
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">IP</th>
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Platform</th>
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Port</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/30">
-                  {cdp.map((c, i) => (
-                    <tr key={i} className="hover:bg-slate-700/20">
-                      <td className="px-3 py-2 text-white font-medium">{c.device_id}</td>
-                      <td className="px-3 py-2 font-mono text-slate-400">{c.ip_address}</td>
-                      <td className="px-3 py-2 text-slate-300">{c.platform}</td>
-                      <td className="px-3 py-2 text-slate-400">{c.port_id}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          }
-        />
-      );
-    }
-
-    // LLDP Devices
-    const lldp = results.lan_protocols?.lldp_devices || [];
-    if (lldp.length > 0) {
-      findings.push(
-        <FindingCard
-          key="lldp"
-          title="LLDP Device Discovery"
-          severity="Info"
-          count={lldp.length}
-          description={`Healthy: ${lldp.length} device${lldp.length > 1 ? 's' : ''} discovered via LLDP — use this to verify physical topology. No action required.`}
-          knowledge={issueKnowledgeBase.network_discovery}
-          eli5Mode={eli5Mode}
-          details={
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-700/50">
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">System Name</th>
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Chassis ID</th>
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Mgmt IP</th>
-                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Port</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/30">
-                  {lldp.map((l, i) => (
-                    <tr key={i} className="hover:bg-slate-700/20">
-                      <td className="px-3 py-2 text-white font-medium">{l.system_name || '-'}</td>
-                      <td className="px-3 py-2 font-mono text-slate-400">{l.chassis_id}</td>
-                      <td className="px-3 py-2 font-mono text-slate-400">{l.management_ip || '-'}</td>
-                      <td className="px-3 py-2 text-slate-400">{l.port_id}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          }
-        />
-      );
-    }
-
-    // STP Bridges
-    const stp = results.lan_protocols?.stp_bridges || [];
-    if (stp.length > 0) {
-      findings.push(
-        <FindingCard
-          key="stp"
-          title="STP Topology"
-          severity="Info"
-          count={stp.length}
-          description={`Healthy: ${stp.length} STP bridge${stp.length > 1 ? 's' : ''} providing loop prevention — network redundancy is active. No action required.`}
-          knowledge={issueKnowledgeBase.stp_topology}
-          eli5Mode={eli5Mode}
-        />
-      );
-    }
-
-    // VRRP Sessions (non-flapping - info)
-    const vrrpOk = results.lan_protocols?.vrrp_sessions?.filter(s => !s.is_flapping) || [];
-    if (vrrpOk.length > 0) {
-      findings.push(
-        <FindingCard
-          key="vrrp-ok"
-          title="VRRP Sessions (Healthy)"
-          severity="Info"
-          count={vrrpOk.length}
-          description={`Healthy: ${vrrpOk.length} stable VRRP session${vrrpOk.length > 1 ? 's' : ''} providing gateway redundancy — failover protection is active. No action required.`}
-          knowledge={null}
-          eli5Mode={eli5Mode}
-        />
-      );
-    }
+    // ── Issues (Warning/Critical) — rendered first ──────────
 
     // DHCP Findings
     const dhcp = results.dhcp_findings || [];
@@ -1686,6 +1788,196 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
         />
       );
     }
+
+    // ICMP Anomalies
+    const icmpAll = results.icmp_analysis || [];
+    const icmpAnomalies = icmpAll.filter(i => i.is_anomaly);
+    if (icmpAnomalies.length > 0) {
+      findings.push(
+        <FindingCard
+          key="icmp"
+          title="ICMP Anomalies Detected"
+          findingKey="icmp_anomaly"
+          detectedVendors={detectedVendors}
+          severity="Warning"
+          count={icmpAnomalies.length}
+          description={`${icmpAnomalies.length} unusual ICMP pattern${icmpAnomalies.length > 1 ? 's' : ''} detected — may indicate scanning, tunneling, or routing issues`}
+          knowledge={issueKnowledgeBase.icmp_anomaly}
+          eli5Mode={eli5Mode}
+          details={
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-700/50">
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Type</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Source</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Destination</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Count</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Description</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {icmpAnomalies.map((ic, i) => (
+                    <tr key={i} className="hover:bg-slate-700/20">
+                      <td className="px-3 py-2 text-white font-medium">{ic.type_name}</td>
+                      <td className="px-3 py-2 font-mono text-slate-400">{ic.source_ip}</td>
+                      <td className="px-3 py-2 font-mono text-slate-400">{ic.dest_ip}</td>
+                      <td className="px-3 py-2 text-slate-400">{ic.count.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-slate-400 max-w-xs truncate">{ic.description || `ICMP type ${ic.icmp_type} code ${ic.icmp_code}`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+        />
+      );
+    }
+
+    // ── Insights (Info) — passive observations, rendered below issues ──
+    const cdp = results.lan_protocols?.cdp_devices || [];
+    const lldp = results.lan_protocols?.lldp_devices || [];
+    const stp = results.lan_protocols?.stp_bridges || [];
+    const vrrpOk = results.lan_protocols?.vrrp_sessions?.filter(s => !s.is_flapping) || [];
+    const icmpInfo = icmpAll.filter(i => !i.is_anomaly);
+    const hasInsights = cdp.length > 0 || lldp.length > 0 || stp.length > 0 || vrrpOk.length > 0 || icmpInfo.length > 0;
+
+    if (hasInsights) {
+      // Visual separator between issues and insights
+      findings.push(
+        <div key="infra-insights-divider" className="flex items-center gap-3 pt-2">
+          <div className="h-px flex-1 bg-slate-700/50" />
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Info className="w-3 h-3" />
+            Infrastructure Insights
+          </span>
+          <div className="h-px flex-1 bg-slate-700/50" />
+        </div>
+      );
+
+      // CDP Devices
+      if (cdp.length > 0) {
+        findings.push(
+          <FindingCard
+            key="cdp"
+            title="CDP Device Discovery"
+            severity="Info"
+            count={cdp.length}
+            description={`Healthy: ${cdp.length} Cisco device${cdp.length > 1 ? 's' : ''} discovered via CDP — useful for topology mapping. No action required.`}
+            knowledge={issueKnowledgeBase.network_discovery}
+            eli5Mode={eli5Mode}
+            details={
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Device</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">IP</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Platform</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Port</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {cdp.map((c, i) => (
+                      <tr key={i} className="hover:bg-slate-700/20">
+                        <td className="px-3 py-2 text-white font-medium">{c.device_id}</td>
+                        <td className="px-3 py-2 font-mono text-slate-400">{c.ip_address}</td>
+                        <td className="px-3 py-2 text-slate-300">{c.platform}</td>
+                        <td className="px-3 py-2 text-slate-400">{c.port_id}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            }
+          />
+        );
+      }
+
+      // LLDP Devices
+      if (lldp.length > 0) {
+        findings.push(
+          <FindingCard
+            key="lldp"
+            title="LLDP Device Discovery"
+            severity="Info"
+            count={lldp.length}
+            description={`Healthy: ${lldp.length} device${lldp.length > 1 ? 's' : ''} discovered via LLDP — use this to verify physical topology. No action required.`}
+            knowledge={issueKnowledgeBase.network_discovery}
+            eli5Mode={eli5Mode}
+            details={
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">System Name</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Chassis ID</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Mgmt IP</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Port</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {lldp.map((l, i) => (
+                      <tr key={i} className="hover:bg-slate-700/20">
+                        <td className="px-3 py-2 text-white font-medium">{l.system_name || '-'}</td>
+                        <td className="px-3 py-2 font-mono text-slate-400">{l.chassis_id}</td>
+                        <td className="px-3 py-2 font-mono text-slate-400">{l.management_ip || '-'}</td>
+                        <td className="px-3 py-2 text-slate-400">{l.port_id}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            }
+          />
+        );
+      }
+
+      // STP Bridges
+      if (stp.length > 0) {
+        findings.push(
+          <FindingCard
+            key="stp"
+            title="STP Topology"
+            severity="Info"
+            count={stp.length}
+            description={`Healthy: ${stp.length} STP bridge${stp.length > 1 ? 's' : ''} providing loop prevention — network redundancy is active. No action required.`}
+            knowledge={issueKnowledgeBase.stp_topology}
+            eli5Mode={eli5Mode}
+          />
+        );
+      }
+
+      // VRRP Sessions (non-flapping - info)
+      if (vrrpOk.length > 0) {
+        findings.push(
+          <FindingCard
+            key="vrrp-ok"
+            title="VRRP Sessions (Healthy)"
+            severity="Info"
+            count={vrrpOk.length}
+            description={`Healthy: ${vrrpOk.length} stable VRRP session${vrrpOk.length > 1 ? 's' : ''} providing gateway redundancy — failover protection is active. No action required.`}
+            knowledge={null}
+            eli5Mode={eli5Mode}
+          />
+        );
+      }
+
+      // ICMP informational (non-anomaly)
+      if (icmpInfo.length > 0 && category === 'infrastructure') {
+        findings.push(
+          <FindingCard
+            key="icmp-info"
+            title="ICMP Traffic Summary"
+            severity="Info"
+            count={icmpInfo.length}
+            description={`Healthy: ${icmpInfo.length} normal ICMP pattern${icmpInfo.length > 1 ? 's' : ''} observed (ping, traceroute, etc.) — standard network diagnostic traffic. No action required.`}
+            knowledge={null}
+            eli5Mode={eli5Mode}
+          />
+        );
+      }
+    }
   }
 
   // ─── APPLICATION FINDINGS ──────────────────────────────────
@@ -1781,16 +2073,17 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
 
   // ─── NO FINDINGS ───────────────────────────────────────────
   if (findings.length === 0) {
+    const catLabel = category === 'all' ? '' : category.charAt(0).toUpperCase() + category.slice(1);
     return (
       <div className="bg-slate-800/80 border border-slate-700/50 rounded-xl p-12 text-center">
         <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-white mb-2">
-          {category === 'all' ? 'No Issues Detected' : `No ${category.charAt(0).toUpperCase() + category.slice(1)} Issues`}
+          {category === 'all' ? 'No Issues Detected' : `No ${catLabel} Findings`}
         </h3>
         <p className="text-slate-400 text-sm max-w-md mx-auto">
           {category === 'all'
             ? 'The analysis did not detect any significant issues in this capture. The network appears healthy.'
-            : `No ${category} issues were found in this capture. Try selecting "All Findings" to see other categories.`}
+            : `No ${category} findings were found in this capture. Try selecting "All Findings" to see other categories.`}
         </p>
       </div>
     );

@@ -303,6 +303,109 @@ export const issueKnowledgeBase: Record<string, IssueKnowledge> = {
     wiresharkFilter: 'hsrp',
   },
 
+  // ─── STABILITY: BFD Flapping ────────────────────────────────
+  bfd_flapping: {
+    code: 'BFD_FLAPPING',
+    icon: '⚡',
+    category: 'stability',
+    what: 'BFD (Bidirectional Forwarding Detection) sessions are flapping — the link-health probes between routers are rapidly alternating between Up and Down states.',
+    why: 'BFD is designed to detect link failures in milliseconds. When BFD flaps, every protocol relying on it (BGP, OSPF, IPsec, SD-WAN tunnels) tears down and reconverges. Users experience repeated 1-5 second outages, voice calls drop, and VPN tunnels bounce.',
+    how: [
+      'Check the physical WAN link for errors, CRC, input/output drops (show interface counters)',
+      'Verify BFD Tx/Rx intervals and multiplier — aggressive timers on lossy links cause false flaps',
+      'Check ISP for micro-outages or packet loss on the circuit',
+      'Review SD-WAN path health / SLA metrics for the affected transport',
+      'If on MPLS/Metro Ethernet, check provider CE-PE link for L2 errors',
+      'Consider increasing BFD detect multiplier from 3 to 5 on lossy WAN links',
+    ],
+    eli5: 'The "heartbeat monitor" between two routers keeps saying the link is dead, then alive, then dead again — like a heart monitor beeping erratically. Every beep causes the network to panic and reroute.',
+    severity: 'critical',
+    tacTip: 'Vendor support will ask for BFD neighbor detail, interface error counters, and ISP circuit ID for the affected link',
+    fixRate: 'BFD timer tuning or ISP circuit repair fixes 85% of cases',
+    wiresharkFilter: 'bfd',
+    commands: [
+      'Check BFD session detail for Tx/Rx intervals and detect multiplier',
+      'Check interface error counters on both endpoints',
+      'Check system logs for BFD and link-state events',
+    ],
+  },
+
+  // ─── STABILITY: IKE Tunnel Rebuild ─────────────────────────
+  ike_tunnel_rebuild: {
+    code: 'IKE_TUNNEL_REBUILD',
+    icon: '🔐',
+    category: 'stability',
+    what: 'IPsec VPN tunnels are repeatedly tearing down and rebuilding. Multiple IKE_SA_INIT (Phase 1) negotiations detected from the same peer in a short window.',
+    why: 'Each tunnel rebuild causes 2-10 seconds of traffic loss while IKE renegotiates keys and IPsec SAs are re-established. Frequent rebuilds indicate the underlying WAN link is flapping or there is a configuration mismatch (DPD timers, lifetime, crypto mismatch).',
+    how: [
+      'Check IPsec tunnel status and uptime on both endpoints',
+      'Review IKE/IPsec logs for Phase 1 or Phase 2 failure reasons',
+      'Verify DPD (Dead Peer Detection) timers — aggressive DPD on a lossy link causes false teardowns',
+      'Check if the underlay WAN link (BFD, ICMP) shows flapping',
+      'Verify IKE lifetime and rekey settings match on both peers',
+      'Check for NAT/firewall changes that may be breaking UDP 500/4500',
+    ],
+    eli5: 'The encrypted tunnel between your offices keeps collapsing and being rebuilt from scratch — like a bridge that keeps falling and being reconstructed every few seconds.',
+    severity: 'critical',
+    tacTip: 'Vendor support will ask for IKEv2 SA detail, IPsec SA detail, and debug crypto output from both peers',
+    fixRate: 'Fixing the underlying WAN link or adjusting DPD timers resolves 75% of cases',
+    wiresharkFilter: 'isakmp.exchangetype == 34 || isakmp.exchangetype == 2',
+    commands: [
+      'Check IKEv2 SA detail for tunnel uptime and negotiation state',
+      'Check IPsec SA detail for packet counters and rekey events',
+      'Check system logs for IKE/IPsec tunnel up/down events',
+    ],
+  },
+
+  // ─── STABILITY: STP TCN Storm ──────────────────────────────
+  stp_tcn_storm: {
+    code: 'STP_TCN_STORM',
+    icon: '🌳',
+    category: 'stability',
+    what: 'A Spanning Tree Protocol Topology Change Notification (TCN) storm has been detected — an excessive number of TCN BPDUs indicate a switch port is rapidly flapping.',
+    why: 'Each TCN causes all switches in the STP domain to flush their MAC address tables and re-learn, flooding traffic to all ports. This causes broadcast storms, increased CPU on switches, and intermittent connectivity for all LAN users.',
+    how: [
+      'Identify the originating switch and port from STP detail output',
+      'Check the port for physical issues: cable fault, bad SFP, speed/duplex mismatch',
+      'Enable PortFast + BPDU Guard on access ports to prevent end-devices from sending BPDUs',
+      'Consider enabling storm-control on access ports',
+      'Check for loop detection — a physical loop causes continuous TCNs',
+      'Review spanning-tree topology change counters per-VLAN',
+    ],
+    eli5: 'A network switch port keeps connecting and disconnecting, like someone plugging and unplugging a cable rapidly. Every time it happens, the entire LAN network has to re-learn where all devices are.',
+    severity: 'critical',
+    tacTip: 'Switch support will ask for spanning-tree detail per VLAN, interface status, and recent log entries showing LINK-3-UPDOWN events',
+    fixRate: 'Identifying and fixing the flapping port resolves 90% of cases',
+    wiresharkFilter: 'stp.type == 0x80 || (stp.type == 0x00 && stp.flags.tc == 1)',
+    commands: [
+      'Check spanning-tree detail for topology change counters per VLAN',
+      'Check all interface status for err-disabled or flapping ports',
+      'Check system logs for link up/down events in the last hour',
+    ],
+  },
+
+  // ─── STABILITY: Interface Flapping (generic) ──────────────
+  interface_flapping: {
+    code: 'INTERFACE_FLAPPING',
+    icon: '⚡',
+    category: 'stability',
+    what: 'Interface instability detected — a network interface is rapidly changing state, causing dependent protocols and services to fail repeatedly.',
+    why: 'Interface flapping is a root cause for many network issues: BGP/OSPF reconvergence, IPsec tunnel rebuilds, HSRP/VRRP failovers, and STP recalculations. Each flap creates a cascade of failures across the network.',
+    how: [
+      'Identify the specific flapping interface from logs and protocol state changes',
+      'Check physical layer: cable, SFP, patch panel, port on switch/router',
+      'Check for speed/duplex mismatch or auto-negotiation failures',
+      'Review ISP circuit health if it is a WAN link',
+      'Check for environmental issues: heat, power, EMI near cables',
+      'Consider enabling dampening on the interface to rate-limit state changes',
+    ],
+    eli5: 'A network connection keeps going on and off rapidly, like a light switch being flicked. Every time it happens, the whole network has to figure out a new path, causing everyone to lose connection briefly.',
+    severity: 'critical',
+    tacTip: 'Support will ask for interface error counters, optical power levels (if fiber), and log entries from the last hour',
+    fixRate: 'Physical layer fix (cable/SFP replacement) resolves 70% of flapping issues',
+    wiresharkFilter: 'bfd || hsrp || vrrp || isakmp || stp',
+  },
+
   // ─── SD-WAN: Tunnel Issues ─────────────────────────────────
   tunnel_flapping: {
     code: 'TUNNEL_FLAPPING',

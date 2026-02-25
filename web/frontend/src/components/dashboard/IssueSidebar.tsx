@@ -37,6 +37,7 @@ function computeCategories(results: AnalysisResults): CategoryItem[] {
     (results.packet_loss && results.packet_loss.packets_lost > 0 ? 1 : 0);
 
   const stabilityCount =
+    (results.stability_findings?.length || 0) +
     (results.lan_protocols?.vrrp_sessions?.filter(s => s.is_flapping)?.length || 0) +
     (results.lan_protocols?.hsrp_groups?.length || 0);
 
@@ -162,6 +163,18 @@ export function IssueSidebar({ results, activeCategory, onCategoryChange }: Issu
             <span className="text-slate-500">Duration</span>
             <span className="text-slate-300">{results.duration}</span>
           </div>
+          {results.capture_format && (
+            <div className="flex justify-between">
+              <span className="text-slate-500">Format</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                results.capture_format === 'pcapng'
+                  ? 'bg-purple-500/20 text-purple-400'
+                  : 'bg-cyan-500/20 text-cyan-400'
+              }`}>
+                {results.capture_format.toUpperCase()}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 )
 
 // ─── Packet Comparison States ───────────────────────────────────
@@ -511,16 +510,13 @@ func (c *Comparator) Compare(fileA, fileB string) (*ComparisonReport, error) {
 // ─── Packet Loading (Tunnel-Aware) ──────────────────────────────
 
 func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
-	f, err := os.Open(filePath)
+	handle, err := OpenCapture(filePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid capture file: %w", err)
 	}
-	defer f.Close()
+	defer handle.Close()
 
-	reader, err := pcapgo.NewReader(f)
-	if err != nil {
-		return nil, fmt.Errorf("invalid PCAP: %w", err)
-	}
+	reader := handle.Reader
 
 	var packets []packetMeta
 	index := 0

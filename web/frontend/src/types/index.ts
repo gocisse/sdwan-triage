@@ -70,6 +70,7 @@ export interface AnalysisResults {
   packet_count: number;
   duration: string;
   generated_at: string;
+  capture_format?: string; // "pcap" or "pcapng"
   
   // Risk assessment
   risk_score?: number;
@@ -134,6 +135,9 @@ export interface AnalysisResults {
   tcp_window_findings?: TCPWindowFinding[];
   tcp_out_of_order_flows?: TCPOutOfOrderFlow[];
 
+  // Interface Stability / Flapping Detection
+  stability_findings?: StabilityFinding[];
+
   // VoIP
   voip_analysis?: VoIPAnalysis;
 
@@ -142,6 +146,9 @@ export interface AnalysisResults {
 
   // Plain English Summary
   plain_english_summary?: PlainEnglishSummary;
+
+  // QoS Analysis
+  qos_analysis?: QoSReport;
 }
 
 // Security analysis container
@@ -866,4 +873,68 @@ export interface FlowComparisonSummary {
   has_nat: boolean;
   tunnel_type?: string;
   encapsulated: boolean;
+}
+
+// ─── QoS / DSCP Analysis Types ──────────────────────────────────
+
+export interface QoSReport {
+  class_distribution?: Record<string, QoSClassMetrics>;
+  total_packets: number;
+  mismatched_qos?: QoSMismatch[];
+}
+
+export interface QoSClassMetrics {
+  class_name: string;
+  dscp_value: number;
+  packet_count: number;
+  byte_count: number;
+  percentage: number;
+  avg_rtt_ms?: number;
+  retransmit_count: number;
+  retransmit_rate_percent: number;
+}
+
+export interface QoSMismatch {
+  flow: string;
+  expected_class: string;
+  actual_class: string;
+  reason: string;
+}
+
+// ─── Latency Matrix Types ────────────────────────────────────────
+
+export interface LatencyMatrix {
+  subnets: string[];
+  cells: Record<string, CellStat>;
+  total_flows: number;
+  max_rtt_ms: number;
+  max_loss_pct: number;
+}
+
+export interface CellStat {
+  src_subnet: string;
+  dst_subnet: string;
+  avg_rtt_ms: number;
+  min_rtt_ms: number;
+  max_rtt_ms: number;
+  loss_pct: number;
+  flow_count: number;
+  total_bytes?: number;
+}
+
+// ─── Interface Stability / Flapping Types ─────────────────────────
+
+export interface StabilityFinding {
+  type: string;             // "BFD Flapping", "IKE Tunnel Rebuild", "HSRP Flapping", "VRRP Flapping", "STP TCN Storm"
+  severity: string;         // "Critical", "High", "Warning"
+  identifier: string;       // IP pair, group ID, or bridge ID
+  description: string;
+  state_changes: number;
+  window_seconds: number;
+  first_seen: string;
+  last_seen: string;
+  source_ip?: string;
+  peer_ip?: string;
+  protocol: string;         // "BFD", "IKE", "HSRP", "VRRP", "STP"
+  root_cause_hint: string;
 }

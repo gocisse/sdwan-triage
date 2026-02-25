@@ -102,17 +102,26 @@ type LLDPDevice struct {
 	PacketCount  uint64
 }
 
+// HSRPTransition tracks an HSRP state change event
+type HSRPTransition struct {
+	Timestamp time.Time
+	FromState string
+	ToState   string
+	RouterIP  string
+}
+
 // HSRPGroup represents an HSRP group
 type HSRPGroup struct {
-	GroupNumber  uint8
-	State        string
-	Priority     uint8
-	VirtualIP    string
-	ActiveRouter string
+	GroupNumber   uint16
+	State         string
+	Priority      uint8
+	VirtualIP     string
+	ActiveRouter  string
 	StandbyRouter string
-	FirstSeen    time.Time
-	LastSeen     time.Time
-	PacketCount  uint64
+	FirstSeen     time.Time
+	LastSeen      time.Time
+	PacketCount   uint64
+	Transitions   []HSRPTransition
 }
 
 // STPBridge represents a Spanning Tree Protocol bridge
@@ -152,7 +161,7 @@ func (l *LANProtocolAnalyzer) Analyze(packet gopacket.Packet, state *models.Anal
 	// Check for CDP (Ethernet Type 0x2000 or SNAP with Cisco OUI)
 	if ethLayer := packet.Layer(layers.LayerTypeEthernet); ethLayer != nil {
 		eth := ethLayer.(*layers.Ethernet)
-		
+
 		// CDP detection
 		if eth.EthernetType == CDPEtherType || eth.DstMAC.String() == CDPMulticastMAC {
 			l.analyzeCDP(packet, eth, timestamp, report)
@@ -239,7 +248,7 @@ func (l *LANProtocolAnalyzer) analyzeVRRP(packet gopacket.Packet, ipInfo *Packet
 
 	// Track VRRP session
 	sessionKey := fmt.Sprintf("%s-vrid-%d", ipInfo.SrcIP, virtualRouterID)
-	
+
 	if session, exists := l.vrrpSessions[sessionKey]; exists {
 		// Check for state transition
 		if session.Priority != priority {
@@ -302,7 +311,7 @@ func (l *LANProtocolAnalyzer) analyzeVRRP(packet gopacket.Packet, ipInfo *Packet
 func (l *LANProtocolAnalyzer) analyzeCDP(packet gopacket.Packet, eth *layers.Ethernet, timestamp time.Time, report *models.TriageReport) {
 	// CDP packets use SNAP encapsulation
 	payload := eth.Payload
-	
+
 	// Check for LLC/SNAP header
 	if len(payload) < 8 {
 		return
@@ -339,7 +348,7 @@ func (l *LANProtocolAnalyzer) analyzeCDP(packet gopacket.Packet, eth *layers.Eth
 	for offset+4 <= len(cdpPayload) {
 		tlvType := binary.BigEndian.Uint16(cdpPayload[offset : offset+2])
 		tlvLength := binary.BigEndian.Uint16(cdpPayload[offset+2 : offset+4])
-		
+
 		if tlvLength < 4 || offset+int(tlvLength) > len(cdpPayload) {
 			break
 		}
@@ -468,23 +477,11 @@ func (l *LANProtocolAnalyzer) analyzeLLDP(packet gopacket.Packet, eth *layers.Et
 	}
 }
 
-// analyzeHSRP processes HSRP packets
+// analyzeHSRP processes HSRP packets (supports both HSRPv1 and HSRPv2)
 func (l *LANProtocolAnalyzer) analyzeHSRP(packet gopacket.Packet, udp *layers.UDP, timestamp time.Time, report *models.TriageReport) {
 	payload := udp.Payload
 	if len(payload) < 20 {
 		return
-	}
-
-	// Parse HSRP header
-	version := payload[0]
-	opCode := payload[1]
-	state := payload[2]
-	priority := payload[4]
-	groupNumber := payload[5]
-	
-	var virtualIP string
-	if len(payload) >= 16 {
-		virtualIP = fmt.Sprintf("%d.%d.%d.%d", payload[12], payload[13], payload[14], payload[15])
 	}
 
 	ipInfo := ExtractIPInfo(packet)
@@ -492,27 +489,107 @@ func (l *LANProtocolAnalyzer) analyzeHSRP(packet gopacket.Packet, udp *layers.UD
 		return
 	}
 
-	stateStr := parseHSRPState(state)
+	var version uint8
+	var opCode uint8
+	var state uint8
+	var priority uint8
+	var groupNumber uint16
+	var virtualIP string
+
+	// Detect HSRPv2 vs HSRPv1:
+	// HSRPv2 uses a TLV format where byte 0 is the TLV Type (1 = Group State)
+	// and byte 2 contains version == 2.
+	// HSRPv1 has byte 0 as version (0) and byte 1 as OpCode.
+	// Also HSRPv2 packets are typically 40+ bytes (TLV length at byte 1).
+	isV2 := false
+	if payload[0] == 1 && len(payload) >= 30 && payload[2] == 2 {
+		// HSRPv2 TLV Group State (Type=1)
+		isV2 = true
+	}
+
+	if isV2 {
+		// HSRPv2 Group State TLV layout:
+		// Byte  0: TLV Type (1 = Group State)
+		// Byte  1: TLV Length
+		// Byte  2: Version (2)
+		// Byte  3: OpCode
+		// Byte  4: State (0=Disabled,1=Init,2=Learn,3=Listen,4=Speak,5=Standby,6=Active)
+		// Byte  5: IP Version (4 or 6)
+		// Bytes 6-7: Group Number (uint16 big-endian)
+		// Bytes 8-13: Identifier (6 bytes, typically MAC)
+		// Bytes 14-17: Priority (uint32 big-endian)
+		// Bytes 18-21: Hello interval (ms, uint32)
+		// Bytes 22-25: Hold time (ms, uint32)
+		// Bytes 26-29: Virtual IP address
+		version = payload[2]
+		opCode = payload[3]
+		state = payload[4]
+		groupNumber = uint16(payload[6])<<8 | uint16(payload[7])
+		// Priority is uint32 in v2 but we store uint8; take the low byte
+		pri32 := uint32(payload[14])<<24 | uint32(payload[15])<<16 | uint32(payload[16])<<8 | uint32(payload[17])
+		if pri32 > 255 {
+			priority = 255
+		} else {
+			priority = uint8(pri32)
+		}
+		virtualIP = fmt.Sprintf("%d.%d.%d.%d", payload[26], payload[27], payload[28], payload[29])
+	} else {
+		// HSRPv1 fixed header (RFC 2281, 20 bytes):
+		// Byte  0: Version (0)
+		// Byte  1: Op Code
+		// Byte  2: State (0=Initial,1=Learn,2=Listen,4=Speak,8=Standby,16=Active)
+		// Byte  3: Hellotime
+		// Byte  4: Holdtime
+		// Byte  5: Priority
+		// Byte  6: Group
+		// Byte  7: Reserved
+		// Bytes 8-15: Authentication (8 bytes)
+		// Bytes 16-19: Virtual IP
+		version = payload[0]
+		opCode = payload[1]
+		state = payload[2]
+		priority = payload[5]
+		groupNumber = uint16(payload[6])
+		virtualIP = fmt.Sprintf("%d.%d.%d.%d", payload[16], payload[17], payload[18], payload[19])
+	}
+
+	var stateStr string
+	if isV2 {
+		stateStr = parseHSRPv2State(state)
+	} else {
+		stateStr = parseHSRPState(state)
+	}
 	groupKey := fmt.Sprintf("hsrp-group-%d", groupNumber)
 
 	if group, exists := l.hsrpGroups[groupKey]; exists {
 		group.LastSeen = timestamp
 		group.PacketCount++
-		
+
 		// Track state changes
-		if group.State != stateStr || group.Priority != priority {
+		if group.State != stateStr {
+			transition := HSRPTransition{
+				Timestamp: timestamp,
+				FromState: group.State,
+				ToState:   stateStr,
+				RouterIP:  ipInfo.SrcIP,
+			}
+			group.Transitions = append(group.Transitions, transition)
+
 			event := models.TimelineEvent{
 				Timestamp: float64(timestamp.UnixNano()) / 1e9,
 				EventType: "HSRP State Change",
 				SourceIP:  ipInfo.SrcIP,
 				Protocol:  "HSRP",
-				Detail:    fmt.Sprintf("Group %d: State=%s, Priority=%d, Virtual IP=%s (v%d, Op=%d)", groupNumber, stateStr, priority, virtualIP, version, opCode),
+				Detail:    fmt.Sprintf("Group %d: %s → %s, Priority=%d, Virtual IP=%s (v%d, Op=%d)", groupNumber, group.State, stateStr, priority, virtualIP, version, opCode),
 			}
 			report.Timeline = append(report.Timeline, event)
 		}
-		
+
 		group.State = stateStr
 		group.Priority = priority
+		if virtualIP != "" && virtualIP != "0.0.0.0" {
+			group.VirtualIP = virtualIP
+		}
 		if stateStr == "Active" {
 			group.ActiveRouter = ipInfo.SrcIP
 		} else if stateStr == "Standby" {
@@ -528,6 +605,7 @@ func (l *LANProtocolAnalyzer) analyzeHSRP(packet gopacket.Packet, udp *layers.UD
 			FirstSeen:    timestamp,
 			LastSeen:     timestamp,
 			PacketCount:  1,
+			Transitions:  []HSRPTransition{},
 		}
 
 		event := models.TimelineEvent{
@@ -544,9 +622,9 @@ func (l *LANProtocolAnalyzer) analyzeHSRP(packet gopacket.Packet, udp *layers.UD
 // analyzeSTP processes STP/RSTP packets
 func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Ethernet, timestamp time.Time, report *models.TriageReport) {
 	payload := eth.Payload
-	
-	// Check for LLC header
-	if len(payload) < 35 {
+
+	// Minimum: 3 bytes LLC + 4 bytes BPDU header (proto_id + version + type)
+	if len(payload) < 7 {
 		return
 	}
 
@@ -555,36 +633,61 @@ func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Eth
 		return
 	}
 
-	stpPayload := payload[3:] // Skip LLC header
-	if len(stpPayload) < 35 {
+	stpPayload := payload[3:] // Skip LLC header (DSAP + SSAP + Control)
+	if len(stpPayload) < 4 {
 		return
 	}
 
-	// Parse STP BPDU
+	// Parse STP BPDU header
 	protocolID := binary.BigEndian.Uint16(stpPayload[0:2])
 	if protocolID != 0 {
 		return // Not STP
 	}
 
+	bpduType := stpPayload[3]
+
+	// TCN BPDU (Type 0x80) is only 4 bytes — no bridge/root fields
+	if bpduType == 0x80 {
+		event := models.TimelineEvent{
+			Timestamp: float64(timestamp.UnixNano()) / 1e9,
+			EventType: "STP TCN BPDU",
+			Protocol:  "STP",
+			Detail:    fmt.Sprintf("Topology Change Notification from %s", eth.SrcMAC),
+		}
+		report.Timeline = append(report.Timeline, event)
+		return
+	}
+
+	// Config BPDU (0x00) or RST BPDU (0x02) require at least 35 bytes
+	if len(stpPayload) < 35 {
+		return
+	}
+
 	// Extract bridge IDs and costs
-	rootBridgeID := fmt.Sprintf("%02x%02x.%02x%02x.%02x%02x.%02x%02x",
-		stpPayload[5], stpPayload[6], stpPayload[7], stpPayload[8],
-		stpPayload[9], stpPayload[10], stpPayload[11], stpPayload[12])
-	
+	// Root Bridge ID: 2 bytes priority + 6 bytes MAC
+	rootPriority := binary.BigEndian.Uint16(stpPayload[5:7])
+	rootMAC := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+		stpPayload[7], stpPayload[8], stpPayload[9], stpPayload[10],
+		stpPayload[11], stpPayload[12])
+	rootBridgeID := fmt.Sprintf("%d/%s", rootPriority, rootMAC)
+
 	rootCost := binary.BigEndian.Uint32(stpPayload[13:17])
-	
-	bridgeID := fmt.Sprintf("%02x%02x.%02x%02x.%02x%02x.%02x%02x",
-		stpPayload[17], stpPayload[18], stpPayload[19], stpPayload[20],
-		stpPayload[21], stpPayload[22], stpPayload[23], stpPayload[24])
-	
+
+	// Bridge ID: 2 bytes priority + 6 bytes MAC
+	bridgePriority := binary.BigEndian.Uint16(stpPayload[17:19])
+	bridgeMAC := fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+		stpPayload[19], stpPayload[20], stpPayload[21], stpPayload[22],
+		stpPayload[23], stpPayload[24])
+	bridgeID := fmt.Sprintf("%d/%s", bridgePriority, bridgeMAC)
+
 	portID := binary.BigEndian.Uint16(stpPayload[25:27])
 
 	bridgeKey := fmt.Sprintf("stp-%s", bridgeID)
-	
+
 	if bridge, exists := l.stpBridges[bridgeKey]; exists {
 		bridge.LastSeen = timestamp
 		bridge.PacketCount++
-		
+
 		// Detect topology changes
 		if bridge.RootBridgeID != rootBridgeID {
 			event := models.TimelineEvent{
@@ -595,7 +698,7 @@ func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Eth
 			}
 			report.Timeline = append(report.Timeline, event)
 		}
-		
+
 		bridge.RootBridgeID = rootBridgeID
 		bridge.RootCost = rootCost
 	} else {
@@ -644,13 +747,13 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 			PacketCount:     session.PacketCount,
 			TransitionCount: len(session.Transitions),
 		}
-		
+
 		// Check for flapping
 		if len(session.Transitions) > 3 {
 			finding.IsFlapping = true
 			finding.FlappingReason = fmt.Sprintf("Detected %d state transitions", len(session.Transitions))
 		}
-		
+
 		findings.VRRPSessions = append(findings.VRRPSessions, finding)
 	}
 
@@ -713,6 +816,82 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	}
 
 	return findings
+}
+
+// FinalizeStability evaluates HSRP and VRRP session data for flapping and
+// appends StabilityFinding entries to the report. Called by processor.go
+// alongside the StabilityMonitor's own Finalize.
+func (l *LANProtocolAnalyzer) FinalizeStability(report *models.TriageReport) {
+	// ── HSRP Flapping ──────────────────────────────────────────
+	for _, group := range l.hsrpGroups {
+		if len(group.Transitions) < 3 {
+			continue
+		}
+
+		// Extract timestamps for sliding-window analysis
+		times := make([]time.Time, len(group.Transitions))
+		for i, t := range group.Transitions {
+			times[i] = t.Timestamp
+		}
+		maxInWindow := countInSlidingWindow(times, 60.0)
+
+		if maxInWindow > 3 {
+			window := group.LastSeen.Sub(group.FirstSeen).Seconds()
+			if window < 1 {
+				window = 1
+			}
+
+			finding := models.StabilityFinding{
+				Type:          "HSRP Flapping",
+				Severity:      "Critical",
+				Identifier:    fmt.Sprintf("HSRP Group %d (VIP %s)", group.GroupNumber, group.VirtualIP),
+				Description:   fmt.Sprintf("HSRP Group %d is flapping: %d state transitions detected (%d within 60s). Active router: %s", group.GroupNumber, len(group.Transitions), maxInWindow, group.ActiveRouter),
+				StateChanges:  len(group.Transitions),
+				WindowSeconds: window,
+				FirstSeen:     group.FirstSeen.Format(time.RFC3339),
+				LastSeen:      group.LastSeen.Format(time.RFC3339),
+				SourceIP:      group.ActiveRouter,
+				Protocol:      "HSRP",
+				RootCauseHint: "Physical LAN link flapping or misconfigured HSRP timers (Hello interval vs Dead interval). Check 'show standby brief' and 'show log | include HSRP'.",
+			}
+			report.StabilityFindings = append(report.StabilityFindings, finding)
+		}
+	}
+
+	// ── VRRP Flapping ──────────────────────────────────────────
+	for _, session := range l.vrrpSessions {
+		if len(session.Transitions) < 3 {
+			continue
+		}
+
+		times := make([]time.Time, len(session.Transitions))
+		for i, t := range session.Transitions {
+			times[i] = t.Timestamp
+		}
+		maxInWindow := countInSlidingWindow(times, 60.0)
+
+		if maxInWindow > 3 {
+			window := session.LastSeen.Sub(session.FirstSeen).Seconds()
+			if window < 1 {
+				window = 1
+			}
+
+			finding := models.StabilityFinding{
+				Type:          "VRRP Flapping",
+				Severity:      "Critical",
+				Identifier:    fmt.Sprintf("VRID %d (Master %s)", session.VirtualRouterID, session.MasterIP),
+				Description:   fmt.Sprintf("VRRP VRID %d is flapping: %d state transitions detected (%d within 60s). Master: %s", session.VirtualRouterID, len(session.Transitions), maxInWindow, session.MasterIP),
+				StateChanges:  len(session.Transitions),
+				WindowSeconds: window,
+				FirstSeen:     session.FirstSeen.Format(time.RFC3339),
+				LastSeen:      session.LastSeen.Format(time.RFC3339),
+				SourceIP:      session.MasterIP,
+				Protocol:      "VRRP",
+				RootCauseHint: "Physical link flapping or VRRP preemption war between routers. Check 'show vrrp brief' and verify preempt delay timers.",
+			}
+			report.StabilityFindings = append(report.StabilityFindings, finding)
+		}
+	}
 }
 
 // Helper functions
@@ -798,6 +977,19 @@ func parseLLDPCapabilities(caps uint16) string {
 }
 
 func parseLLDPString(data []byte) string {
+	// Check if data looks like a MAC address (6 bytes, non-printable)
+	if len(data) == 6 {
+		isPrintable := true
+		for _, b := range data {
+			if b < 0x20 || b > 0x7E {
+				isPrintable = false
+				break
+			}
+		}
+		if !isPrintable {
+			return fmt.Sprintf("%02x:%02x:%02x:%02x:%02x:%02x", data[0], data[1], data[2], data[3], data[4], data[5])
+		}
+	}
 	return string(data)
 }
 
@@ -811,7 +1003,7 @@ func parseManagementAddress(data []byte) string {
 	}
 	addrType := data[1]
 	addr := data[2 : 1+addrLen]
-	
+
 	// IPv4
 	if addrType == 1 && len(addr) == 4 {
 		return fmt.Sprintf("%d.%d.%d.%d", addr[0], addr[1], addr[2], addr[3])
@@ -823,6 +1015,28 @@ func parseManagementAddress(data []byte) string {
 			addr[8], addr[9], addr[10], addr[11], addr[12], addr[13], addr[14], addr[15])
 	}
 	return ""
+}
+
+// parseHSRPv2State maps HSRPv2 state values (sequential 0-6)
+func parseHSRPv2State(state uint8) string {
+	switch state {
+	case 0:
+		return "Disabled"
+	case 1:
+		return "Init"
+	case 2:
+		return "Learn"
+	case 3:
+		return "Listen"
+	case 4:
+		return "Speak"
+	case 5:
+		return "Standby"
+	case 6:
+		return "Active"
+	default:
+		return fmt.Sprintf("Unknown(%d)", state)
+	}
 }
 
 func parseHSRPState(state uint8) string {

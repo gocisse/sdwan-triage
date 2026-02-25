@@ -104,8 +104,29 @@ type TriageReport struct {
 	// Underlay/Overlay Correlation
 	RootCauseChains []RootCauseChain `json:"root_cause_chains,omitempty"`
 
+	// Interface Stability / Flapping Detection
+	StabilityFindings []StabilityFinding `json:"stability_findings,omitempty"`
+
 	// PCAP Export Info
 	SourcePCAPPath string `json:"source_pcap_path,omitempty"`
+}
+
+// StabilityFinding represents a detected interface flapping or instability event.
+// Covers BFD session flapping, IPsec IKE tunnel rebuilds, HSRP/VRRP gateway
+// flapping, and STP Topology Change Notification (TCN) storms.
+type StabilityFinding struct {
+	Type          string  `json:"type"`           // "BFD Flapping", "IKE Tunnel Rebuild", "HSRP Flapping", "VRRP Flapping", "STP TCN Storm"
+	Severity      string  `json:"severity"`       // "Critical", "High", "Warning"
+	Identifier    string  `json:"identifier"`     // IP pair, group ID, or bridge ID
+	Description   string  `json:"description"`    // Human-readable summary
+	StateChanges  int     `json:"state_changes"`  // Number of transitions / events
+	WindowSeconds float64 `json:"window_seconds"` // Observation window in seconds
+	FirstSeen     string  `json:"first_seen"`     // RFC3339
+	LastSeen      string  `json:"last_seen"`      // RFC3339
+	SourceIP      string  `json:"source_ip,omitempty"`
+	PeerIP        string  `json:"peer_ip,omitempty"`
+	Protocol      string  `json:"protocol"`        // "BFD", "IKE", "HSRP", "VRRP", "STP"
+	RootCauseHint string  `json:"root_cause_hint"` // Suggested root cause
 }
 
 // TrafficGapInfo represents a gap in network traffic
@@ -695,7 +716,7 @@ type LLDPFinding struct {
 
 // HSRPFinding represents an HSRP group
 type HSRPFinding struct {
-	GroupNumber   uint8  `json:"group_number"`
+	GroupNumber   uint16 `json:"group_number"`
 	State         string `json:"state"`
 	Priority      uint8  `json:"priority"`
 	VirtualIP     string `json:"virtual_ip"`

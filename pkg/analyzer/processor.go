@@ -15,7 +15,6 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
 )
 
 // Processor handles PCAP file processing
@@ -51,6 +50,7 @@ type Processor struct {
 	dnsTunnelingAnalyzer *detector.DNSTunnelingAnalyzer
 	c2BeaconingAnalyzer  *detector.C2BeaconingAnalyzer
 	tcpAdvancedAnalyzer  *detector.TCPAdvancedAnalyzer
+	stabilityMonitor     *detector.StabilityMonitor
 	arubaDetector        *ArubaIssueDetector
 	viptelaDetector      *ViptelaIssueDetector
 	veloCloudDetector    *VeloCloudIssueDetector
@@ -104,6 +104,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		dnsTunnelingAnalyzer: detector.NewDNSTunnelingAnalyzer(),
 		c2BeaconingAnalyzer:  detector.NewC2BeaconingAnalyzer(),
 		tcpAdvancedAnalyzer:  detector.NewTCPAdvancedAnalyzer(),
+		stabilityMonitor:     detector.NewStabilityMonitor(),
 		arubaDetector:        NewArubaIssueDetector(),
 		viptelaDetector:      NewViptelaIssueDetector(),
 		veloCloudDetector:    NewVeloCloudIssueDetector(),
@@ -179,8 +180,10 @@ func (p *Processor) logWarning(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "[WARNING] "+format+"\n", args...)
 }
 
-// Process reads and analyzes all packets from a PCAP file
-func (p *Processor) Process(reader *pcapgo.Reader, state *models.AnalysisState, report *models.TriageReport, filter *models.Filter) error {
+// Process reads and analyzes all packets from a PCAP or pcapng file.
+// reader must satisfy the PacketReader interface (both pcapgo.Reader
+// and pcapgo.NgReader do).
+func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, report *models.TriageReport, filter *models.Filter) error {
 	packetCount := 0
 	startTime := time.Now()
 
@@ -320,6 +323,9 @@ func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
 
 		// TCP advanced (window issues, out-of-order)
 		NewAnalyzerFunc("TCP-Advanced", p.tcpAdvancedAnalyzer.Analyze),
+
+		// Interface stability (BFD, IKE, STP TCN)
+		NewAnalyzerFunc("Stability", p.stabilityMonitor.Analyze),
 
 		// Packet-only detectors (no state/report dependency)
 		NewPacketOnlyAnalyzer("PacketLoss", p.packetLossDetector.ProcessPacket),
@@ -523,6 +529,10 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Finalize TCP advanced analysis (out-of-order flows)
 	p.tcpAdvancedAnalyzer.Finalize(report)
 
+	// Finalize interface stability analysis (BFD, IKE, STP TCN + HSRP/VRRP from LAN analyzer)
+	p.stabilityMonitor.Finalize(report)
+	p.lanProtocolAnalyzer.FinalizeStability(report)
+
 	// Add stream reassembly data (top 50 streams by bytes)
 	topStreams := p.streamReassembler.GetTopStreams(50)
 	report.RawStreams = topStreams // Store raw streams for actionable analysis
@@ -676,6 +686,18 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 		score += len(report.TCPOutOfOrderFlows) * 3
 		issues["TCP Out-of-Order"] = len(report.TCPOutOfOrderFlows)
 	}
+	if len(report.StabilityFindings) > 0 {
+		for _, f := range report.StabilityFindings {
+			if f.Severity == "Critical" {
+				score += 15
+			} else if f.Severity == "High" {
+				score += 10
+			} else {
+				score += 5
+			}
+		}
+		issues["Interface Flapping"] = len(report.StabilityFindings)
+	}
 
 	// Set risk level based on score
 	report.RiskScore = score
@@ -764,6 +786,9 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 	}
 	if issues["TCP Out-of-Order"] > 0 {
 		actions = append(actions, "MEDIUM: TCP out-of-order packets detected. Check for asymmetric routing, load balancer issues, or link problems.")
+	}
+	if issues["Interface Flapping"] > 0 {
+		actions = append(actions, "CRITICAL: Interface instability detected (BFD/IKE/HSRP/VRRP/STP). Check physical links, SFP modules, and protocol timers. Run 'show log | include LINK|FLAP|BFD|HSRP|VRRP'.")
 	}
 
 	// Limit to top 5 actions

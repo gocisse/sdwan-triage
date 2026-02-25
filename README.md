@@ -1,4 +1,4 @@
-# SD-WAN Network Triage v4.3.3
+# SD-WAN Network Triage v4.5.0
 
 [![Release](https://img.shields.io/github/v/release/gocisse/sdwan-triage)](https://github.com/gocisse/sdwan-triage/releases/latest)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://golang.org/)
@@ -21,8 +21,8 @@
 
 ```bash
 # 1. Download (macOS Apple Silicon example)
-curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-darwin-arm64.tar.gz
-tar xzf sdwan-triage-v4.3.3-darwin-arm64.tar.gz
+curl -LO https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.5.0-darwin-arm64.tar.gz
+tar xzf sdwan-triage-v4.5.0-darwin-arm64.tar.gz
 
 # 2. Run
 ./sdwan-triage-darwin-arm64 -web
@@ -37,12 +37,12 @@ That's it. The React dashboard, API server, and SQLite database are all embedded
 
 | Platform | Download |
 |---|---|
-| **macOS (Apple Silicon)** | [`sdwan-triage-v4.3.3-darwin-arm64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-darwin-arm64.tar.gz) |
-| **macOS (Intel)** | [`sdwan-triage-v4.3.3-darwin-amd64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-darwin-amd64.tar.gz) |
-| **Linux (x86_64)** | [`sdwan-triage-v4.3.3-linux-amd64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-linux-amd64.tar.gz) |
-| **Windows (x86_64)** | [`sdwan-triage-v4.3.3-windows-amd64.zip`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.3.3-windows-amd64.zip) |
+| **macOS (Apple Silicon)** | [`sdwan-triage-v4.5.0-darwin-arm64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.5.0-darwin-arm64.tar.gz) |
+| **macOS (Intel)** | [`sdwan-triage-v4.5.0-darwin-amd64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.5.0-darwin-amd64.tar.gz) |
+| **Linux (x86_64)** | [`sdwan-triage-v4.5.0-linux-amd64.tar.gz`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.5.0-linux-amd64.tar.gz) |
+| **Windows (x86_64)** | [`sdwan-triage-v4.5.0-windows-amd64.zip`](https://github.com/gocisse/sdwan-triage/releases/latest/download/sdwan-triage-v4.5.0-windows-amd64.zip) |
 
-Verify downloads with [`checksums-v4.3.3.txt`](https://github.com/gocisse/sdwan-triage/releases/latest/download/checksums-v4.3.3.txt).
+Verify downloads with [`checksums-v4.5.0.txt`](https://github.com/gocisse/sdwan-triage/releases/latest/download/checksums-v4.5.0.txt).
 
 ---
 
@@ -102,7 +102,7 @@ The same binary supports two workflows. Choose the one that fits your role.
 
 ## Forensic Workflow — LAN vs. WAN Comparison
 
-Version 4.3.3 introduces **tunnel-aware PCAP comparison** for forensic troubleshooting across SD-WAN devices. Place a capture on the LAN side and another on the WAN side of your SD-WAN appliance to determine exactly where packets are dropped, modified, or encrypted.
+Version 4.5.0 introduces **tunnel-aware PCAP comparison** for forensic troubleshooting across SD-WAN devices. Place a capture on the LAN side and another on the WAN side of your SD-WAN appliance to determine exactly where packets are dropped, modified, or encrypted.
 
 ### How It Works
 
@@ -281,9 +281,49 @@ Supported vendors: **VeloCloud**, Cisco Viptela, Fortinet, Palo Alto Prisma, Sil
 
 ---
 
+## Troubleshooting Workflow
+
+Version 4.5.0 provides a complete **end-to-end troubleshooting pipeline**. Follow these four stages to go from raw PCAP to actionable resolution.
+
+```
+  ┌──────────┐    ┌──────────┐    ┌───────────────────┐    ┌──────────┐
+  │  Upload   │───►│  Wizard   │───►│  Forensic         │───►│  Export   │
+  │           │    │           │    │  Drill-Down        │    │           │
+  │ Drag-drop │    │ Guided    │    │ Protocol Hierarchy │    │ Filtered  │
+  │ PCAP file │    │ step-by-  │    │ Conversations      │    │ PCAP for  │
+  │           │    │ step fix  │    │ IO Graphs          │    │ Wireshark │
+  └──────────┘    └──────────┘    └───────────────────┘    └──────────┘
+```
+
+### Stage 1: Upload
+
+Drag and drop a PCAP or pcapng file into the web dashboard. The tool runs **35+ detectors in parallel** and produces results within seconds. The **Executive Summary** gives you a risk score and top findings immediately.
+
+### Stage 2: Wizard
+
+Click any finding card to open the **Troubleshooting Wizard**. It checks for vendor-specific CLI runbooks first (e.g., VeloCloud `debug.py`, Viptela `show` commands), then falls back to generic knowledge base entries. Every finding includes:
+- **WHAT** — Plain-English explanation of the issue
+- **WHY** — Root cause analysis and impact
+- **HOW** — Step-by-step remediation with CLI commands and Wireshark filters
+
+### Stage 3: Forensic Drill-Down
+
+Switch to the **Forensic Drill-Down** tab for deep-dive analysis:
+- **IO Graphs** — Time-series packet/byte charts with click-to-zoom
+- **Protocol Hierarchy** — Ethernet → IP → TCP/UDP → Application breakdown with percentages
+- **Conversations** — Sortable src↔dst matrix with packets, bytes, duration, throughput
+- **Expert Info** — Aggregated anomaly stream from all detectors with severity filtering
+- **Display Filter** — Wireshark-like filter bar (`ip.src == 10.0.0.1 && tcp.port == 443`)
+
+### Stage 4: Export
+
+Click **Export Filtered PCAP** to download a subset of the original capture matching your current display filter. Open it directly in Wireshark for packet-level inspection, or attach it to a TAC/vendor support case.
+
+---
+
 ## Smart Insights for Junior Engineers
 
-Version 4.3.3 introduces a clear distinction between **Issues** (actionable problems) and **Insights** (passive observations). This helps junior engineers focus on what matters without being confused by informational findings.
+Version 4.5.0 introduces a clear distinction between **Issues** (actionable problems) and **Insights** (passive observations). This helps junior engineers focus on what matters without being confused by informational findings.
 
 ### Issues vs. Insights
 
@@ -291,6 +331,20 @@ Version 4.3.3 introduces a clear distinction between **Issues** (actionable prob
 |------|-------|---------|---------|
 | **Issue** | `3` (solid badge) | Actionable problem requiring investigation | DDoS Attack, DHCP Rogue Server, TCP Retransmissions |
 | **Insight** | `+2` (subtle badge) | Passive observation — healthy, no action needed | CDP/LLDP Device Discovery, STP Topology, VRRP Sessions |
+
+### Category Breakdown
+
+Each sidebar category can show **both Issues and Insights**. Here's what to expect:
+
+| Category | Issues (Red/Amber) | Insights (Grey) |
+|----------|-------------------|-----------------|
+| **Security** | DDoS, Port Scan, DNS Tunneling, C2 Beaconing | IOC database status |
+| **Performance** | High RTT, Retransmissions, Packet Loss, TCP Zero Window | QoS class distribution, Bandwidth stats |
+| **Infrastructure** | DHCP Rogue Server, NTP Amplification, BFD Flapping | CDP/LLDP Discovery, STP Topology, VRRP/HSRP Sessions |
+| **Stability** | BFD Flapping, IKE Tunnel Rebuild, STP TCN Storm, HSRP/VRRP Flapping | Stable redundancy protocol sessions |
+| **SD-WAN** | Tunnel Flapping, Path Quality Degradation | Vendor detection, Overlay tunnel inventory |
+
+> **Tip for Junior Engineers:** Red badges mean "investigate now." Grey `+N` badges mean "good to know." Start with red, then use grey insights to understand the network topology and context around the issue.
 
 ### How It Appears in the Sidebar
 

@@ -15,17 +15,17 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/gocisse/sdwan-triage/pkg/output"
 	"github.com/gocisse/sdwan-triage/pkg/web/storage"
-	"github.com/google/gopacket/pcapgo"
 )
 
 // WebResultsWrapper wraps TriageReport with metadata fields expected by the frontend
 type WebResultsWrapper struct {
 	// Metadata fields for frontend display
-	FileName    string `json:"file_name"`
-	FileSize    string `json:"file_size"`
-	PacketCount int    `json:"packet_count"`
-	Duration    string `json:"duration"`
-	GeneratedAt string `json:"generated_at"`
+	FileName      string `json:"file_name"`
+	FileSize      string `json:"file_size"`
+	PacketCount   int    `json:"packet_count"`
+	Duration      string `json:"duration"`
+	GeneratedAt   string `json:"generated_at"`
+	CaptureFormat string `json:"capture_format,omitempty"` // "pcap" or "pcapng"
 
 	// Embed all TriageReport fields
 	*models.TriageReport
@@ -45,24 +45,16 @@ func AnalyzePCAP(store *storage.Storage, job *storage.AnalysisJob, integrations 
 	// Update progress: Starting
 	store.UpdateProgress(job.ID, 5, "Opening PCAP file...", 60)
 
-	// Open the PCAP file
-	file, err := os.Open(job.FilePath)
+	// Open capture file (auto-detects pcap vs pcapng)
+	capHandle, err := analyzer.OpenCapture(job.FilePath)
 	if err != nil {
-		log.Printf("[ANALYSIS] Failed to open PCAP file: %v", err)
-		return "", "", fmt.Errorf("failed to open PCAP file: %w", err)
+		log.Printf("[ANALYSIS] Failed to open capture file: %v", err)
+		return "", "", fmt.Errorf("failed to open capture file: %w", err)
 	}
-	defer file.Close()
+	defer capHandle.Close()
+	reader := capHandle.Reader
 
-	log.Printf("[ANALYSIS] PCAP file opened successfully: %s", job.FilePath)
-
-	// Create PCAP reader
-	reader, err := pcapgo.NewReader(file)
-	if err != nil {
-		log.Printf("[ANALYSIS] Failed to create PCAP reader: %v", err)
-		return "", "", fmt.Errorf("failed to create PCAP reader: %w", err)
-	}
-
-	log.Printf("[ANALYSIS] PCAP reader created, starting packet analysis...")
+	log.Printf("[ANALYSIS] Capture file opened (format: %s): %s", capHandle.Format, job.FilePath)
 
 	// Update progress: Analyzing
 	store.UpdateProgress(job.ID, 10, "Analyzing packets...", 50)
@@ -138,12 +130,13 @@ func AnalyzePCAP(store *storage.Storage, job *storage.AnalysisJob, integrations 
 
 	// Wrap report with metadata for frontend
 	webResults := &WebResultsWrapper{
-		FileName:     job.FileName,
-		FileSize:     formatBytes(job.FileSize),
-		PacketCount:  packetCount,
-		Duration:     analysisDuration.Round(time.Millisecond).String(),
-		GeneratedAt:  time.Now().Format(time.RFC3339),
-		TriageReport: report,
+		FileName:      job.FileName,
+		FileSize:      formatBytes(job.FileSize),
+		PacketCount:   packetCount,
+		Duration:      analysisDuration.Round(time.Millisecond).String(),
+		GeneratedAt:   time.Now().Format(time.RFC3339),
+		CaptureFormat: string(capHandle.Format),
+		TriageReport:  report,
 	}
 
 	// Save JSON results with metadata

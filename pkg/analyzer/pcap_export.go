@@ -56,19 +56,15 @@ func (pe *PCAPExporter) ExportStream(filter ExportFilter) (*ExportResult, error)
 	startTime := time.Now()
 	result := &ExportResult{}
 
-	// Open source PCAP
-	sourceFile, err := os.Open(pe.sourcePath)
+	// Open source capture (auto-detects pcap vs pcapng)
+	capHandle, err := OpenCapture(pe.sourcePath)
 	if err != nil {
-		result.Error = fmt.Errorf("failed to open source PCAP: %w", err)
+		result.Error = fmt.Errorf("failed to open source capture: %w", err)
 		return result, result.Error
 	}
-	defer sourceFile.Close()
+	defer capHandle.Close()
 
-	reader, err := pcapgo.NewReader(sourceFile)
-	if err != nil {
-		result.Error = fmt.Errorf("failed to create PCAP reader: %w", err)
-		return result, result.Error
-	}
+	reader := capHandle.Reader
 
 	// Generate output filename
 	outputFilename := pe.generateFilename(filter)

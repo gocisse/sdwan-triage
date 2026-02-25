@@ -25,8 +25,8 @@
             <div class="header-top">
                 <!-- Brand -->
                 <div class="header-brand">
-                    <div class="brand-logo">
-                        <i class="fas fa-network-wired"></i>
+                    <div class="brand-logo" style="padding:0;overflow:hidden;">
+                        <img src="data:image/png;base64,{{.LogoBase64}}" alt="Logo" style="width:40px;height:40px;object-fit:contain;">
                     </div>
                     <div>
                         <h1 class="brand-title">
@@ -3667,6 +3667,59 @@
         <!-- ====================================================================
              LAN PROTOCOLS SECTION
              ==================================================================== -->
+        <!-- Interface Stability / Flapping Detection -->
+        {{if .HasStabilityFindings}}
+        <section id="stability" class="dashboard-section" style="display: none;">
+            <h2 class="mb-xl">
+                <i class="fas fa-bolt" style="color: #ef4444;"></i>
+                Interface Stability — Flapping Detection
+            </h2>
+            <div style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow-md);">
+                <div style="background: linear-gradient(135deg, #dc2626 0%, #f87171 100%); color: white; padding: 20px 24px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {{len .StabilityFindings}} Instability Event{{if gt (len .StabilityFindings) 1}}s{{end}} Detected
+                    </h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Interface flapping causes cascading failures across routing, VPN, and gateway redundancy protocols.</p>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: rgba(0,0,0,0.2);">
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--color-text-secondary);">Severity</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--color-text-secondary);">Type</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--color-text-secondary);">Identifier</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--color-text-secondary);">Protocol</th>
+                                <th style="padding: 12px 16px; text-align: center; font-weight: 600; color: var(--color-text-secondary);">State Changes</th>
+                                <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--color-text-secondary);">Window</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .StabilityFindings}}
+                            <tr style="border-top: 1px solid var(--color-border);">
+                                <td style="padding: 12px 16px;">
+                                    <span style="padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; {{if eq .Severity "Critical"}}background: rgba(239,68,68,0.15); color: #ef4444;{{else if eq .Severity "High"}}background: rgba(245,158,11,0.15); color: #f59e0b;{{else}}background: rgba(59,130,246,0.15); color: #3b82f6;{{end}}">{{.Severity}}</span>
+                                </td>
+                                <td style="padding: 12px 16px; font-weight: 500; color: var(--color-text);">{{.Type}}</td>
+                                <td style="padding: 12px 16px; font-family: monospace; color: var(--color-text-secondary);">{{.Identifier}}</td>
+                                <td style="padding: 12px 16px; color: var(--color-text-secondary);">{{.Protocol}}</td>
+                                <td style="padding: 12px 16px; text-align: center; color: #ef4444; font-weight: 600;">{{.StateChanges}}</td>
+                                <td style="padding: 12px 16px; color: var(--color-text-secondary);">{{.WindowSeconds}}s</td>
+                            </tr>
+                            <tr style="border-top: 1px solid rgba(255,255,255,0.03);">
+                                <td colspan="6" style="padding: 8px 16px 12px 16px;">
+                                    <div style="font-size: 0.8rem; color: var(--color-text-secondary); margin-bottom: 6px;">{{.Description}}</div>
+                                    {{if .RootCauseHint}}<div style="font-size: 0.8rem; padding: 8px 12px; background: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; border-radius: 4px; color: #fbbf24;"><strong>Root Cause Hint:</strong> {{.RootCauseHint}}</div>{{end}}
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        {{end}}
+
         <section id="lan-protocols" class="dashboard-section" style="display: none;">
             <h2 class="mb-xl">
                 <i class="fas fa-sitemap" style="color: var(--color-primary);"></i>
