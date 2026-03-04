@@ -1,6 +1,7 @@
 package detector
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -13,7 +14,52 @@ const (
 	RTPVersion     = 2
 	RTPHeaderSize  = 12
 	RTCPHeaderSize = 8
+
+	// Minimum packets required before a stream is considered real RTP.
+	// Single-packet "streams" are almost always false positives.
+	minRTPStreamPackets = 5
 )
+
+// wellKnownServicePorts contains UDP ports that must never be classified as
+// RTP unless explicit SIP/SDP signaling is observed (which we do not track
+// in this heuristic detector). Query-response protocols on these ports
+// frequently produce payloads whose first bytes accidentally satisfy the
+// loose "version == 2" RTP check.
+var wellKnownServicePorts = map[uint16]bool{
+	53:   true, // DNS
+	67:   true, // DHCP server
+	68:   true, // DHCP client
+	123:  true, // NTP
+	161:  true, // SNMP
+	162:  true, // SNMP Trap
+	443:  true, // QUIC / HTTPS-over-UDP
+	500:  true, // IKE (IPsec)
+	514:  true, // Syslog
+	520:  true, // RIP
+	1194: true, // OpenVPN
+	1985: true, // HSRP
+	3784: true, // BFD
+	4500: true, // IPsec NAT-T
+	4789: true, // VXLAN
+	4790: true, // VXLAN-GPE
+	6081: true, // Geneve
+	8472: true, // Linux VXLAN
+}
+
+// knownPublicDNSResolvers contains IPs that are definitively not VoIP
+// endpoints. Streams involving these IPs are suppressed.
+var knownPublicDNSResolvers = map[string]bool{
+	"8.8.8.8":         true, // Google
+	"8.8.4.4":         true, // Google
+	"1.1.1.1":         true, // Cloudflare
+	"1.0.0.1":         true, // Cloudflare
+	"9.9.9.9":         true, // Quad9
+	"149.112.112.112": true, // Quad9
+	"208.67.222.222":  true, // OpenDNS
+	"208.67.220.220":  true, // OpenDNS
+	"4.2.2.1":         true, // Level3
+	"4.2.2.2":         true, // Level3
+}
 
 // Common RTP payload types
 var rtpPayloadTypes = map[uint8]string{
@@ -103,13 +149,20 @@ func (r *RTPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	}
 
 	udp := udpLayer.(*layers.UDP)
-	payload := udp.Payload
+	srcPort := uint16(udp.SrcPort)
+	dstPort := uint16(udp.DstPort)
 
+	// ── Gate 1: Exclude well-known service ports ────────────────
+	if wellKnownServicePorts[srcPort] || wellKnownServicePorts[dstPort] {
+		return
+	}
+
+	payload := udp.Payload
 	if len(payload) < RTPHeaderSize {
 		return
 	}
 
-	// Check RTP header
+	// ── Gate 2: Strict RTP header validation ─────────────────────
 	if !r.isRTPPacket(payload) {
 		return
 	}
@@ -119,8 +172,13 @@ func (r *RTPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		return
 	}
 
+	// ── Gate 3: Exclude known public DNS resolvers ───────────────
+	if knownPublicDNSResolvers[ipInfo.SrcIP] || knownPublicDNSResolvers[ipInfo.DstIP] {
+		return
+	}
+
 	timestamp := packet.Metadata().Timestamp
-	r.parseRTPPacket(payload, ipInfo.SrcIP, ipInfo.DstIP, uint16(udp.SrcPort), uint16(udp.DstPort), timestamp)
+	r.parseRTPPacket(payload, ipInfo.SrcIP, ipInfo.DstIP, srcPort, dstPort, timestamp)
 }
 
 func (r *RTPAnalyzer) isRTPPacket(payload []byte) bool {
@@ -128,23 +186,60 @@ func (r *RTPAnalyzer) isRTPPacket(payload []byte) bool {
 		return false
 	}
 
-	// Check RTP version (should be 2)
+	// ── Check 1: RTP version must be 2 ──────────────────────────
 	version := (payload[0] >> 6) & 0x03
 	if version != RTPVersion {
 		return false
 	}
 
-	// Check payload type (should be valid)
-	payloadType := payload[1] & 0x7F
-	if payloadType > 127 {
+	// ── Check 2: CSRC count sanity — CC field (4 bits) ──────────
+	// Each CSRC adds 4 bytes; the total header must fit in the payload.
+	cc := payload[0] & 0x0F
+	requiredLen := RTPHeaderSize + int(cc)*4
+	if len(payload) < requiredLen {
 		return false
 	}
 
-	// Additional heuristics to distinguish from other UDP traffic
-	// RTP typically uses even port numbers, RTCP uses odd
-	// Payload types 72-76 are reserved for RTCP
+	// ── Check 3: Payload type must be in a valid range ──────────
+	pt := payload[1] & 0x7F
+	if !isValidRTPPayloadType(pt) {
+		return false
+	}
+
+	// ── Check 4: Payload must carry actual media data ───────────
+	// A real RTP audio frame has data beyond the header. DNS answers
+	// that accidentally match version=2 often have only ~12 bytes
+	// of "payload" once you subtract the UDP header.
+	minMediaBytes := 10 // even the smallest G.729 frame is 10 bytes
+	if len(payload) < requiredLen+minMediaBytes {
+		return false
+	}
+
+	// ── Check 5: Sequence number should not be zero ─────────────
+	// Zero seq + zero timestamp + zero SSRC is highly unlikely for
+	// real media but common in protocol control messages.
+	seqNum := uint16(payload[2])<<8 | uint16(payload[3])
+	rtpTS := uint32(payload[4])<<24 | uint32(payload[5])<<16 | uint32(payload[6])<<8 | uint32(payload[7])
+	ssrc := uint32(payload[8])<<24 | uint32(payload[9])<<16 | uint32(payload[10])<<8 | uint32(payload[11])
+	if seqNum == 0 && rtpTS == 0 && ssrc == 0 {
+		return false
+	}
 
 	return true
+}
+
+// isValidRTPPayloadType returns true only for payload types defined in
+// RFC 3551 (static audio/video 0-34) or the dynamic range (96-127).
+// PTs 35-71 are unassigned, 72-76 overlap with RTCP packet types,
+// and 77-95 are unassigned — all rejected.
+func isValidRTPPayloadType(pt uint8) bool {
+	if pt <= 34 {
+		return true // static audio/video types
+	}
+	if pt >= 96 && pt <= 127 {
+		return true // dynamic types
+	}
+	return false
 }
 
 func (r *RTPAnalyzer) parseRTPPacket(payload []byte, srcIP, dstIP string, srcPort, dstPort uint16, timestamp time.Time) {
@@ -228,18 +323,30 @@ func (r *RTPAnalyzer) parseRTPPacket(payload []byte, srcIP, dstIP string, srcPor
 }
 
 func (r *RTPAnalyzer) getStreamKey(srcIP, dstIP string, srcPort, dstPort uint16, ssrc uint32) string {
-	return srcIP + ":" + string(rune(srcPort)) + "->" + dstIP + ":" + string(rune(dstPort)) + "/" + string(rune(ssrc))
+	return fmt.Sprintf("%s:%d->%s:%d/%d", srcIP, srcPort, dstIP, dstPort, ssrc)
 }
 
-// GetStreams returns all tracked RTP streams
+// GetStreams returns RTP streams that meet the minimum packet threshold.
+// Streams with fewer than minRTPStreamPackets are suppressed as likely
+// false positives (single DNS response, stray NTP packet, etc.).
 func (r *RTPAnalyzer) GetStreams() map[string]*RTPStream {
-	return r.streams
+	filtered := make(map[string]*RTPStream, len(r.streams))
+	for k, s := range r.streams {
+		if s.PacketCount >= minRTPStreamPackets {
+			filtered[k] = s
+		}
+	}
+	return filtered
 }
 
-// GetStreamStats returns aggregate RTP statistics
+// GetStreamStats returns aggregate RTP statistics (only for streams
+// that meet the minimum packet threshold).
 func (r *RTPAnalyzer) GetStreamStats() (totalStreams int, totalPackets, totalBytes, totalLost uint64, avgJitter float64) {
 	var jitterSum float64
 	for _, stream := range r.streams {
+		if stream.PacketCount < minRTPStreamPackets {
+			continue
+		}
 		totalStreams++
 		totalPackets += stream.PacketCount
 		totalBytes += stream.ByteCount
