@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import type { ParsedFilter } from '../hooks/useForensicFilter';
+import { getAuthToken } from '../api/client';
 
 interface ExportButtonProps {
   jobId: string;
@@ -46,8 +47,8 @@ export default function ExportButton({
         body.time_end = timeEnd;
       }
 
-      // Get auth token
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      // Get auth token (stored under 'sdwan_token' by AuthContext)
+      const token = getAuthToken();
 
       const response = await fetch(`/api/export-pcap/${jobId}`, {
         method: 'POST',
