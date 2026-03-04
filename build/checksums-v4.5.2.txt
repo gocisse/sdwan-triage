@@ -1,4 +1,4 @@
-cc69305899ee098e7fac802f84121991a3fce16d015e904312c1e6ca9ef69d36  sdwan-triage-v4.5.2-darwin-amd64.tar.gz
-0d4465eabce3baf0afca923cde2f740f1214fdcf5ab1bda46126abb7dc5b86b0  sdwan-triage-v4.5.2-darwin-arm64.tar.gz
-d30074abcec7e176f6b544431332ac1fc0df5813f2d4d6690c7d47ba095bb827  sdwan-triage-v4.5.2-linux-amd64.tar.gz
-17c9a0150f5a78973526413dc536831716787a9bcdbf8b136ca42b086df37c61  sdwan-triage-v4.5.2-windows-amd64.zip
+17d59e44c76d60f70a282bd685e5ce744bd331365f2967aee0f2b6c24ea99950  sdwan-triage-v4.5.2-darwin-amd64.tar.gz
+a70533bbb98e4a156a4998cab6083f3d3c7f02b83174a24542b891e26d909426  sdwan-triage-v4.5.2-darwin-arm64.tar.gz
+d0942057215238990e6d0ae15438ba3b40b8f4494384bb6d7cd08dd9129e4548  sdwan-triage-v4.5.2-linux-amd64.tar.gz
+54147120c77269566e63f026688a68cd4606e33c830f3d32e0609370dae8d88d  sdwan-triage-v4.5.2-windows-amd64.zip

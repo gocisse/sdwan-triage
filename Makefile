@@ -69,6 +69,9 @@ build-darwin: copy-dist
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/sdwan-triage
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/sdwan-triage
+	@echo "🔏 Ad-hoc codesigning macOS binaries..."
+	codesign -s - --force $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64
+	codesign -s - --force $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64
 	@echo "✓ $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64"
 	@echo "✓ $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64"
 
@@ -90,9 +93,11 @@ release: clean copy-dist
 	tar -czf $(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-linux-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-linux-amd64
 	@# macOS amd64
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/sdwan-triage
+	codesign -s - --force $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64
 	tar -czf $(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-darwin-amd64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-amd64
 	@# macOS arm64 (Apple Silicon)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/sdwan-triage
+	codesign -s - --force $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64
 	tar -czf $(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-darwin-arm64.tar.gz -C $(BUILD_DIR) $(BINARY_NAME)-darwin-arm64
 	@# Windows amd64
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/sdwan-triage
