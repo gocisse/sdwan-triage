@@ -165,7 +165,7 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 		protected.GET("/packets/:jobID", packetHandlers.ListPackets)
 		protected.GET("/packet/:jobID/:packetIndex", packetHandlers.GetPacket)
 		protected.GET("/streams/:jobID", packetHandlers.ListStreams)
-		protected.GET("/stream/:jobID/:streamID", packetHandlers.GetStream)
+		protected.GET("/stream/:jobID/*streamID", packetHandlers.GetStream)
 
 		// ── PCAP Export & Annotation endpoints ──────────────────
 		protected.POST("/export-pcap/:jobID", exportHandlers.PostExportPCAP)

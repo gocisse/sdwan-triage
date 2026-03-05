@@ -129,17 +129,34 @@ func (h *PacketInspectionHandlers) ensurePacketsLoaded(c *gin.Context, jobID str
 }
 
 // GetStream returns the reassembled stream data
-// GET /api/stream/:jobID/:streamID
+// GET /api/stream/:jobID/*streamID
 func (h *PacketInspectionHandlers) GetStream(c *gin.Context) {
 	jobID := c.Param("jobID")
 	streamID := c.Param("streamID")
+
+	// Gin wildcard params include a leading "/" — strip it
+	streamID = strings.TrimPrefix(streamID, "/")
 
 	if h.ensurePacketsLoaded(c, jobID) == nil {
 		return
 	}
 
-	// Get packets for this stream
+	// Try exact match first
 	packets := h.packetStore.GetPacketsByStream(streamID)
+
+	// If not found, try the normalized (canonical) form where the lower
+	// tuple comes first, since the frontend may send src->dst while the
+	// backend stored dst->src.
+	if len(packets) == 0 {
+		normalized := normalizeStreamKey(streamID)
+		if normalized != streamID {
+			packets = h.packetStore.GetPacketsByStream(normalized)
+			if len(packets) > 0 {
+				streamID = normalized
+			}
+		}
+	}
+
 	if len(packets) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Stream not found"})
 		return
@@ -537,6 +554,32 @@ func (h *PacketInspectionHandlers) buildPacketResponse(p *models.RawPacket) *Pac
 	}
 
 	return response
+}
+
+// normalizeStreamKey takes a stream key like "A:P->B:Q/PROTO" and returns the
+// canonical form where the lexicographically lower endpoint comes first.
+// This matches the normalizeStreamID logic in models/packet_store.go.
+func normalizeStreamKey(key string) string {
+	// Split off protocol suffix: "A:P->B:Q/TCP" → ("A:P->B:Q", "TCP")
+	slashIdx := strings.LastIndex(key, "/")
+	if slashIdx < 0 {
+		return key
+	}
+	proto := key[slashIdx+1:]
+	body := key[:slashIdx]
+
+	// Split endpoints: "A:P->B:Q" → ("A:P", "B:Q")
+	parts := strings.SplitN(body, "->", 2)
+	if len(parts) != 2 {
+		return key
+	}
+	src, dst := parts[0], parts[1]
+
+	// Canonical order: lower tuple first
+	if src < dst {
+		return fmt.Sprintf("%s->%s/%s", src, dst, proto)
+	}
+	return fmt.Sprintf("%s->%s/%s", dst, src, proto)
 }
 
 // formatASCII converts bytes to ASCII with non-printables as dots
