@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
-	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -125,6 +123,9 @@ type ComparisonReport struct {
 	EncryptedCount    int            `json:"encrypted_count"`            // ESP packets where inner is hidden
 	TunnelBreakdown   map[string]int `json:"tunnel_breakdown,omitempty"` // TunnelType → count
 
+	// Forensic Comparison Summary (streaming engine)
+	Forensics *ForensicSummary `json:"forensics,omitempty"`
+
 	// Timing
 	AnalysisDuration time.Duration `json:"analysis_duration_ms"`
 }
@@ -179,346 +180,27 @@ type FlowComparisonSummary struct {
 
 // ─── Main Compare Method ────────────────────────────────────────
 
-// Compare performs a full packet-level comparison between two PCAP files.
-// fileA is typically the LAN-side capture, fileB is the WAN-side capture.
+// Compare performs a streaming two-pass packet-level comparison between
+// two PCAP files. fileA is the LAN-side capture, fileB is the WAN-side.
+//
+// The streaming engine uses O(flows + fingerprints) memory instead of
+// O(all_packets × 2), enabling 100 MB+ captures without crashing.
 func (c *Comparator) Compare(fileA, fileB string) (*ComparisonReport, error) {
-	start := time.Now()
-
-	if c.verbose {
-		fmt.Fprintf(os.Stderr, "[COMPARE] Loading file A: %s\n", fileA)
-	}
-	packetsA, err := c.loadPackets(fileA)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load file A (%s): %w", fileA, err)
-	}
-
-	if c.verbose {
-		fmt.Fprintf(os.Stderr, "[COMPARE] Loading file B: %s\n", fileB)
-		fmt.Fprintf(os.Stderr, "[COMPARE] File A: %d packets, File B: loading...\n", len(packetsA))
-	}
-	packetsB, err := c.loadPackets(fileB)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load file B (%s): %w", fileB, err)
-	}
-
-	if c.verbose {
-		fmt.Fprintf(os.Stderr, "[COMPARE] File B: %d packets\n", len(packetsB))
-		fmt.Fprintf(os.Stderr, "[COMPARE] Building indices...\n")
-	}
-
-	// Build lookup index for file B: key → []packetMeta (multiple packets may share a key)
-	indexB := make(map[string][]*packetMeta, len(packetsB))
-	for i := range packetsB {
-		k := packetsB[i].Key.String()
-		indexB[k] = append(indexB[k], &packetsB[i])
-	}
-
-	// Track which B packets were matched
-	matchedB := make(map[string]bool) // key string → matched
-
-	// Collect tunnel stats from WAN-side packets
-	tunnelBreakdown := make(map[string]int)
-	tunnelTypesSet := make(map[string]bool)
-	encapsulatedCount := 0
-	encryptedCount := 0
-	for i := range packetsB {
-		if packetsB[i].TunnelType != TunnelNone {
-			tunnelBreakdown[packetsB[i].TunnelType]++
-			tunnelTypesSet[packetsB[i].TunnelType] = true
-			encapsulatedCount++
-			if packetsB[i].Encrypted {
-				encryptedCount++
-			}
-		}
-	}
-	var tunnelTypes []string
-	for t := range tunnelTypesSet {
-		tunnelTypes = append(tunnelTypes, t)
-	}
-
-	if c.verbose && encapsulatedCount > 0 {
-		fmt.Fprintf(os.Stderr, "[COMPARE] Tunnel decapsulation: %d encapsulated packets (%d encrypted)\n", encapsulatedCount, encryptedCount)
-		for t, cnt := range tunnelBreakdown {
-			fmt.Fprintf(os.Stderr, "[COMPARE]   %s: %d packets\n", t, cnt)
-		}
-	}
-
-	report := &ComparisonReport{
-		FileA:             fileA,
-		FileB:             fileB,
-		TotalPacketsA:     len(packetsA),
-		TotalPacketsB:     len(packetsB),
-		Discrepancies:     make([]Discrepancy, 0),
-		TunnelDetected:    encapsulatedCount > 0,
-		TunnelTypes:       tunnelTypes,
-		EncapsulatedCount: encapsulatedCount,
-		EncryptedCount:    encryptedCount,
-		TunnelBreakdown:   tunnelBreakdown,
-	}
-
-	// Flow-level aggregation
-	type flowKey struct {
-		SrcIP, DstIP     string
-		SrcPort, DstPort uint16
-		Protocol         string
-	}
-	flowStats := make(map[flowKey]*FlowComparisonSummary)
-	getFlow := func(m *packetMeta) *FlowComparisonSummary {
-		fk := flowKey{m.Key.SrcIP, m.Key.DstIP, m.Key.SrcPort, m.Key.DstPort, m.Key.Protocol}
-		if fs, ok := flowStats[fk]; ok {
-			// Upgrade tunnel info if this packet is encapsulated
-			if m.TunnelType != TunnelNone && !fs.Encapsulated {
-				fs.Encapsulated = true
-				fs.TunnelType = m.TunnelType
-			}
-			return fs
-		}
-		fs := &FlowComparisonSummary{
-			SrcIP: m.Key.SrcIP, DstIP: m.Key.DstIP,
-			SrcPort: m.Key.SrcPort, DstPort: m.Key.DstPort,
-			Protocol:     m.Key.Protocol,
-			Encapsulated: m.TunnelType != TunnelNone,
-			TunnelType:   m.TunnelType,
-		}
-		flowStats[fk] = fs
-		return fs
-	}
-
-	// ── Phase 1: Match packets from A against B ─────────────────
-	for i := range packetsA {
-		pa := &packetsA[i]
-		fs := getFlow(pa)
-		fs.PacketsA++
-
-		k := pa.Key.String()
-		candidates, found := indexB[k]
-
-		if !found || len(candidates) == 0 {
-			// Try relaxed match for NAT detection:
-			// Same protocol + seq but different IP (NAT rewrites source)
-			natMatch := c.findNATMatch(pa, indexB, matchedB)
-			if natMatch != nil {
-				// MODIFIED — NAT detected
-				changes := c.detectModifications(pa, natMatch)
-				report.ModifiedCount++
-				report.NATDetected = true
-				fs.Modified++
-				fs.HasNAT = true
-				matchedB[natMatch.Key.String()] = true
-
-				report.Discrepancies = append(report.Discrepancies, Discrepancy{
-					State:        StateModified,
-					SrcIP:        pa.Key.SrcIP,
-					DstIP:        pa.Key.DstIP,
-					SrcPort:      pa.Key.SrcPort,
-					DstPort:      pa.Key.DstPort,
-					Protocol:     pa.Key.Protocol,
-					PacketIndex:  pa.Index,
-					Timestamp:    pa.Timestamp.Format("15:04:05.000000"),
-					Length:       pa.Length,
-					Detail:       "NAT translation detected",
-					TCPFlags:     pa.TCPFlags,
-					FieldChanges: changes,
-				})
-				continue
-			}
-
-			// MISSING_B — packet in A not in B (dropped)
-			report.MissingBCount++
-			fs.MissingB++
-			report.Discrepancies = append(report.Discrepancies, Discrepancy{
-				State:       StateMissingB,
-				SrcIP:       pa.Key.SrcIP,
-				DstIP:       pa.Key.DstIP,
-				SrcPort:     pa.Key.SrcPort,
-				DstPort:     pa.Key.DstPort,
-				Protocol:    pa.Key.Protocol,
-				PacketIndex: pa.Index,
-				Timestamp:   pa.Timestamp.Format("15:04:05.000000"),
-				Length:      pa.Length,
-				Detail:      "Packet present in LAN capture but missing from WAN capture (dropped by device)",
-				TCPFlags:    pa.TCPFlags,
-			})
-			continue
-		}
-
-		// Found exact key match — consume the first unmatched candidate
-		var pb *packetMeta
-		for ci, cand := range candidates {
-			ck := cand.Key.String()
-			if !matchedB[ck+fmt.Sprintf("@%d", cand.Index)] {
-				pb = cand
-				matchedB[ck+fmt.Sprintf("@%d", cand.Index)] = true
-				// Remove from candidates to avoid double-match
-				indexB[k] = append(candidates[:ci], candidates[ci+1:]...)
-				break
-			}
-		}
-		if pb == nil {
-			// All candidates already matched — treat as missing
-			report.MissingBCount++
-			fs.MissingB++
-			report.Discrepancies = append(report.Discrepancies, Discrepancy{
-				State:       StateMissingB,
-				SrcIP:       pa.Key.SrcIP,
-				DstIP:       pa.Key.DstIP,
-				SrcPort:     pa.Key.SrcPort,
-				DstPort:     pa.Key.DstPort,
-				Protocol:    pa.Key.Protocol,
-				PacketIndex: pa.Index,
-				Timestamp:   pa.Timestamp.Format("15:04:05.000000"),
-				Length:      pa.Length,
-				Detail:      "Packet present in LAN capture but no unmatched counterpart in WAN capture",
-				TCPFlags:    pa.TCPFlags,
-			})
-			continue
-		}
-
-		// Check for modifications (TTL, DSCP changes)
-		changes := c.detectModifications(pa, pb)
-		if len(changes) > 0 {
-			report.ModifiedCount++
-			fs.Modified++
-			for _, ch := range changes {
-				switch ch.Field {
-				case "TTL":
-					report.TTLChanges++
-				case "DSCP":
-					report.DSCPChanges++
-				}
-			}
-			report.Discrepancies = append(report.Discrepancies, Discrepancy{
-				State:        StateModified,
-				SrcIP:        pa.Key.SrcIP,
-				DstIP:        pa.Key.DstIP,
-				SrcPort:      pa.Key.SrcPort,
-				DstPort:      pa.Key.DstPort,
-				Protocol:     pa.Key.Protocol,
-				PacketIndex:  pa.Index,
-				Timestamp:    pa.Timestamp.Format("15:04:05.000000"),
-				Length:       pa.Length,
-				Detail:       formatModificationDetail(changes),
-				TCPFlags:     pa.TCPFlags,
-				FieldChanges: changes,
-			})
-		} else {
-			// PRESENT_BOTH — no discrepancy to report
-			report.MatchedCount++
-			fs.Matched++
-		}
-	}
-
-	// ── Phase 2: Find unmatched packets in B (MISSING_A) ────────
-	// Build a set of matched B packet indices for efficient lookup
-	matchedBIdx := make(map[int]bool, len(matchedB))
-	for i := range packetsB {
-		k := packetsB[i].Key.String() + fmt.Sprintf("@%d", packetsB[i].Index)
-		if matchedB[k] {
-			matchedBIdx[packetsB[i].Index] = true
-		}
-	}
-	for i := range packetsB {
-		pb := &packetsB[i]
-		if matchedBIdx[pb.Index] {
-			continue
-		}
-
-		fs := getFlow(pb)
-		fs.PacketsB++
-
-		// If this packet is encrypted and we couldn't decapsulate, don't count as MISSING_A —
-		// it's expected that encrypted tunnel packets have no LAN-side match on outer headers.
-		if pb.Encrypted {
-			continue
-		}
-
-		report.MissingACount++
-		fs.MissingA++
-
-		detail := "Packet present in WAN capture but missing from LAN capture (asymmetric routing or injected)"
-		if pb.TunnelType != TunnelNone {
-			detail = fmt.Sprintf("[%s tunnel] %s", pb.TunnelType, detail)
-		}
-
-		report.Discrepancies = append(report.Discrepancies, Discrepancy{
-			State:       StateMissingA,
-			SrcIP:       pb.Key.SrcIP,
-			DstIP:       pb.Key.DstIP,
-			SrcPort:     pb.Key.SrcPort,
-			DstPort:     pb.Key.DstPort,
-			Protocol:    pb.Key.Protocol,
-			PacketIndex: pb.Index,
-			Timestamp:   pb.Timestamp.Format("15:04:05.000000"),
-			Length:      pb.Length,
-			Detail:      detail,
-			TCPFlags:    pb.TCPFlags,
-			TunnelType:  pb.TunnelType,
-			Encrypted:   pb.Encrypted,
-		})
-	}
-
-	// ── Phase 3: Compute flow summaries and scores ──────────────
-	for _, fs := range flowStats {
-		total := fs.PacketsA
-		if fs.PacketsB > total {
-			total = fs.PacketsB
-		}
-		if total > 0 {
-			fs.MatchRate = float64(fs.Matched) / float64(total)
-		}
-		report.FlowSummaries = append(report.FlowSummaries, *fs)
-	}
-	// Sort flows by match rate ascending (worst first)
-	sort.Slice(report.FlowSummaries, func(i, j int) bool {
-		return report.FlowSummaries[i].MatchRate < report.FlowSummaries[j].MatchRate
-	})
-
-	// Calculate Path Integrity Score
-	totalPackets := report.TotalPacketsA
-	if report.TotalPacketsB > totalPackets {
-		totalPackets = report.TotalPacketsB
-	}
-	if totalPackets > 0 {
-		report.PathIntegrityScore = float64(report.MatchedCount) / float64(totalPackets) * 100.0
-	}
-	switch {
-	case report.PathIntegrityScore >= 95:
-		report.IntegrityRating = "Healthy"
-	case report.PathIntegrityScore >= 80:
-		report.IntegrityRating = "Degraded"
-	case report.PathIntegrityScore >= 50:
-		report.IntegrityRating = "Warning"
-	default:
-		report.IntegrityRating = "Critical"
-	}
-
-	report.AnalysisDuration = time.Since(start)
-
-	// Limit discrepancies to 10000 for API/UI sanity
-	if len(report.Discrepancies) > 10000 {
-		report.Discrepancies = report.Discrepancies[:10000]
-	}
-
-	if c.verbose {
-		fmt.Fprintf(os.Stderr, "[COMPARE] Done in %v: matched=%d missingB=%d missingA=%d modified=%d score=%.1f%%\n",
-			report.AnalysisDuration, report.MatchedCount, report.MissingBCount, report.MissingACount, report.ModifiedCount, report.PathIntegrityScore)
-	}
-
-	return report, nil
+	return c.CompareStreaming(fileA, fileB)
 }
 
-// ─── Packet Loading (Tunnel-Aware) ──────────────────────────────
+// ─── Streaming Packet Reader ────────────────────────────────────
 
-func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
+// streamFile opens a PCAP file and streams each packet through the callback.
+// Returns total packet count. No packet data is retained after the callback.
+func (c *Comparator) streamFile(filePath string, onPacket func(*packetMeta)) (int, error) {
 	handle, err := OpenCapture(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("invalid capture file: %w", err)
+		return 0, fmt.Errorf("invalid capture file: %w", err)
 	}
 	defer handle.Close()
 
 	reader := handle.Reader
-
-	var packets []packetMeta
 	index := 0
 
 	for {
@@ -541,9 +223,8 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 
 		// Extract outer network layer
 		var srcIP, dstIP string
-		var outerIPv4 *layers.IPv4
 		if ip4 := pkt.Layer(layers.LayerTypeIPv4); ip4 != nil {
-			outerIPv4 = ip4.(*layers.IPv4)
+			outerIPv4 := ip4.(*layers.IPv4)
 			srcIP = outerIPv4.SrcIP.String()
 			dstIP = outerIPv4.DstIP.String()
 			meta.TTL = outerIPv4.TTL
@@ -566,20 +247,15 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 		meta.Key.DstIP = dstIP
 
 		// ── Tunnel Detection & Decapsulation ─────────────────────
-		// Check for encapsulated packets and extract inner headers.
-		// Order of checks: ESP, GRE, then UDP-based tunnels (VXLAN, VCMP, Viptela)
 		tunnelDetected := false
 
 		// 1. ESP (IPsec) — IP Protocol 50
 		if espLayer := pkt.Layer(layers.LayerTypeIPSecESP); espLayer != nil {
-			outerKey := meta.Key // save outer
+			outerKey := meta.Key
 			meta.OuterKey = &outerKey
 			meta.TunnelType = TunnelESP
 			meta.Encrypted = true
 			tunnelDetected = true
-			// ESP is encrypted — we can't see the inner headers.
-			// Keep the outer key but mark it encrypted so the UI can report it.
-			// We still extract the ESP SPI for correlation potential.
 			esp := espLayer.(*layers.IPSecESP)
 			meta.Key.SeqNum = esp.Seq
 		}
@@ -588,7 +264,6 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 		if !tunnelDetected {
 			if greLayer := pkt.Layer(layers.LayerTypeGRE); greLayer != nil {
 				gre := greLayer.(*layers.GRE)
-				// GRE payload should contain an inner IP packet
 				if len(gre.Payload) >= 20 {
 					if inner := c.decapsulateIP(gre.Payload); inner != nil {
 						outerKey := meta.Key
@@ -610,9 +285,7 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 
 				switch {
 				case dstP == vxlanPort || srcP == vxlanPort:
-					// VXLAN: 8-byte VXLAN header then inner Ethernet frame
 					if payload := u.Payload; len(payload) > 8+14 {
-						// Skip 8-byte VXLAN header + 14-byte Ethernet header
 						innerIPData := payload[8+14:]
 						if inner := c.decapsulateIP(innerIPData); inner != nil {
 							outerKey := meta.Key
@@ -624,8 +297,6 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 					}
 
 				case dstP == vcmpPort || srcP == vcmpPort:
-					// VeloCloud VCMP: proprietary header then inner IP
-					// VCMP has a variable-length header; try common offsets
 					if inner := c.tryDecapsulateWithOffsets(u.Payload, []int{16, 20, 24, 32}); inner != nil {
 						outerKey := meta.Key
 						meta.OuterKey = &outerKey
@@ -633,7 +304,6 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 						c.applyInnerMeta(&meta, inner)
 						tunnelDetected = true
 					} else {
-						// Can't extract inner — mark as encrypted/opaque
 						outerKey := meta.Key
 						meta.OuterKey = &outerKey
 						meta.TunnelType = TunnelVCMP
@@ -643,7 +313,6 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 
 				case (dstP >= viptelaPortLow && dstP <= viptelaPortHigh) ||
 					(srcP >= viptelaPortLow && srcP <= viptelaPortHigh):
-					// Cisco Viptela: proprietary DTLS/OMP header then inner IP
 					if inner := c.tryDecapsulateWithOffsets(u.Payload, []int{8, 12, 16, 20, 24, 28, 32, 36, 40, 48}); inner != nil {
 						outerKey := meta.Key
 						meta.OuterKey = &outerKey
@@ -651,7 +320,6 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 						c.applyInnerMeta(&meta, inner)
 						tunnelDetected = true
 					} else {
-						// Encrypted overlay — can't extract inner
 						outerKey := meta.Key
 						meta.OuterKey = &outerKey
 						meta.TunnelType = TunnelViptela
@@ -687,11 +355,11 @@ func (c *Comparator) loadPackets(filePath string) ([]packetMeta, error) {
 			}
 		}
 
-		packets = append(packets, meta)
+		onPacket(&meta)
 		index++
 	}
 
-	return packets, nil
+	return index, nil
 }
 
 // ─── Tunnel Decapsulation Helpers ───────────────────────────────
@@ -839,101 +507,6 @@ func (c *Comparator) applyInnerMeta(meta *packetMeta, inner *innerPacketInfo) {
 	meta.Checksum = inner.Checksum
 	meta.Payload = inner.Payload
 	meta.TCPFlags = inner.TCPFlags
-}
-
-// ─── Modification Detection ─────────────────────────────────────
-
-func (c *Comparator) detectModifications(a, b *packetMeta) []FieldChange {
-	var changes []FieldChange
-
-	if a.TTL != b.TTL {
-		changes = append(changes, FieldChange{
-			Field:  "TTL",
-			ValueA: fmt.Sprintf("%d", a.TTL),
-			ValueB: fmt.Sprintf("%d", b.TTL),
-		})
-	}
-
-	if a.DSCP != b.DSCP {
-		changes = append(changes, FieldChange{
-			Field:  "DSCP",
-			ValueA: fmt.Sprintf("%d", a.DSCP),
-			ValueB: fmt.Sprintf("%d", b.DSCP),
-		})
-	}
-
-	if a.Key.SrcIP != b.Key.SrcIP {
-		changes = append(changes, FieldChange{
-			Field:  "SrcIP",
-			ValueA: a.Key.SrcIP,
-			ValueB: b.Key.SrcIP,
-		})
-	}
-
-	if a.Key.DstIP != b.Key.DstIP {
-		changes = append(changes, FieldChange{
-			Field:  "DstIP",
-			ValueA: a.Key.DstIP,
-			ValueB: b.Key.DstIP,
-		})
-	}
-
-	if a.Key.SrcPort != b.Key.SrcPort {
-		changes = append(changes, FieldChange{
-			Field:  "SrcPort",
-			ValueA: fmt.Sprintf("%d", a.Key.SrcPort),
-			ValueB: fmt.Sprintf("%d", b.Key.SrcPort),
-		})
-	}
-
-	if a.Key.DstPort != b.Key.DstPort {
-		changes = append(changes, FieldChange{
-			Field:  "DstPort",
-			ValueA: fmt.Sprintf("%d", a.Key.DstPort),
-			ValueB: fmt.Sprintf("%d", b.Key.DstPort),
-		})
-	}
-
-	return changes
-}
-
-// findNATMatch attempts to find a matching packet in B when exact 5-tuple fails,
-// by relaxing the source/dest IP constraint (NAT rewrites addresses).
-// We match on: protocol + TCP seq (or IP ID for UDP) + ports.
-func (c *Comparator) findNATMatch(a *packetMeta, indexB map[string][]*packetMeta, matchedB map[string]bool) *packetMeta {
-	// Only attempt NAT match for TCP/UDP with meaningful seq numbers
-	if a.Key.Protocol != "TCP" && a.Key.Protocol != "UDP" {
-		return nil
-	}
-
-	// Search all B packets for a match on protocol + seq + payload size
-	for _, candidates := range indexB {
-		for _, b := range candidates {
-			bk := b.Key.String() + fmt.Sprintf("@%d", b.Index)
-			if matchedB[bk] {
-				continue
-			}
-			if b.Key.Protocol != a.Key.Protocol {
-				continue
-			}
-			if b.Key.SeqNum != a.Key.SeqNum {
-				continue
-			}
-			// For TCP, require same ports (NAT usually preserves ports or at least dest port)
-			if a.Key.Protocol == "TCP" {
-				if b.Key.DstPort != a.Key.DstPort {
-					continue
-				}
-			}
-			// Must have similar payload size (within 4 bytes for possible header differences)
-			if abs(a.Payload-b.Payload) > 4 {
-				continue
-			}
-			// Good enough match — likely NAT
-			return b
-		}
-	}
-	return nil
 }
 
 // ─── Helpers ────────────────────────────────────────────────────

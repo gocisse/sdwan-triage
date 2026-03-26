@@ -20,7 +20,7 @@ import (
 
 // Build-time variables — stamped via -ldflags "-X main.version=... -X main.buildCommit=... -X main.buildDate=..."
 var (
-	version     = "4.5.3"
+	version     = "4.6.0"
 	buildCommit = "unknown"
 	buildDate   = "unknown"
 )
@@ -745,6 +745,112 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 		}
 		if len(report.Discrepancies) > limit {
 			fmt.Printf("  ... and %d more discrepancies\n", len(report.Discrepancies)-limit)
+		}
+	}
+
+	// ── Forensic Comparison Summary ─────────────────────────────
+	if f := report.Forensics; f != nil {
+		fmt.Println()
+		color.Cyan("  ╔══════════════════════════════════════════════════════════╗")
+		color.Cyan("  ║          FORENSIC COMPARISON SUMMARY                    ║")
+		color.Cyan("  ╚══════════════════════════════════════════════════════════╝")
+		fmt.Println()
+
+		// High-level flow stats
+		color.White("  ━━━ FLOW CORRELATION ━━━")
+		fmt.Printf("  %-40s %d\n", "Total Flows Matched:", f.TotalFlowsMatched)
+		if f.FlowsDroppedLANtoWAN > 0 {
+			color.Red("  %-40s %d (SYN dropped by policy)", "Flows Dropped (LAN→WAN):", f.FlowsDroppedLANtoWAN)
+		} else {
+			fmt.Printf("  %-40s %d\n", "Flows Dropped (LAN→WAN):", f.FlowsDroppedLANtoWAN)
+		}
+		if f.FlowsDroppedWANtoLAN > 0 {
+			color.Yellow("  %-40s %d (return path issue)", "Flows Dropped (WAN→LAN):", f.FlowsDroppedWANtoLAN)
+		} else {
+			fmt.Printf("  %-40s %d\n", "Flows Dropped (WAN→LAN):", f.FlowsDroppedWANtoLAN)
+		}
+		fmt.Println()
+
+		// One-Way Latency (Device Processing Delay)
+		if f.LatencySampleCount > 0 {
+			color.White("  ━━━ ONE-WAY LATENCY (Device Processing Delay) ━━━")
+			fmt.Printf("  Samples:  %d TCP SYN pairs correlated\n", f.LatencySampleCount)
+			fmt.Printf("  Average:  %.2f ms\n", f.AvgOneWayLatencyMs)
+			fmt.Printf("  Min:      %.2f ms\n", f.MinOneWayLatencyMs)
+			fmt.Printf("  Max:      %.2f ms\n", f.MaxOneWayLatencyMs)
+			fmt.Printf("  P95:      %.2f ms\n", f.P95OneWayLatencyMs)
+			if f.AvgOneWayLatencyMs > 50 {
+				color.Red("  ⚠ High average latency — WAN underlay or device processing is slow")
+			} else if f.AvgOneWayLatencyMs > 10 {
+				color.Yellow("  ⚠ Moderate latency — monitor for degradation")
+			} else {
+				color.Green("  ✓ Latency within normal range")
+			}
+			fmt.Println()
+		}
+
+		// Retransmission Analysis
+		if f.TotalRetransmissionsDropped > 0 {
+			color.White("  ━━━ RETRANSMISSION STORMS ━━━")
+			color.Red("  %-40s %d", "Packets retransmitted then dropped:", f.TotalRetransmissionsDropped)
+			fmt.Println()
+
+			if len(f.TopRetransmissionOffenders) > 0 {
+				color.White("  Top Retransmission Offenders:")
+				fmt.Printf("  %-42s %12s %12s\n", "Flow", "Retrans", "Dropped")
+				fmt.Printf("  %s\n", strings.Repeat("─", 70))
+				limit := 5
+				if len(f.TopRetransmissionOffenders) < limit {
+					limit = len(f.TopRetransmissionOffenders)
+				}
+				for i := 0; i < limit; i++ {
+					o := f.TopRetransmissionOffenders[i]
+					flowStr := fmt.Sprintf("%s:%d→%s:%d/%s", o.SrcIP, o.SrcPort, o.DstIP, o.DstPort, o.Protocol)
+					if len(flowStr) > 42 {
+						flowStr = flowStr[:39] + "..."
+					}
+					color.Red("  %-42s %12d %12d", flowStr, o.Retransmissions, o.PacketsDropped)
+				}
+				fmt.Println()
+			}
+		}
+
+		// Failed Handshakes
+		if len(f.FailedHandshakes) > 0 {
+			color.White("  ━━━ FAILED TCP HANDSHAKES ━━━")
+			limit := 10
+			if len(f.FailedHandshakes) < limit {
+				limit = len(f.FailedHandshakes)
+			}
+			for i := 0; i < limit; i++ {
+				h := f.FailedHandshakes[i]
+				switch h.Reason {
+				case "SYN dropped by policy":
+					color.Red("  ✗ %s:%d→%s:%d — %s", h.SrcIP, h.SrcPort, h.DstIP, h.DstPort, h.Reason)
+				default:
+					color.Yellow("  ✗ %s:%d→%s:%d — %s", h.SrcIP, h.SrcPort, h.DstIP, h.DstPort, h.Reason)
+				}
+				fmt.Printf("    %s\n", h.Detail)
+			}
+			if len(f.FailedHandshakes) > limit {
+				fmt.Printf("  ... and %d more failed handshakes\n", len(f.FailedHandshakes)-limit)
+			}
+			fmt.Println()
+		}
+
+		// Latency Spikes
+		if len(f.LatencySpikes) > 0 {
+			color.White("  ━━━ LATENCY SPIKES ━━━")
+			limit := 5
+			if len(f.LatencySpikes) < limit {
+				limit = len(f.LatencySpikes)
+			}
+			for i := 0; i < limit; i++ {
+				s := f.LatencySpikes[i]
+				color.Yellow("  ⚠ %s:%d→%s:%d  %.1f ms (%.1f× avg)",
+					s.SrcIP, s.SrcPort, s.DstIP, s.DstPort, s.LatencyMs, s.Multiplier)
+			}
+			fmt.Println()
 		}
 	}
 
