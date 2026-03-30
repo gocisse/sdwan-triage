@@ -819,6 +819,14 @@ export interface ComparisonReport {
   missing_b_count: number;
   missing_a_count: number;
   modified_count: number;
+  verified_encrypted_count: number;
+  ignored_local_count: number;
+  ignored_mgmt_count: number;
+  ignored_routing_count: number;
+  ignored_local_lan_count: number;
+  ignored_control_plane_count: number;
+  policy_drop_count: number;
+  blackhole_count: number;
   path_integrity_score: number;
   integrity_rating: string; // "Healthy" | "Degraded" | "Warning" | "Critical"
   discrepancies: Discrepancy[];
@@ -831,7 +839,43 @@ export interface ComparisonReport {
   encapsulated_count: number;
   encrypted_count: number;
   tunnel_breakdown?: Record<string, number>;
+  forensics?: ForensicSummary;
   analysis_duration_ms: number;
+}
+
+export interface ForensicSummary {
+  total_flows_matched: number;
+  flows_dropped_lan_to_wan: number;
+  flows_dropped_wan_to_lan: number;
+  avg_one_way_latency_ms: number;
+  min_one_way_latency_ms: number;
+  max_one_way_latency_ms: number;
+  p95_one_way_latency_ms: number;
+  latency_sample_count: number;
+  total_retransmissions_dropped: number;
+  failed_handshakes?: FailedHandshake[];
+  top_retransmission_offenders?: RetransmissionOffender[];
+}
+
+export interface FailedHandshake {
+  src_ip: string;
+  dst_ip: string;
+  src_port: number;
+  dst_port: number;
+  reason: string;
+  detail: string;
+}
+
+export interface RetransmissionOffender {
+  src_ip: string;
+  dst_ip: string;
+  src_port: number;
+  dst_port: number;
+  protocol: string;
+  retransmissions: number;
+  dropped: number;
+  mtu_blackhole?: boolean;
+  max_payload?: number;
 }
 
 export interface Discrepancy {
@@ -871,8 +915,10 @@ export interface FlowComparisonSummary {
   modified: number;
   match_rate: number;
   has_nat: boolean;
+  drop_reason?: string;
   tunnel_type?: string;
   encapsulated: boolean;
+  verified_encrypted?: number;
 }
 
 // ─── QoS / DSCP Analysis Types ──────────────────────────────────

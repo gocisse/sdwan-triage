@@ -13,10 +13,28 @@ import (
 
 // ─── Packet Comparison States ───────────────────────────────────
 const (
-	StatePresentBoth = "PRESENT_BOTH" // Packet found in both captures
-	StateMissingB    = "MISSING_B"    // In file A (LAN), not in B (WAN) — dropped by device
-	StateMissingA    = "MISSING_A"    // In file B (WAN), not in A (LAN) — asymmetric routing / spoofed
-	StateModified    = "MODIFIED"     // Present in both but fields changed (TTL, DSCP, NAT)
+	StatePresentBoth       = "PRESENT_BOTH"       // Packet found in both captures
+	StateMissingB          = "MISSING_B"          // In file A (LAN), not in B (WAN) — dropped by device
+	StateMissingA          = "MISSING_A"          // In file B (WAN), not in A (LAN) — asymmetric routing / spoofed
+	StateModified          = "MODIFIED"           // Present in both but fields changed (TTL, DSCP, NAT)
+	StateVerifiedEncrypted = "VERIFIED_ENCRYPTED" // LAN clear-text correlated to encrypted WAN tunnel via time+size
+	StateIgnoredLocal      = "IGNORED_LOCAL"      // Broadcast/multicast/link-local — not expected on WAN
+)
+
+// Noise classification for LAN packets not expected on WAN.
+const (
+	NoiseNone     = ""          // Real user traffic — candidate for WAN transit
+	NoiseLocal    = "local"     // Broadcast/multicast/link-local
+	NoiseMgmt     = "mgmt"      // SNMP (161/162), Syslog (514), NTP (123)
+	NoiseRouting  = "routing"   // HSRP/VRRP (proto 112, UDP 1985), OSPF (proto 89), EIGRP (proto 88)
+	NoiseLocalLAN = "local_lan" // Same private subnet (RFC1918 intra-subnet)
+)
+
+// Drop reason categories for MISSING_B packets.
+const (
+	DropReasonPolicyDrop = "policy_drop" // TCP SYN with no response — likely ACL/policy block
+	DropReasonBlackhole  = "blackhole"   // Ongoing data transfer that suddenly disappears
+	DropReasonUnknown    = "unknown"     // Cannot determine reason
 )
 
 // ─── Tunnel Encapsulation Types ─────────────────────────────────
@@ -94,12 +112,20 @@ type ComparisonReport struct {
 	FileB string `json:"file_b"` // WAN-side filename
 
 	// Aggregate stats
-	TotalPacketsA int `json:"total_packets_a"`
-	TotalPacketsB int `json:"total_packets_b"`
-	MatchedCount  int `json:"matched_count"`
-	MissingBCount int `json:"missing_b_count"` // In A not B (dropped)
-	MissingACount int `json:"missing_a_count"` // In B not A (asymmetric)
-	ModifiedCount int `json:"modified_count"`
+	TotalPacketsA            int `json:"total_packets_a"`
+	TotalPacketsB            int `json:"total_packets_b"`
+	MatchedCount             int `json:"matched_count"`
+	MissingBCount            int `json:"missing_b_count"` // In A not B (dropped)
+	MissingACount            int `json:"missing_a_count"` // In B not A (asymmetric)
+	ModifiedCount            int `json:"modified_count"`
+	VerifiedEncryptedCount   int `json:"verified_encrypted_count"`    // LAN↔encrypted WAN correlated by time+size
+	IgnoredLocalCount        int `json:"ignored_local_count"`         // Broadcast/multicast/link-local excluded
+	IgnoredMgmtCount         int `json:"ignored_mgmt_count"`          // SNMP/Syslog/NTP excluded
+	IgnoredRoutingCount      int `json:"ignored_routing_count"`       // HSRP/VRRP/OSPF/EIGRP excluded
+	IgnoredLocalLANCount     int `json:"ignored_local_lan_count"`     // Same-subnet RFC1918 excluded
+	IgnoredControlPlaneCount int `json:"ignored_control_plane_count"` // WAN-side BFD/OMP/keepalive excluded from score
+	PolicyDropCount          int `json:"policy_drop_count"`           // TCP SYN with no response
+	BlackholeCount           int `json:"blackhole_count"`             // Ongoing data that disappears
 
 	// Path Integrity Score (0–100)
 	PathIntegrityScore float64 `json:"path_integrity_score"`
@@ -161,21 +187,23 @@ type FieldChange struct {
 
 // FlowComparisonSummary aggregates comparison results per 5-tuple flow.
 type FlowComparisonSummary struct {
-	SrcIP        string  `json:"src_ip"`
-	DstIP        string  `json:"dst_ip"`
-	SrcPort      uint16  `json:"src_port"`
-	DstPort      uint16  `json:"dst_port"`
-	Protocol     string  `json:"protocol"`
-	PacketsA     int     `json:"packets_a"`
-	PacketsB     int     `json:"packets_b"`
-	Matched      int     `json:"matched"`
-	MissingB     int     `json:"missing_b"`
-	MissingA     int     `json:"missing_a"`
-	Modified     int     `json:"modified"`
-	MatchRate    float64 `json:"match_rate"` // 0.0–1.0
-	HasNAT       bool    `json:"has_nat"`
-	TunnelType   string  `json:"tunnel_type,omitempty"`
-	Encapsulated bool    `json:"encapsulated"`
+	SrcIP             string  `json:"src_ip"`
+	DstIP             string  `json:"dst_ip"`
+	SrcPort           uint16  `json:"src_port"`
+	DstPort           uint16  `json:"dst_port"`
+	Protocol          string  `json:"protocol"`
+	PacketsA          int     `json:"packets_a"`
+	PacketsB          int     `json:"packets_b"`
+	Matched           int     `json:"matched"`
+	MissingB          int     `json:"missing_b"`
+	MissingA          int     `json:"missing_a"`
+	Modified          int     `json:"modified"`
+	VerifiedEncrypted int     `json:"verified_encrypted"` // Correlated via time+size
+	MatchRate         float64 `json:"match_rate"`         // 0.0–1.0
+	HasNAT            bool    `json:"has_nat"`
+	DropReason        string  `json:"drop_reason,omitempty"` // policy_drop, blackhole, or empty
+	TunnelType        string  `json:"tunnel_type,omitempty"`
+	Encapsulated      bool    `json:"encapsulated"`
 }
 
 // ─── Main Compare Method ────────────────────────────────────────

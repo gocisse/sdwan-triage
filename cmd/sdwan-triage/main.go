@@ -20,7 +20,7 @@ import (
 
 // Build-time variables — stamped via -ldflags "-X main.version=... -X main.buildCommit=... -X main.buildDate=..."
 var (
-	version     = "4.6.0"
+	version     = "4.7.0"
 	buildCommit = "unknown"
 	buildDate   = "unknown"
 )
@@ -654,10 +654,47 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 	fmt.Printf("  %-30s %d\n", "Packets in LAN capture (A):", report.TotalPacketsA)
 	fmt.Printf("  %-30s %d\n", "Packets in WAN capture (B):", report.TotalPacketsB)
 	color.Green("  %-30s %d", "Matched (PRESENT_BOTH):", report.MatchedCount)
+	if report.VerifiedEncryptedCount > 0 {
+		color.Green("  %-30s %d (time+size correlated)", "Verified Encrypted Transit:", report.VerifiedEncryptedCount)
+	}
 	if report.MissingBCount > 0 {
 		color.Red("  %-30s %d (dropped by device)", "Missing from WAN (MISSING_B):", report.MissingBCount)
+		if report.PolicyDropCount > 0 || report.BlackholeCount > 0 {
+			other := report.MissingBCount - report.PolicyDropCount - report.BlackholeCount
+			if other < 0 {
+				other = 0
+			}
+			if report.PolicyDropCount > 0 {
+				color.Red("    ├─ Policy Drops (SYN blocked):   %d", report.PolicyDropCount)
+			}
+			if report.BlackholeCount > 0 {
+				color.Red("    ├─ Blackhole (data disappeared):  %d", report.BlackholeCount)
+			}
+			if other > 0 {
+				fmt.Printf("    └─ Uncategorized:                %d\n", other)
+			}
+		}
 	} else {
 		fmt.Printf("  %-30s %d\n", "Missing from WAN (MISSING_B):", report.MissingBCount)
+	}
+	totalNoise := report.IgnoredLocalCount + report.IgnoredMgmtCount + report.IgnoredRoutingCount + report.IgnoredLocalLANCount
+	if totalNoise > 0 {
+		fmt.Printf("  %-30s %d (not WAN candidates)\n", "Excluded Noise Traffic:", totalNoise)
+		if report.IgnoredLocalCount > 0 {
+			fmt.Printf("    ├─ Broadcast/Multicast:          %d\n", report.IgnoredLocalCount)
+		}
+		if report.IgnoredMgmtCount > 0 {
+			fmt.Printf("    ├─ SNMP/Syslog/NTP:              %d\n", report.IgnoredMgmtCount)
+		}
+		if report.IgnoredRoutingCount > 0 {
+			fmt.Printf("    ├─ Routing (HSRP/VRRP/OSPF):     %d\n", report.IgnoredRoutingCount)
+		}
+		if report.IgnoredLocalLANCount > 0 {
+			fmt.Printf("    └─ Same-Subnet (local LAN):      %d\n", report.IgnoredLocalLANCount)
+		}
+	}
+	if report.IgnoredControlPlaneCount > 0 {
+		fmt.Printf("  %-30s %d (BFD/OMP/keepalive — excluded from score)\n", "Control Plane Traffic:", report.IgnoredControlPlaneCount)
 	}
 	if report.MissingACount > 0 {
 		color.Yellow("  %-30s %d (asymmetric/injected)", "Missing from LAN (MISSING_A):", report.MissingACount)
@@ -670,7 +707,11 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 		fmt.Printf("  %-30s %d\n", "Modified:", report.ModifiedCount)
 	}
 	if report.EncryptedCount > 0 {
-		color.Cyan("  %-30s %d (inner flow hidden)", "Encrypted tunnel packets:", report.EncryptedCount)
+		if report.VerifiedEncryptedCount > 0 {
+			color.Cyan("  %-30s %d (%d verified via time+size)", "Encrypted tunnel packets:", report.EncryptedCount, report.VerifiedEncryptedCount)
+		} else {
+			color.Cyan("  %-30s %d (inner flow hidden)", "Encrypted tunnel packets:", report.EncryptedCount)
+		}
 	}
 	fmt.Println()
 
@@ -722,15 +763,18 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 		fmt.Println()
 	}
 
-	// Top discrepancies (first 10)
+	// Top discrepancies (first 10, filtering out MISSING_A noise)
 	if len(report.Discrepancies) > 0 {
 		color.White("  ━━━ TOP DISCREPANCIES ━━━")
-		limit := 10
-		if len(report.Discrepancies) < limit {
-			limit = len(report.Discrepancies)
-		}
-		for i := 0; i < limit; i++ {
+		shown := 0
+		skipped := 0
+		for i := 0; i < len(report.Discrepancies) && shown < 10; i++ {
 			d := report.Discrepancies[i]
+			// Skip MISSING_A noise: HSRP/multicast/ICMP/routing/encrypted tunnel
+			if d.State == analyzer.StateMissingA && analyzer.IsWANNoisyDiscrepancy(&d) {
+				skipped++
+				continue
+			}
 			switch d.State {
 			case analyzer.StateMissingB:
 				color.Red("  [MISSING_B] #%d %s %s:%d→%s:%d %s — %s",
@@ -742,9 +786,13 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 				color.Yellow("  [MODIFIED]  #%d %s %s:%d→%s:%d %s — %s",
 					d.PacketIndex, d.Timestamp, d.SrcIP, d.SrcPort, d.DstIP, d.DstPort, d.Protocol, d.Detail)
 			}
+			shown++
 		}
-		if len(report.Discrepancies) > limit {
-			fmt.Printf("  ... and %d more discrepancies\n", len(report.Discrepancies)-limit)
+		remaining := len(report.Discrepancies) - shown - skipped
+		if remaining > 0 {
+			fmt.Printf("  ... and %d more discrepancies (%d noise filtered)\n", remaining, skipped)
+		} else if skipped > 0 {
+			fmt.Printf("  (%d noise discrepancies filtered)\n", skipped)
 		}
 	}
 
@@ -760,7 +808,7 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 		color.White("  ━━━ FLOW CORRELATION ━━━")
 		fmt.Printf("  %-40s %d\n", "Total Flows Matched:", f.TotalFlowsMatched)
 		if f.FlowsDroppedLANtoWAN > 0 {
-			color.Red("  %-40s %d (SYN dropped by policy)", "Flows Dropped (LAN→WAN):", f.FlowsDroppedLANtoWAN)
+			color.Red("  %-40s %d (policy/blackhole)", "Flows Dropped (LAN→WAN):", f.FlowsDroppedLANtoWAN)
 		} else {
 			fmt.Printf("  %-40s %d\n", "Flows Dropped (LAN→WAN):", f.FlowsDroppedLANtoWAN)
 		}
@@ -810,6 +858,9 @@ func printComparisonReport(report *analyzer.ComparisonReport) {
 						flowStr = flowStr[:39] + "..."
 					}
 					color.Red("  %-42s %12d %12d", flowStr, o.Retransmissions, o.PacketsDropped)
+					if o.MTUBlackhole {
+						color.Yellow("    ⚠ Potential MTU Blackhole — max payload %d bytes (>1400)", o.MaxPayload)
+					}
 				}
 				fmt.Println()
 			}

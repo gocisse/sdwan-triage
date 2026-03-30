@@ -16,6 +16,7 @@ import {
 import type { ComparisonReport, Discrepancy, FlowComparisonSummary } from '../types';
 import { getAuthToken } from '../api/client';
 import FlowGraphView from './FlowGraphView';
+import { EducationalLegend, InfoTooltip, METRIC_TOOLTIPS, getDiscrepancyAnalysis } from './ComparisonEducational';
 
 interface ComparisonViewProps {
   onClose?: () => void;
@@ -177,6 +178,9 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
         </div>
       </div>
 
+      {/* Educational Legend */}
+      <EducationalLegend />
+
       {/* Path Integrity Score Banner */}
       <div className={`bg-gradient-to-r ${scoreBg} border rounded-xl p-6`}>
         <div className="flex items-center justify-between">
@@ -195,21 +199,39 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-right">
-            <Stat label="Packets A (LAN)" value={report.total_packets_a.toLocaleString()} />
-            <Stat label="Packets B (WAN)" value={report.total_packets_b.toLocaleString()} />
-            <Stat label="Matched" value={report.matched_count.toLocaleString()} color="text-green-400" />
-            <Stat label="Dropped" value={report.missing_b_count.toLocaleString()} color={report.missing_b_count > 0 ? 'text-red-400' : undefined} />
+            <Stat label="Packets A (LAN)" value={report.total_packets_a.toLocaleString()} tooltip={METRIC_TOOLTIPS.packetsA} />
+            <Stat label="Packets B (WAN)" value={report.total_packets_b.toLocaleString()} tooltip={METRIC_TOOLTIPS.packetsB} />
+            <Stat label="Matched" value={report.matched_count.toLocaleString()} color="text-green-400" tooltip={METRIC_TOOLTIPS.matched} />
+            <Stat label="Dropped" value={report.missing_b_count.toLocaleString()} color={report.missing_b_count > 0 ? 'text-red-400' : undefined} tooltip={METRIC_TOOLTIPS.dropped} />
           </div>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SummaryCard icon={<CheckCircle className="w-5 h-5 text-green-400" />} label="Matched" value={report.matched_count} color="green" />
-        <SummaryCard icon={<XCircle className="w-5 h-5 text-red-400" />} label="Dropped (B)" value={report.missing_b_count} color="red" />
-        <SummaryCard icon={<AlertTriangle className="w-5 h-5 text-yellow-400" />} label="Modified" value={report.modified_count} color="yellow" />
-        <SummaryCard icon={<Activity className="w-5 h-5 text-purple-400" />} label="Asymmetric (A)" value={report.missing_a_count} color="purple" />
+        <SummaryCard icon={<CheckCircle className="w-5 h-5 text-green-400" />} label="Matched" value={report.matched_count} color="green" tooltip={METRIC_TOOLTIPS.matched} />
+        <SummaryCard icon={<XCircle className="w-5 h-5 text-red-400" />} label="Dropped (B)" value={report.missing_b_count} color="red" tooltip={METRIC_TOOLTIPS.dropped} />
+        <SummaryCard icon={<AlertTriangle className="w-5 h-5 text-yellow-400" />} label="Modified" value={report.modified_count} color="yellow" tooltip={METRIC_TOOLTIPS.modified} />
+        <SummaryCard icon={<Activity className="w-5 h-5 text-purple-400" />} label="Asymmetric (A)" value={report.missing_a_count} color="purple" tooltip={METRIC_TOOLTIPS.asymmetric} />
       </div>
+
+      {/* Additional Metrics Row */}
+      {(report.verified_encrypted_count > 0 || report.ignored_control_plane_count > 0 || report.policy_drop_count > 0) && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {report.verified_encrypted_count > 0 && (
+            <SummaryCard icon={<Lock className="w-5 h-5 text-cyan-400" />} label="Verified Encrypted" value={report.verified_encrypted_count} color="cyan" tooltip={METRIC_TOOLTIPS.verifiedEncrypted} />
+          )}
+          {report.policy_drop_count > 0 && (
+            <SummaryCard icon={<XCircle className="w-5 h-5 text-red-400" />} label="Policy Drops" value={report.policy_drop_count} color="red" tooltip={METRIC_TOOLTIPS.policyDrop} />
+          )}
+          {report.ignored_control_plane_count > 0 && (
+            <SummaryCard icon={<Activity className="w-5 h-5 text-slate-400" />} label="Control Plane" value={report.ignored_control_plane_count} color="slate" tooltip={METRIC_TOOLTIPS.controlPlane} />
+          )}
+          {(report.ignored_local_count + report.ignored_mgmt_count + report.ignored_routing_count + report.ignored_local_lan_count) > 0 && (
+            <SummaryCard icon={<AlertTriangle className="w-5 h-5 text-yellow-400" />} label="Noise Excluded" value={report.ignored_local_count + report.ignored_mgmt_count + report.ignored_routing_count + report.ignored_local_lan_count} color="yellow" tooltip={METRIC_TOOLTIPS.noiseTraffic} />
+          )}
+        </div>
+      )}
 
       {/* Tunnel Encapsulation Banner */}
       {report.tunnel_detected && (
@@ -350,25 +372,34 @@ function FileDropZone({ label, sublabel, file, onFileSelect, accentColor }: {
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+function Stat({ label, value, color, tooltip }: { label: string; value: string; color?: string; tooltip?: string }) {
   return (
     <div>
-      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xs text-slate-500 flex items-center justify-end gap-0.5">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </div>
       <div className={`text-sm font-medium ${color || 'text-white'}`}>{value}</div>
     </div>
   );
 }
 
-function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function SummaryCard({ icon, label, value, color, tooltip }: { icon: React.ReactNode; label: string; value: number; color: string; tooltip?: string }) {
   const bgMap: Record<string, string> = {
     green: 'bg-green-500/10 border-green-500/20',
     red: 'bg-red-500/10 border-red-500/20',
     yellow: 'bg-yellow-500/10 border-yellow-500/20',
     purple: 'bg-purple-500/10 border-purple-500/20',
+    cyan: 'bg-cyan-500/10 border-cyan-500/20',
+    slate: 'bg-slate-500/10 border-slate-500/20',
   };
   return (
     <div className={`${bgMap[color] || ''} border rounded-lg p-4`}>
-      <div className="flex items-center gap-2 mb-2">{icon}<span className="text-xs text-slate-400">{label}</span></div>
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <span className="text-xs text-slate-400">{label}</span>
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </div>
       <div className="text-2xl font-bold text-white">{value.toLocaleString()}</div>
     </div>
   );
@@ -508,10 +539,27 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
   onFilterChange: (f: string) => void;
   total: number;
 }) {
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
+  const toggleRow = (idx: number) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
   const stateColors: Record<string, string> = {
     MISSING_B: 'bg-red-500/20 text-red-400',
     MISSING_A: 'bg-purple-500/20 text-purple-400',
     MODIFIED: 'bg-yellow-500/20 text-yellow-400',
+  };
+
+  const severityBg: Record<string, string> = {
+    critical: 'bg-red-900/30 border-red-700/40',
+    warning: 'bg-yellow-900/30 border-yellow-700/40',
+    info: 'bg-slate-800/60 border-slate-600/40',
   };
 
   return (
@@ -537,33 +585,77 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
       {/* Discrepancy list */}
       <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 overflow-hidden max-h-[600px] overflow-y-auto">
         <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-slate-800">
+          <thead className="sticky top-0 bg-slate-800 z-10">
             <tr className="border-b border-slate-700/50">
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">State</th>
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">#</th>
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">Time</th>
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">Flow</th>
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">Detail</th>
+              <th className="px-3 py-2.5 text-left text-slate-500 font-medium">
+                Analysis
+                <InfoTooltip text="Click any row to see a plain-English explanation of why this packet is flagged and what to check." />
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/30">
-            {discrepancies.slice(0, 500).map((d, i) => (
-              <tr key={i} className="hover:bg-slate-700/20">
-                <td className="px-3 py-2">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${stateColors[d.state] || 'text-slate-400'}`}>
-                    {d.state.replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-slate-500 font-mono">{d.packet_index}</td>
-                <td className="px-3 py-2 text-slate-400 font-mono">{d.timestamp}</td>
-                <td className="px-3 py-2 font-mono text-slate-300">
-                  {d.src_ip}:{d.src_port}→{d.dst_ip}:{d.dst_port}
-                  <span className="ml-1 text-slate-500">{d.protocol}</span>
-                  {d.tcp_flags && <span className="ml-1 text-slate-600">[{d.tcp_flags}]</span>}
-                </td>
-                <td className="px-3 py-2 text-slate-400 max-w-xs truncate" title={d.detail}>{d.detail}</td>
-              </tr>
-            ))}
+            {discrepancies.slice(0, 500).map((d, i) => {
+              const analysis = getDiscrepancyAnalysis(d);
+              const isExpanded = expandedRows.has(i);
+              return (
+                <React.Fragment key={i}>
+                  <tr className="hover:bg-slate-700/20 cursor-pointer" onClick={() => toggleRow(i)}>
+                    <td className="px-3 py-2">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${stateColors[d.state] || 'text-slate-400'}`}>
+                        {d.state.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 font-mono">{d.packet_index}</td>
+                    <td className="px-3 py-2 text-slate-400 font-mono">{d.timestamp}</td>
+                    <td className="px-3 py-2 font-mono text-slate-300">
+                      {d.src_ip}:{d.src_port}→{d.dst_ip}:{d.dst_port}
+                      <span className="ml-1 text-slate-500">{d.protocol}</span>
+                      {d.tcp_flags && <span className="ml-1 text-slate-600">[{d.tcp_flags}]</span>}
+                    </td>
+                    <td className="px-3 py-2 text-slate-400 max-w-[200px] truncate" title={d.detail}>{d.detail}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        {analysis.icon}
+                        <span className="text-slate-300 truncate max-w-[180px]">{analysis.summary}</span>
+                        {isExpanded
+                          ? <ChevronUp className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                          : <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={6} className="px-0 py-0">
+                        <div className={`mx-3 my-2 px-4 py-3 rounded-lg border ${severityBg[analysis.severity]}`}>
+                          <div className="flex items-start gap-2">
+                            <div className="mt-0.5 flex-shrink-0">{analysis.icon}</div>
+                            <div>
+                              <div className="text-xs font-semibold text-white mb-1">{analysis.summary}</div>
+                              <p className="text-[11px] text-slate-400 leading-relaxed">{analysis.suggestion}</p>
+                              {d.field_changes && d.field_changes.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {d.field_changes.map((fc, j) => (
+                                    <span key={j} className="px-2 py-0.5 text-[10px] bg-yellow-500/10 text-yellow-400 rounded border border-yellow-500/20">
+                                      {fc.field}: {fc.value_a} → {fc.value_b}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
         {discrepancies.length > 500 && (
