@@ -12,11 +12,18 @@ import {
   Loader2,
   Lock,
   Layers,
+  MessageSquare,
 } from 'lucide-react';
-import type { ComparisonReport, Discrepancy, FlowComparisonSummary } from '../types';
+import type { ComparisonReport, Discrepancy, FlowComparisonSummary, ForensicSummary } from '../types';
 import { getAuthToken } from '../api/client';
 import FlowGraphView from './FlowGraphView';
 import { EducationalLegend, InfoTooltip, METRIC_TOOLTIPS, getDiscrepancyAnalysis } from './ComparisonEducational';
+import { DiscrepancyDeepDive } from './DiscrepancyDeepDive';
+import { InvestigationChecklist } from './InvestigationChecklist';
+import { PacketDissector } from './PacketDissector';
+import { StreamConversation } from './StreamConversation';
+import { FilterBuilderEducator } from './FilterBuilderEducator';
+import { GuidedTroubleshooting } from './GuidedTroubleshooting';
 
 interface ComparisonViewProps {
   onClose?: () => void;
@@ -181,6 +188,12 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
       {/* Educational Legend */}
       <EducationalLegend />
 
+      {/* Investigation Checklist */}
+      <InvestigationChecklist report={report} />
+
+      {/* Filter Builder & Explainer */}
+      <FilterBuilderEducator discrepancies={report.discrepancies} />
+
       {/* Path Integrity Score Banner */}
       <div className={`bg-gradient-to-r ${scoreBg} border rounded-xl p-6`}>
         <div className="flex items-center justify-between">
@@ -307,13 +320,15 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'summary' && <SummaryTab report={report} />}
+      {activeTab === 'summary' && <GuidedTroubleshooting report={report} onSwitchTab={(tab) => setActiveTab(tab as 'summary' | 'flows' | 'discrepancies')} />}
       {activeTab === 'flows' && (
         <FlowsTab
           flows={report.flow_summaries}
           expandedFlows={expandedFlows}
           onToggleFlow={toggleFlow}
           onVisualize={setVisualizeFlow}
+          allDiscrepancies={report.discrepancies}
+          forensics={report.forensics}
         />
       )}
 
@@ -331,6 +346,8 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           filter={discrepancyFilter}
           onFilterChange={setDiscrepancyFilter}
           total={report.discrepancies.length}
+          allDiscrepancies={report.discrepancies}
+          forensics={report.forensics}
         />
       )}
     </div>
@@ -405,141 +422,116 @@ function SummaryCard({ icon, label, value, color, tooltip }: { icon: React.React
   );
 }
 
-function SummaryTab({ report }: { report: ComparisonReport }) {
-  const total = report.matched_count + report.missing_b_count + report.missing_a_count + report.modified_count;
-  const pctMatch = total > 0 ? (report.matched_count / total * 100) : 0;
-  const pctDrop = total > 0 ? (report.missing_b_count / total * 100) : 0;
-  const pctModified = total > 0 ? (report.modified_count / total * 100) : 0;
-  const pctAsym = total > 0 ? (report.missing_a_count / total * 100) : 0;
+function FlowsTab({ flows, expandedFlows, onToggleFlow, onVisualize, allDiscrepancies, forensics }: {
+  flows: FlowComparisonSummary[];
+  expandedFlows: Set<number>;
+  onToggleFlow: (idx: number) => void;
+  onVisualize: (flow: FlowComparisonSummary) => void;
+  allDiscrepancies: Discrepancy[];
+  forensics?: ForensicSummary;
+}) {
+  const [conversationFlow, setConversationFlow] = useState<FlowComparisonSummary | null>(null);
 
   return (
-    <div className="space-y-4">
-      {/* Stacked bar */}
-      <div className="bg-slate-800/80 rounded-xl p-6 border border-slate-700/50">
-        <h3 className="text-sm font-medium text-slate-400 mb-4">Packet Distribution</h3>
-        <div className="h-6 rounded-full overflow-hidden flex bg-slate-900">
-          {pctMatch > 0 && <div className="bg-green-500 transition-all" style={{ width: `${pctMatch}%` }} title={`Matched: ${pctMatch.toFixed(1)}%`} />}
-          {pctModified > 0 && <div className="bg-yellow-500 transition-all" style={{ width: `${pctModified}%` }} title={`Modified: ${pctModified.toFixed(1)}%`} />}
-          {pctDrop > 0 && <div className="bg-red-500 transition-all" style={{ width: `${pctDrop}%` }} title={`Dropped: ${pctDrop.toFixed(1)}%`} />}
-          {pctAsym > 0 && <div className="bg-purple-500 transition-all" style={{ width: `${pctAsym}%` }} title={`Asymmetric: ${pctAsym.toFixed(1)}%`} />}
-        </div>
-        <div className="flex gap-6 mt-3 text-xs">
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500" />Matched {pctMatch.toFixed(1)}%</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />Modified {pctModified.toFixed(1)}%</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" />Dropped {pctDrop.toFixed(1)}%</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" />Asymmetric {pctAsym.toFixed(1)}%</span>
-        </div>
+    <div>
+      <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-700/50">
+              <th className="px-3 py-2.5 text-left text-slate-500 font-medium">Flow</th>
+              <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Pkts A</th>
+              <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Pkts B</th>
+              <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Match</th>
+              <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Drop</th>
+              <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Rate</th>
+              <th className="px-3 py-2.5 text-center text-slate-500 font-medium w-20">Actions</th>
+              <th className="px-3 py-2.5 text-center text-slate-500 font-medium w-8" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700/30">
+            {flows.map((f, i) => {
+              const expanded = expandedFlows.has(i);
+              const rateColor = f.match_rate >= 0.95 ? 'text-green-400' : f.match_rate >= 0.5 ? 'text-yellow-400' : 'text-red-400';
+              return (
+                <React.Fragment key={i}>
+                  <tr className="hover:bg-slate-700/20 cursor-pointer" onClick={() => onToggleFlow(i)}>
+                    <td className="px-3 py-2 font-mono text-slate-300">
+                      {f.src_ip}:{f.src_port} → {f.dst_ip}:{f.dst_port}
+                      <span className="ml-2 text-slate-500">{f.protocol}</span>
+                      {f.has_nat && <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-yellow-500/20 text-yellow-400 rounded">NAT</span>}
+                      {f.encapsulated && <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 rounded">{f.tunnel_type || 'Tunnel'}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-400">{f.packets_a}</td>
+                    <td className="px-3 py-2 text-right text-slate-400">{f.packets_b}</td>
+                    <td className="px-3 py-2 text-right text-green-400">{f.matched}</td>
+                    <td className="px-3 py-2 text-right text-red-400">{f.missing_b}</td>
+                    <td className={`px-3 py-2 text-right font-medium ${rateColor}`}>{(f.match_rate * 100).toFixed(0)}%</td>
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={e => { e.stopPropagation(); onVisualize(f); }}
+                          className="px-2 py-1 text-[10px] font-medium rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors"
+                          title="Open sequence diagram"
+                        >
+                          Flow Graph
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); setConversationFlow(f); }}
+                          className="px-2 py-1 text-[10px] font-medium rounded bg-green-600/20 text-green-400 hover:bg-green-600/40 transition-colors flex items-center gap-1"
+                          title="Follow Stream — View as conversation"
+                        >
+                          <MessageSquare className="w-3 h-3" />
+                          Follow
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-center text-slate-500">
+                      {expanded ? <ChevronUp className="w-3.5 h-3.5 inline" /> : <ChevronDown className="w-3.5 h-3.5 inline" />}
+                    </td>
+                  </tr>
+                  {expanded && (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-3 bg-slate-900/50">
+                        <div className="grid grid-cols-3 gap-4 text-xs">
+                          <div><span className="text-slate-500">Missing from WAN:</span> <span className="text-red-400">{f.missing_b}</span></div>
+                          <div><span className="text-slate-500">Missing from LAN:</span> <span className="text-purple-400">{f.missing_a}</span></div>
+                          <div><span className="text-slate-500">Modified:</span> <span className="text-yellow-400">{f.modified}</span></div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Worst flows */}
-      {report.flow_summaries.length > 0 && (
-        <div className="bg-slate-800/80 rounded-xl p-6 border border-slate-700/50">
-          <h3 className="text-sm font-medium text-slate-400 mb-4">Worst Flows by Match Rate</h3>
-          <div className="space-y-2">
-            {report.flow_summaries.slice(0, 5).map((f, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <span className="font-mono text-xs text-slate-400 w-64 truncate">
-                  {f.src_ip}:{f.src_port}→{f.dst_ip}:{f.dst_port}/{f.protocol}
-                </span>
-                <div className="flex-1 h-2 rounded-full bg-slate-900 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${f.match_rate >= 0.95 ? 'bg-green-500' : f.match_rate >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                    style={{ width: `${f.match_rate * 100}%` }}
-                  />
-                </div>
-                <span className={`text-xs font-medium w-12 text-right ${
-                  f.match_rate >= 0.95 ? 'text-green-400' : f.match_rate >= 0.5 ? 'text-yellow-400' : 'text-red-400'
-                }`}>
-                  {(f.match_rate * 100).toFixed(0)}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Stream Conversation Modal */}
+      {conversationFlow && (
+        <StreamConversation
+          allDiscrepancies={allDiscrepancies}
+          flow={conversationFlow}
+          forensics={forensics}
+          onClose={() => setConversationFlow(null)}
+        />
       )}
     </div>
   );
 }
 
-function FlowsTab({ flows, expandedFlows, onToggleFlow, onVisualize }: {
-  flows: FlowComparisonSummary[];
-  expandedFlows: Set<number>;
-  onToggleFlow: (idx: number) => void;
-  onVisualize: (flow: FlowComparisonSummary) => void;
-}) {
-  return (
-    <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 overflow-hidden">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-slate-700/50">
-            <th className="px-3 py-2.5 text-left text-slate-500 font-medium">Flow</th>
-            <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Pkts A</th>
-            <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Pkts B</th>
-            <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Match</th>
-            <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Drop</th>
-            <th className="px-3 py-2.5 text-right text-slate-500 font-medium">Rate</th>
-            <th className="px-3 py-2.5 text-center text-slate-500 font-medium w-20">Visualize</th>
-            <th className="px-3 py-2.5 text-center text-slate-500 font-medium w-8" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-700/30">
-          {flows.map((f, i) => {
-            const expanded = expandedFlows.has(i);
-            const rateColor = f.match_rate >= 0.95 ? 'text-green-400' : f.match_rate >= 0.5 ? 'text-yellow-400' : 'text-red-400';
-            return (
-              <React.Fragment key={i}>
-                <tr className="hover:bg-slate-700/20 cursor-pointer" onClick={() => onToggleFlow(i)}>
-                  <td className="px-3 py-2 font-mono text-slate-300">
-                    {f.src_ip}:{f.src_port} → {f.dst_ip}:{f.dst_port}
-                    <span className="ml-2 text-slate-500">{f.protocol}</span>
-                    {f.has_nat && <span className="ml-2 px-1.5 py-0.5 text-[10px] bg-yellow-500/20 text-yellow-400 rounded">NAT</span>}
-                    {f.encapsulated && <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-400 rounded">{f.tunnel_type || 'Tunnel'}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate-400">{f.packets_a}</td>
-                  <td className="px-3 py-2 text-right text-slate-400">{f.packets_b}</td>
-                  <td className="px-3 py-2 text-right text-green-400">{f.matched}</td>
-                  <td className="px-3 py-2 text-right text-red-400">{f.missing_b}</td>
-                  <td className={`px-3 py-2 text-right font-medium ${rateColor}`}>{(f.match_rate * 100).toFixed(0)}%</td>
-                  <td className="px-3 py-2 text-center">
-                    <button
-                      onClick={e => { e.stopPropagation(); onVisualize(f); }}
-                      className="px-2 py-1 text-[10px] font-medium rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors"
-                      title="Open sequence diagram"
-                    >
-                      Flow Graph
-                    </button>
-                  </td>
-                  <td className="px-3 py-2 text-center text-slate-500">
-                    {expanded ? <ChevronUp className="w-3.5 h-3.5 inline" /> : <ChevronDown className="w-3.5 h-3.5 inline" />}
-                  </td>
-                </tr>
-                {expanded && (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-3 bg-slate-900/50">
-                      <div className="grid grid-cols-3 gap-4 text-xs">
-                        <div><span className="text-slate-500">Missing from WAN:</span> <span className="text-red-400">{f.missing_b}</span></div>
-                        <div><span className="text-slate-500">Missing from LAN:</span> <span className="text-purple-400">{f.missing_a}</span></div>
-                        <div><span className="text-slate-500">Modified:</span> <span className="text-yellow-400">{f.modified}</span></div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
+function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDiscrepancies, forensics }: {
   discrepancies: Discrepancy[];
   filter: string;
   onFilterChange: (f: string) => void;
   total: number;
+  allDiscrepancies: Discrepancy[];
+  forensics?: ForensicSummary;
 }) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [deepDiveDiscrepancy, setDeepDiveDiscrepancy] = useState<Discrepancy | null>(null);
+  const [dissectorDiscrepancy, setDissectorDiscrepancy] = useState<Discrepancy | null>(null);
+  const [conversationFlow, setConversationFlow] = useState<FlowComparisonSummary | null>(null);
 
   const toggleRow = (idx: number) => {
     setExpandedRows(prev => {
@@ -610,7 +602,18 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
                         {d.state.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-500 font-mono">{d.packet_index}</td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDissectorDiscrepancy(d);
+                        }}
+                        className="text-slate-500 hover:text-cyan-400 font-mono transition-colors underline decoration-dotted"
+                        title="Open Packet Dissector"
+                      >
+                        {d.packet_index}
+                      </button>
+                    </td>
                     <td className="px-3 py-2 text-slate-400 font-mono">{d.timestamp}</td>
                     <td className="px-3 py-2 font-mono text-slate-300">
                       {d.src_ip}:{d.src_port}→{d.dst_ip}:{d.dst_port}
@@ -621,7 +624,17 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1.5">
                         {analysis.icon}
-                        <span className="text-slate-300 truncate max-w-[180px]">{analysis.summary}</span>
+                        <span className="text-slate-300 truncate max-w-[140px]">{analysis.summary}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeepDiveDiscrepancy(d);
+                          }}
+                          className="px-2 py-0.5 text-[10px] bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors flex-shrink-0"
+                          title="Open Forensic Coach Deep-Dive"
+                        >
+                          Deep Dive
+                        </button>
                         {isExpanded
                           ? <ChevronUp className="w-3 h-3 text-slate-500 flex-shrink-0" />
                           : <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
@@ -637,7 +650,13 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
                             <div className="mt-0.5 flex-shrink-0">{analysis.icon}</div>
                             <div>
                               <div className="text-xs font-semibold text-white mb-1">{analysis.summary}</div>
-                              <p className="text-[11px] text-slate-400 leading-relaxed">{analysis.suggestion}</p>
+                              <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{analysis.suggestion}</p>
+                              {analysis.seniorTip && (
+                                <div className="mt-2 pt-2 border-t border-slate-600/30">
+                                  <div className="text-[10px] font-semibold text-yellow-400 mb-1">💡 Senior Engineer Tip:</div>
+                                  <p className="text-[11px] text-slate-400 leading-relaxed">{analysis.seniorTip}</p>
+                                </div>
+                              )}
                               {d.field_changes && d.field_changes.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {d.field_changes.map((fc, j) => (
@@ -647,6 +666,21 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
                                   ))}
                                 </div>
                               )}
+                              {/* Follow Stream Button */}
+                              <button
+                                onClick={() => setConversationFlow({
+                                  src_ip: d.src_ip, dst_ip: d.dst_ip,
+                                  src_port: d.src_port, dst_port: d.dst_port,
+                                  protocol: d.protocol,
+                                  packets_a: 0, packets_b: 0, matched: 0,
+                                  missing_b: 0, missing_a: 0, modified: 0,
+                                  match_rate: 0, has_nat: false, encapsulated: false,
+                                })}
+                                className="mt-2 px-3 py-1.5 text-[10px] font-medium rounded bg-green-600/20 text-green-400 hover:bg-green-600/40 transition-colors inline-flex items-center gap-1.5"
+                              >
+                                <MessageSquare className="w-3 h-3" />
+                                Follow This Stream — View Full Conversation
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -664,6 +698,32 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total }: {
           </div>
         )}
       </div>
+
+      {/* Deep Dive Modal */}
+      {deepDiveDiscrepancy && (
+        <DiscrepancyDeepDive
+          discrepancy={deepDiveDiscrepancy}
+          onClose={() => setDeepDiveDiscrepancy(null)}
+        />
+      )}
+
+      {/* Packet Dissector Modal */}
+      {dissectorDiscrepancy && (
+        <PacketDissector
+          discrepancy={dissectorDiscrepancy}
+          onClose={() => setDissectorDiscrepancy(null)}
+        />
+      )}
+
+      {/* Stream Conversation Modal */}
+      {conversationFlow && (
+        <StreamConversation
+          allDiscrepancies={allDiscrepancies}
+          flow={conversationFlow}
+          forensics={forensics}
+          onClose={() => setConversationFlow(null)}
+        />
+      )}
     </div>
   );
 }
