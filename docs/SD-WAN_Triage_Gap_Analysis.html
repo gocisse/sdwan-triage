@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD-WAN Triage Tool — Gap Analysis & Feature Audit</title>
+    <style>
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .page-break { page-break-before: always; }
+            .no-print { display: none; }
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #1a1a2e;
+            background: #fff;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            color: #1e3a5f;
+            margin-bottom: 10px;
+        }
+        
+        .header .subtitle {
+            font-size: 16px;
+            color: #64748b;
+        }
+        
+        .header .date {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-top: 10px;
+        }
+        
+        h2 {
+            font-size: 22px;
+            color: #1e3a5f;
+            border-left: 4px solid #2563eb;
+            padding-left: 15px;
+            margin: 40px 0 20px 0;
+        }
+        
+        h3 {
+            font-size: 18px;
+            color: #334155;
+            margin: 25px 0 15px 0;
+        }
+        
+        h4 {
+            font-size: 16px;
+            color: #475569;
+            margin: 20px 0 10px 0;
+        }
+        
+        p { margin-bottom: 15px; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #334155;
+        }
+        
+        tr:nth-child(even) { background: #f8fafc; }
+        
+        .rating { color: #f59e0b; }
+        
+        .status-implemented { color: #10b981; font-weight: 600; }
+        .status-partial { color: #f59e0b; font-weight: 600; }
+        .status-missing { color: #ef4444; font-weight: 600; }
+        
+        .verdict-box {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .verdict-box h3 { color: white; margin-top: 0; }
+        
+        .gap-critical {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .gap-usability {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .gap-advanced {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .gap-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .killer-feature {
+            background: #ecfdf5;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        
+        .killer-feature strong { color: #059669; }
+        
+        .priority-badge {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        
+        ul { margin: 10px 0 10px 25px; }
+        li { margin-bottom: 8px; }
+        
+        .toc {
+            background: #f8fafc;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .toc h3 { margin-top: 0; }
+        .toc ul { list-style: none; margin-left: 0; }
+        .toc li { margin-bottom: 5px; }
+        .toc a { color: #2563eb; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+        
+        .download-btn {
+            display: inline-block;
+            background: #2563eb;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+        }
+        
+        .download-btn:hover { background: #1d4ed8; }
+        
+        .print-instructions {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            color: #64748b;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="print-instructions no-print">
+        <strong>📄 To save as PDF:</strong> Press <kbd>Ctrl+P</kbd> (Windows) or <kbd>Cmd+P</kbd> (Mac) → Select "Save as PDF" as destination → Click Save
+        <br><br>
+        <button class="download-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+
+    <div class="header">
+        <h1>SD-WAN Triage Tool</h1>
+        <div class="subtitle">Comprehensive Gap Analysis & Feature Audit</div>
+        <div class="date">Report Date: April 19, 2026 | Version: 4.5.0</div>
+    </div>
+
+    <div class="toc no-print">
+        <h3>Table of Contents</h3>
+        <ul>
+            <li><a href="#executive-summary">1. Executive Summary</a></li>
+            <li><a href="#features-audit">2. Implemented Features Audit</a></li>
+            <li><a href="#gap-analysis">3. Professional Forensic Gap Analysis</a></li>
+            <li><a href="#junior-readiness">4. Junior Engineer Readiness</a></li>
+            <li><a href="#roadmap">5. Prioritized Roadmap</a></li>
+        </ul>
+    </div>
+
+    <h2 id="executive-summary">1. Executive Summary</h2>
+    
+    <h3>Readiness Assessment: Production-Ready with Caveats</h3>
+    
+    <table>
+        <tr>
+            <th>Dimension</th>
+            <th>Rating</th>
+            <th>Verdict</th>
+        </tr>
+        <tr>
+            <td>Core Functionality</td>
+            <td class="rating">★★★★☆</td>
+            <td>Solid — LAN/WAN comparison, drop detection, latency forensics work well</td>
+        </tr>
+        <tr>
+            <td>Educational Layer</td>
+            <td class="rating">★★★★★</td>
+            <td>Exceptional — Best-in-class for junior engineers</td>
+        </tr>
+        <tr>
+            <td>Professional Forensics</td>
+            <td class="rating">★★★☆☆</td>
+            <td>Gaps exist — Missing TCP stream graphs, full reassembly, expert filters</td>
+        </tr>
+        <tr>
+            <td>Production Stability</td>
+            <td class="rating">★★★★☆</td>
+            <td>Good — Streaming engine handles large files, 24+ test suites</td>
+        </tr>
+        <tr>
+            <td>Enterprise Readiness</td>
+            <td class="rating">★★☆☆☆</td>
+            <td>Needs work — No RBAC, audit logs, or multi-tenancy</td>
+        </tr>
+    </table>
+
+    <div class="verdict-box">
+        <h3>Bottom Line</h3>
+        <p>This tool is <strong>ready for Tier 1/2 SD-WAN troubleshooting</strong> in production. It excels at the specific use case of "Why are packets dropping across my SD-WAN?" — a question Wireshark cannot answer without expert manual correlation.</p>
+        <p>However, it is <strong>not yet a full Wireshark replacement</strong> for deep protocol forensics.</p>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="features-audit">2. Implemented Features Audit</h2>
+
+    <h3>Core Analysis Capabilities</h3>
+    
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Status</th>
+            <th>Quality</th>
+        </tr>
+        <tr>
+            <td>LAN↔WAN Packet Correlation</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★★</td>
+        </tr>
+        <tr>
+            <td>Path Integrity Score</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Drop Detection (MISSING_B/MISSING_A)</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★★</td>
+        </tr>
+        <tr>
+            <td>NAT/DSCP/TTL Modification Tracking</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Tunnel Decapsulation (GRE/VXLAN/ESP)</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Encrypted Tunnel Correlation</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>One-Way Latency Measurement</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★★</td>
+        </tr>
+        <tr>
+            <td>TCP Retransmission Analysis</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Failed Handshake Detection</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Control Plane Exclusion</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>TLS Decryption (C4)</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★☆☆</td>
+        </tr>
+        <tr>
+            <td>Packet Search (C7)</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Right-Click Filter Actions (C6)</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>TCP Flag Analysis (C5)</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+    </table>
+
+    <h3>Educational Features</h3>
+    
+    <table>
+        <tr>
+            <th>Feature</th>
+            <th>Status</th>
+            <th>Quality</th>
+        </tr>
+        <tr>
+            <td>Packet Dissector</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★★</td>
+        </tr>
+        <tr>
+            <td>Filter Builder Educator</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Guided Troubleshooting Wizard</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★★</td>
+        </tr>
+        <tr>
+            <td>Investigation Checklist</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Discrepancy Deep Dive</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Analysis Badges</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+        <tr>
+            <td>Stream Conversation View</td>
+            <td class="status-implemented">✅ Implemented</td>
+            <td class="rating">★★★★☆</td>
+        </tr>
+    </table>
+
+    <h3>🏆 Killer Features (Unique Advantages)</h3>
+
+    <div class="killer-feature">
+        <strong>1. Two-File Correlation Engine</strong><br>
+        No other tool does automated LAN↔WAN packet matching. Wireshark requires manual editcap merging and expert filter crafting.
+    </div>
+
+    <div class="killer-feature">
+        <strong>2. Path Integrity Score</strong><br>
+        Single actionable metric. Executives can understand "91% healthy" without reading packet dumps.
+    </div>
+
+    <div class="killer-feature">
+        <strong>3. SD-WAN Vendor Intelligence</strong><br>
+        Built-in detection for Viptela, VeloCloud, Aruba, Fortinet, Meraki patterns. Wireshark has no SD-WAN awareness.
+    </div>
+
+    <div class="killer-feature">
+        <strong>4. Educational Dissector</strong><br>
+        Every field has a "why does this matter?" explanation. Wireshark shows raw values with no context.
+    </div>
+
+    <div class="killer-feature">
+        <strong>5. Guided Troubleshooting</strong><br>
+        Decision-tree wizard that teaches methodology, not just answers.
+    </div>
+
+    <div class="killer-feature">
+        <strong>6. Control Plane Filtering</strong><br>
+        Automatically excludes BFD/OMP/keepalives from drop calculations. Wireshark counts everything.
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="gap-analysis">3. Professional Forensic Gap Analysis</h2>
+
+    <h3>Comparison Against Industry Standards</h3>
+    
+    <table>
+        <tr>
+            <th>Capability</th>
+            <th>Wireshark</th>
+            <th>Riverbed</th>
+            <th>SD-WAN Triage</th>
+            <th>Gap</th>
+        </tr>
+        <tr>
+            <td>TCP Stream Reassembly</td>
+            <td class="status-implemented">✅ Full</td>
+            <td class="status-implemented">✅ Full</td>
+            <td class="status-missing">❌ None</td>
+            <td><strong>CRITICAL</strong></td>
+        </tr>
+        <tr>
+            <td>TCP Time-Sequence Graph</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-missing">❌ None</td>
+            <td><strong>CRITICAL</strong></td>
+        </tr>
+        <tr>
+            <td>Follow TCP/UDP Stream</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-partial">⚠️ Partial</td>
+            <td>HIGH</td>
+        </tr>
+        <tr>
+            <td>Expert Info System</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-partial">⚠️ Partial</td>
+            <td>MEDIUM</td>
+        </tr>
+        <tr>
+            <td>Protocol Statistics</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-missing">❌ None</td>
+            <td>MEDIUM</td>
+        </tr>
+        <tr>
+            <td>IO Graphs</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-missing">❌ None</td>
+            <td>MEDIUM</td>
+        </tr>
+        <tr>
+            <td>Filter Autocomplete</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-missing">❌ None</td>
+            <td>USABILITY</td>
+        </tr>
+        <tr>
+            <td>Packet Colorization</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-missing">❌ None</td>
+            <td>USABILITY</td>
+        </tr>
+        <tr>
+            <td>GeoIP Mapping</td>
+            <td class="status-implemented">✅ Plugin</td>
+            <td class="status-implemented">✅ Built-in</td>
+            <td class="status-missing">❌ None</td>
+            <td>ADVANCED</td>
+        </tr>
+        <tr>
+            <td>VoIP/RTP Analysis</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-implemented">✅ Yes</td>
+            <td class="status-partial">⚠️ Basic</td>
+            <td>ADVANCED</td>
+        </tr>
+    </table>
+
+    <h3>Critical Gaps (Blocks Accurate Diagnosis)</h3>
+
+    <div class="gap-critical">
+        <div class="gap-title">C1: TCP Stream Reassembly ❌</div>
+        <p><strong>Impact:</strong> Cannot view complete HTTP requests/responses, file transfers, or application payloads that span multiple packets.</p>
+        <p><strong>Current State:</strong> Only per-packet payload length shown.</p>
+        <p><strong>Required:</strong> Reassemble TCP streams, handle out-of-order packets, display full application data.</p>
+    </div>
+
+    <div class="gap-critical">
+        <div class="gap-title">C2: TCP Time-Sequence Graph ❌</div>
+        <p><strong>Impact:</strong> Cannot visualize retransmissions, window scaling, or congestion patterns over time.</p>
+        <p><strong>Current State:</strong> Retransmission counts exist but no visual timeline.</p>
+        <p><strong>Required:</strong> Stevens-style or tcptrace-style graph showing seq/ack over time with annotations.</p>
+    </div>
+
+    <div class="gap-critical">
+        <div class="gap-title">C3: Follow Stream ❌</div>
+        <p><strong>Impact:</strong> Cannot trace a single conversation across all packets.</p>
+        <p><strong>Current State:</strong> StreamConversation component exists but doesn't filter/highlight related packets.</p>
+        <p><strong>Required:</strong> Click any packet → see all packets in that TCP/UDP stream highlighted.</p>
+    </div>
+
+    <div class="gap-critical" style="background: #ecfdf5; border-color: #10b981;">
+        <div class="gap-title" style="color: #059669;">C4: TLS Decryption ✅ RESOLVED</div>
+        <p><strong>Status:</strong> NSS Key Log parsing + AES-GCM decryption now implemented. Supports TLS 1.2 and TLS 1.3.</p>
+    </div>
+
+    <h3>Usability Gaps (Annoying to Use)</h3>
+
+    <div class="gap-usability">
+        <div class="gap-title">U1: No Display Filter Autocomplete</div>
+        <p>Users must memorize Wireshark filter syntax. Required: Dropdown with ip.src, tcp.port, etc. as user types.</p>
+    </div>
+
+    <div class="gap-usability">
+        <div class="gap-title">U2: No Packet Colorization</div>
+        <p>All packets look the same; hard to spot patterns visually. Required: Color rules (red for RST, yellow for retransmissions).</p>
+    </div>
+
+    <div class="gap-usability">
+        <div class="gap-title">U3: No Keyboard Navigation</div>
+        <p>Mouse-only interaction slows power users. Required: Arrow keys to navigate, Enter to expand, Ctrl+F for search.</p>
+    </div>
+
+    <h3>Advanced Gaps (Nice-to-Have)</h3>
+
+    <div class="gap-advanced">
+        <div class="gap-title">A1: GeoIP Visualization</div>
+        <p>Map overlay showing source/destination countries for geographic traffic distribution.</p>
+    </div>
+
+    <div class="gap-advanced">
+        <div class="gap-title">A2: Protocol Hierarchy Statistics</div>
+        <p>Tree view showing % of TCP vs UDP vs ICMP, HTTP vs HTTPS, etc.</p>
+    </div>
+
+    <div class="gap-advanced">
+        <div class="gap-title">A3: IO Graphs</div>
+        <p>Packets/sec or bytes/sec graph with zoom for throughput visualization over time.</p>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="junior-readiness">4. Junior Engineer Readiness Assessment</h2>
+
+    <h3>Does the Tool Teach or Just Tell?</h3>
+
+    <table>
+        <tr>
+            <th>Aspect</th>
+            <th>Assessment</th>
+            <th>Evidence</th>
+        </tr>
+        <tr>
+            <td>Explains "Why"</td>
+            <td class="status-implemented">✅ Excellent</td>
+            <td>Every dissector field has contextual explanation</td>
+        </tr>
+        <tr>
+            <td>Teaches Methodology</td>
+            <td class="status-implemented">✅ Excellent</td>
+            <td>Guided Troubleshooting wizard walks through decision tree</td>
+        </tr>
+        <tr>
+            <td>Builds Mental Model</td>
+            <td class="status-implemented">✅ Good</td>
+            <td>Protocol diagrams, layer visualization</td>
+        </tr>
+        <tr>
+            <td>Encourages Exploration</td>
+            <td class="status-partial">⚠️ Partial</td>
+            <td>Right-click actions exist but no "try this" prompts</td>
+        </tr>
+        <tr>
+            <td>Provides Practice</td>
+            <td class="status-missing">❌ Missing</td>
+            <td>No sample PCAPs or exercises</td>
+        </tr>
+        <tr>
+            <td>Links to Resources</td>
+            <td class="status-missing">❌ Missing</td>
+            <td>No RFC links, no glossary, no video embeds</td>
+        </tr>
+        <tr>
+            <td>Tracks Progress</td>
+            <td class="status-missing">❌ Missing</td>
+            <td>No "you've learned X" badges or history</td>
+        </tr>
+    </table>
+
+    <h3>Missing Learning Aids</h3>
+    <ul>
+        <li><strong>Glossary/Tooltip Links</strong> — Terms like "DSCP", "TTL", "MSS" should link to definitions</li>
+        <li><strong>Sample PCAP Library</strong> — Curated examples: "TCP handshake", "DNS failure", "TLS negotiation"</li>
+        <li><strong>Practice Scenarios</strong> — "Find the dropped packet in this capture" with hints and solutions</li>
+        <li><strong>RFC/Documentation Links</strong> — "Learn more about TCP flags → RFC 793 Section 3.1"</li>
+        <li><strong>Progress Tracking</strong> — Gamification: "You've analyzed 15 captures and identified 3 policy drops"</li>
+    </ul>
+
+    <div class="verdict-box">
+        <h3>Verdict: Educational Layer is Best-in-Class</h3>
+        <p>The tool already teaches better than any competitor. Adding a glossary + sample PCAPs would make it a genuine training platform and elevate it to world-class status.</p>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2 id="roadmap">5. Prioritized Roadmap — Top 5 Features</h2>
+
+    <p>Based on impact vs. effort analysis:</p>
+
+    <table>
+        <tr>
+            <th>Priority</th>
+            <th>Feature</th>
+            <th>Category</th>
+            <th>Impact</th>
+            <th>Effort</th>
+        </tr>
+        <tr>
+            <td><span class="priority-badge">P1</span></td>
+            <td><strong>TCP Time-Sequence Graph</strong></td>
+            <td>Critical</td>
+            <td class="rating">★★★★★</td>
+            <td>Medium</td>
+        </tr>
+        <tr>
+            <td><span class="priority-badge">P2</span></td>
+            <td><strong>Follow TCP Stream</strong></td>
+            <td>Critical</td>
+            <td class="rating">★★★★★</td>
+            <td>Medium</td>
+        </tr>
+        <tr>
+            <td><span class="priority-badge">P3</span></td>
+            <td><strong>Display Filter Autocomplete</strong></td>
+            <td>Usability</td>
+            <td class="rating">★★★★☆</td>
+            <td>Low</td>
+        </tr>
+        <tr>
+            <td><span class="priority-badge">P4</span></td>
+            <td><strong>Sample PCAP Library</strong></td>
+            <td>Education</td>
+            <td class="rating">★★★★☆</td>
+            <td>Low</td>
+        </tr>
+        <tr>
+            <td><span class="priority-badge">P5</span></td>
+            <td><strong>Protocol Hierarchy Stats</strong></td>
+            <td>Advanced</td>
+            <td class="rating">★★★☆☆</td>
+            <td>Low</td>
+        </tr>
+    </table>
+
+    <h3>Stretch Goals (P6-P10)</h3>
+    <ul>
+        <li><strong>P6:</strong> Packet Colorization Rules</li>
+        <li><strong>P7:</strong> Keyboard Navigation</li>
+        <li><strong>P8:</strong> TCP Stream Reassembly (full)</li>
+        <li><strong>P9:</strong> IO Graphs</li>
+        <li><strong>P10:</strong> GeoIP Map Overlay</li>
+    </ul>
+
+    <div class="verdict-box">
+        <h3>Final Verdict</h3>
+        <p><strong>Current Position:</strong> SD-WAN Triage is the best tool for its specific niche — automated LAN↔WAN correlation with educational guidance. No competitor offers this combination.</p>
+        <br>
+        <p><strong>Path to Gold Standard:</strong> Implement TCP Time-Sequence Graph (P1), Follow TCP Stream (P2), and Sample PCAP Library (P4). These three features would close the critical forensic gaps while maintaining the educational advantage.</p>
+        <br>
+        <p><strong>Competitive Moat:</strong> The tool's moat is not trying to be Wireshark. It's being Wireshark + SD-WAN Intelligence + Teaching. Double down on the educational layer and SD-WAN-specific analysis rather than chasing generic packet analysis features.</p>
+    </div>
+
+    <footer>
+        <p>SD-WAN Triage Tool — Gap Analysis & Feature Audit</p>
+        <p>Generated: April 19, 2026 | Document Version: 1.0</p>
+        <p>© 2026 SD-WAN Triage Project</p>
+    </footer>
+
+</body>
+</html>

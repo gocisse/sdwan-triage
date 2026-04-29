@@ -3,7 +3,7 @@
 
 # ─── VARIABLES ──────────────────────────────────────────────
 BINARY_NAME  := sdwan-triage
-VERSION      ?= 5.0.0
+VERSION      ?= 6.0.0
 BUILD_DIR    := build
 DIST_DIR     := cmd/sdwan-triage/dist
 FRONTEND_DIR := web/frontend
@@ -110,6 +110,31 @@ release: clean copy-dist
 	@echo "  ✓ Release v$(VERSION) artifacts:"
 	@ls -lh $(BUILD_DIR)/*.tar.gz $(BUILD_DIR)/*.zip $(BUILD_DIR)/checksums-*.txt
 	@echo "══════════════════════════════════════════════════"
+
+# ─── GITHUB RELEASE ────────────────────────────────────────
+# Creates a GitHub release with all artifacts
+# Requires: gh CLI authenticated
+github-release: release
+	@echo "🚀 Creating GitHub release v$(VERSION)..."
+	@if ! command -v gh &> /dev/null; then \
+		echo "❌ GitHub CLI (gh) not found. Install: brew install gh"; \
+		exit 1; \
+	fi
+	@if ! gh auth status &> /dev/null; then \
+		echo "❌ Not authenticated. Run: gh auth login"; \
+		exit 1; \
+	fi
+	gh release create v$(VERSION) \
+		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-linux-amd64.tar.gz \
+		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-darwin-amd64.tar.gz \
+		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-darwin-arm64.tar.gz \
+		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-windows-amd64.zip \
+		$(BUILD_DIR)/checksums-v$(VERSION).txt \
+		--title "v$(VERSION) - Forensic Gold Standard" \
+		--notes-file RELEASE_NOTES.md \
+		--draft
+	@echo "✓ GitHub release v$(VERSION) created (draft)"
+	@echo "  Review and publish at: https://github.com/gocisse/sdwan-triage/releases"
 
 install: copy-dist
 	$(GO) install $(GOFLAGS) ./cmd/sdwan-triage

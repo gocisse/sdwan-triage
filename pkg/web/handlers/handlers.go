@@ -181,6 +181,20 @@ func (h *Handlers) UploadFile(c *gin.Context) {
 		return
 	}
 
+	// Optional: SSL Key Log file for TLS decryption (C4)
+	if keyFile, keyHeader, err := c.Request.FormFile("keylog"); err == nil {
+		defer keyFile.Close()
+		keyExt := strings.ToLower(filepath.Ext(keyHeader.Filename))
+		// Accept .log, .txt, or no-extension key log files
+		if keyExt == ".log" || keyExt == ".txt" || keyExt == "" || keyExt == ".keys" {
+			keyPath, err := h.store.SaveUploadedFile(id, keyFile, "sslkeylog_"+keyHeader.Filename)
+			if err == nil {
+				job.KeyLogPath = keyPath
+				h.store.UpdateJob(job)
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, UploadResponse{
 		ID:       job.ID,
 		FileName: job.FileName,

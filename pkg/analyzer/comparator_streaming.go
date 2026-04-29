@@ -87,18 +87,25 @@ type flowID struct {
 	Protocol         string
 }
 
-// fingerprint is a compact per-packet identity (~48 bytes vs ~200+ for packetMeta).
+// fingerprint is a compact per-packet identity (~58 bytes vs ~200+ for packetMeta).
 type fingerprint struct {
-	timestamp  time.Time
-	ttl        uint8
-	dscp       uint8
-	payload    int
-	tcpFlags   string // stored for all TCP packets (needed for drop categorization)
-	protocol   string // TCP/UDP/ICMP etc.
-	dstIP      string // needed for traffic classification
-	srcIP      string // needed for traffic classification
-	srcPort    uint16 // needed for management traffic detection
-	dstPort    uint16 // needed for management traffic detection
+	timestamp time.Time
+	packetIdx int // Index within file A (for discrepancy records)
+	ttl       uint8
+	dscp      uint8
+	payload   int
+	tcpFlags  string // stored for all TCP packets (needed for drop categorization)
+	protocol  string // TCP/UDP/ICMP etc.
+	dstIP     string // needed for traffic classification
+	srcIP     string // needed for traffic classification
+	srcPort   uint16 // needed for management traffic detection
+	dstPort   uint16 // needed for management traffic detection
+	// TCP Time-Sequence graph fields (zero for non-TCP)
+	seqNum uint32
+	ackNum uint32
+	window uint16
+	// Wireshark-style analysis flags (populated during Pass 1 by TCPFlagAnalyzer).
+	analysis   TCPAnalysisFlags
 	matched    bool
 	noiseClass string // NoiseNone, NoiseLocal, NoiseMgmt, NoiseRouting, NoiseLocalLAN
 }
@@ -159,10 +166,31 @@ func (c *Comparator) CompareStreaming(fileA, fileB string) (*ComparisonReport, e
 		TunnelBreakdown: make(map[string]int),
 	}
 
+	// ── TLS Decryption Setup (C4) ────────────────────────────────
+	if c.KeyLogPath != "" {
+		keyLog, err := ParseKeyLogFile(c.KeyLogPath)
+		if err == nil && keyLog != nil {
+			c.tlsDecryptor = NewTLSDecryptor(keyLog)
+			c.tlsStats = &TLSDecryptionStats{KeysLoaded: keyLog.SessionCount()}
+			c.clientRandoms = make(map[string][32]byte, 256)
+			if c.verbose {
+				fmt.Fprintf(os.Stderr, "[COMPARE] TLS decryption enabled: %d sessions in key log\n", keyLog.SessionCount())
+			}
+		} else if c.verbose && err != nil {
+			fmt.Fprintf(os.Stderr, "[COMPARE] TLS key log parse failed: %v\n", err)
+		}
+	}
+
 	flows := make(map[flowID]*flowState, 4096)
 	fpIndex := make(map[uint64][]*fingerprint, 65536)
 	natIndex := make(map[uint64][]*fingerprint, 8192)
 	portIndex := make(map[uint64][]*fingerprint, 16384) // protocol+ports+payload (no IPs, no seq)
+
+	// Per-file TCP analyzers. One instance per side because Wireshark-style
+	// analysis is stateful within a direction (dup-ACK counters, seq
+	// highwater marks) and the two captures are independent streams.
+	analyzerA := NewTCPFlagAnalyzer()
+	analyzerB := NewTCPFlagAnalyzer()
 
 	// Time-sorted LAN packets for encrypted tunnel correlation.
 	// We only store timestamp + wire length — ~24 bytes per slot.
@@ -189,8 +217,24 @@ func (c *Comparator) CompareStreaming(fileA, fileB string) (*ComparisonReport, e
 		}
 
 		nc := classifyNoise(meta.Key.SrcIP, meta.Key.DstIP, meta.Key.SrcPort, meta.Key.DstPort, meta.Key.Protocol)
+
+		// Per-packet TCP analysis flags (Wireshark-style). Only meaningful
+		// for TCP; analyzer gracefully no-ops for non-TCP flows.
+		var analysis TCPAnalysisFlags
+		if meta.Key.Protocol == "TCP" {
+			analysis = analyzerA.Analyze(
+				meta.Key.SrcIP, meta.Key.DstIP,
+				meta.Key.SrcPort, meta.Key.DstPort,
+				meta.Key.SeqNum, meta.AckNum, meta.Window, meta.Payload,
+				tcpFlagSet(meta.TCPFlags, "SYN"),
+				tcpFlagSet(meta.TCPFlags, "RST"),
+				tcpFlagSet(meta.TCPFlags, "FIN"),
+			)
+		}
+
 		fp := &fingerprint{
 			timestamp:  meta.Timestamp,
+			packetIdx:  meta.Index,
 			ttl:        meta.TTL,
 			dscp:       meta.DSCP,
 			payload:    meta.Payload,
@@ -200,12 +244,24 @@ func (c *Comparator) CompareStreaming(fileA, fileB string) (*ComparisonReport, e
 			srcIP:      meta.Key.SrcIP,
 			srcPort:    meta.Key.SrcPort,
 			dstPort:    meta.Key.DstPort,
+			seqNum:     meta.Key.SeqNum,
+			ackNum:     meta.AckNum,
+			window:     meta.Window,
+			analysis:   analysis,
 			noiseClass: nc,
 		}
 
 		// Track max payload for MTU blackhole detection
 		if meta.Payload > fs.MaxPayload {
 			fs.MaxPayload = meta.Payload
+		}
+
+		// TLS decryption (C4): extract client random from ClientHello
+		if c.tlsDecryptor != nil && len(meta.RawPayload) > 0 {
+			if cr, ok := ExtractClientRandom(meta.RawPayload); ok {
+				flowKey := fmt.Sprintf("%s:%d->%s:%d", meta.Key.SrcIP, meta.Key.SrcPort, meta.Key.DstIP, meta.Key.DstPort)
+				c.clientRandoms[flowKey] = cr
+			}
 		}
 
 		h := computeHash(meta)
@@ -275,6 +331,24 @@ func (c *Comparator) CompareStreaming(fileA, fileB string) (*ComparisonReport, e
 			}
 		}
 
+		// Per-packet TCP analysis flags for Pass 2 (used when emitting
+		// MISSING_A and MODIFIED discrepancies below). Non-TCP packets leave
+		// analysisB zero. We copy the result onto meta.Analysis so match
+		// helpers (tryExactMatch, tryNATMatch, tryPortMatch) can attach the
+		// flags without needing to re-run the analyzer.
+		var analysisB TCPAnalysisFlags
+		if meta.Key.Protocol == "TCP" && !meta.Encrypted {
+			analysisB = analyzerB.Analyze(
+				meta.Key.SrcIP, meta.Key.DstIP,
+				meta.Key.SrcPort, meta.Key.DstPort,
+				meta.Key.SeqNum, meta.AckNum, meta.Window, meta.Payload,
+				tcpFlagSet(meta.TCPFlags, "SYN"),
+				tcpFlagSet(meta.TCPFlags, "RST"),
+				tcpFlagSet(meta.TCPFlags, "FIN"),
+			)
+			meta.Analysis = analysisB
+		}
+
 		// ── Strategy A: Exact match (works for clear-text + decapsulated) ──
 		if !meta.Encrypted {
 			fid := flowID{meta.Key.SrcIP, meta.Key.DstIP, meta.Key.SrcPort, meta.Key.DstPort, meta.Key.Protocol}
@@ -340,7 +414,14 @@ func (c *Comparator) CompareStreaming(fileA, fileB string) (*ComparisonReport, e
 				SrcPort: meta.Key.SrcPort, DstPort: meta.Key.DstPort, Protocol: meta.Key.Protocol,
 				PacketIndex: meta.Index, Timestamp: meta.Timestamp.Format("15:04:05.000000"),
 				Length: meta.Length, Detail: detail, TCPFlags: meta.TCPFlags,
-				TunnelType: meta.TunnelType, Encrypted: meta.Encrypted,
+				SeqNum: meta.Key.SeqNum, AckNum: meta.AckNum, WindowSize: meta.Window, PayloadLen: meta.Payload,
+				IsRetransmission:  analysisB.IsRetransmission,
+				IsDuplicateAck:    analysisB.IsDuplicateAck,
+				IsZeroWindow:      analysisB.IsZeroWindow,
+				IsKeepAlive:       analysisB.IsKeepAlive,
+				DuplicateAckCount: analysisB.DuplicateAckCount,
+				TunnelType:        meta.TunnelType,
+				Encrypted:         meta.Encrypted,
 			})
 			return
 		}
@@ -417,6 +498,27 @@ func (c *Comparator) CompareStreaming(fileA, fileB string) (*ComparisonReport, e
 				continue
 			}
 			unmatchedInWindow++
+
+			// Emit MISSING_B discrepancy record so drops are visible in the
+			// UI (Stream Conversation, Sequence Graph, etc.). Capped by the
+			// addDisc() safety limit. TCP graph fields are populated here to
+			// allow client-side rendering of dropped segments in red.
+			addDisc(report, Discrepancy{
+				State: StateMissingB, SrcIP: fp.srcIP, DstIP: fp.dstIP,
+				SrcPort: fp.srcPort, DstPort: fp.dstPort, Protocol: fp.protocol,
+				PacketIndex: fp.packetIdx, Timestamp: fp.timestamp.Format("15:04:05.000000"),
+				Length: fp.payload, Detail: "Packet in LAN but never reached WAN (dropped by device)",
+				TCPFlags:          fp.tcpFlags,
+				SeqNum:            fp.seqNum,
+				AckNum:            fp.ackNum,
+				WindowSize:        fp.window,
+				PayloadLen:        fp.payload,
+				IsRetransmission:  fp.analysis.IsRetransmission,
+				IsDuplicateAck:    fp.analysis.IsDuplicateAck,
+				IsZeroWindow:      fp.analysis.IsZeroWindow,
+				IsKeepAlive:       fp.analysis.IsKeepAlive,
+				DuplicateAckCount: fp.analysis.DuplicateAckCount,
+			})
 		}
 	}
 	report.IgnoredLocalCount = localTrafficCount
@@ -632,6 +734,11 @@ func (c *Comparator) finalizeStreaming(report *ComparisonReport, flows map[flowI
 	}
 
 	report.Forensics = forensics
+
+	// TLS Decryption stats (C4)
+	if c.tlsStats != nil && c.tlsStats.KeysLoaded > 0 {
+		report.TLSDecryption = c.tlsStats
+	}
 
 	// Path Integrity Score: matched + modified + verified_encrypted all count as successful transit.
 	// Denominator excludes:
@@ -930,6 +1037,35 @@ func isSynOnly(flags string) bool {
 	return flags == "SYN" || flags == "SYN,ECE" || flags == "SYN,CWR,ECE"
 }
 
+// tcpFlagSet reports whether a specific TCP flag name (e.g. "SYN", "RST")
+// is present in the comma-separated flag list produced by formatTCPFlags.
+// The comparison is case-sensitive and matches whole tokens only, so
+// "ACK" does not match inside "SYN,ACK" erroneously.
+func tcpFlagSet(flags, name string) bool {
+	if flags == "" || name == "" {
+		return false
+	}
+	// Fast path: exact equality (single-flag packet).
+	if flags == name {
+		return true
+	}
+	// Check each comma-separated token.
+	for len(flags) > 0 {
+		i := 0
+		for i < len(flags) && flags[i] != ',' {
+			i++
+		}
+		if flags[:i] == name {
+			return true
+		}
+		if i == len(flags) {
+			break
+		}
+		flags = flags[i+1:]
+	}
+	return false
+}
+
 func isSynAck(flags string) bool {
 	return strings.Contains(flags, "SYN") && strings.Contains(flags, "ACK") && !strings.Contains(flags, "FIN")
 }
@@ -1002,6 +1138,12 @@ func tryExactMatch(fpIndex map[uint64][]*fingerprint, h uint64, meta *packetMeta
 				PacketIndex: meta.Index, Timestamp: meta.Timestamp.Format("15:04:05.000000"),
 				Length: meta.Length, Detail: formatModificationDetail(changes),
 				TCPFlags: meta.TCPFlags, FieldChanges: changes,
+				SeqNum: meta.Key.SeqNum, AckNum: meta.AckNum, WindowSize: meta.Window, PayloadLen: meta.Payload,
+				IsRetransmission:  meta.Analysis.IsRetransmission,
+				IsDuplicateAck:    meta.Analysis.IsDuplicateAck,
+				IsZeroWindow:      meta.Analysis.IsZeroWindow,
+				IsKeepAlive:       meta.Analysis.IsKeepAlive,
+				DuplicateAckCount: meta.Analysis.DuplicateAckCount,
 			})
 		} else {
 			report.MatchedCount++
@@ -1040,6 +1182,12 @@ func tryNATMatch(natIndex map[uint64][]*fingerprint, nh uint64, meta *packetMeta
 			SrcPort: meta.Key.SrcPort, DstPort: meta.Key.DstPort, Protocol: meta.Key.Protocol,
 			PacketIndex: meta.Index, Timestamp: meta.Timestamp.Format("15:04:05.000000"),
 			Length: meta.Length, Detail: "NAT translation detected", TCPFlags: meta.TCPFlags,
+			SeqNum: meta.Key.SeqNum, AckNum: meta.AckNum, WindowSize: meta.Window, PayloadLen: meta.Payload,
+			IsRetransmission:  meta.Analysis.IsRetransmission,
+			IsDuplicateAck:    meta.Analysis.IsDuplicateAck,
+			IsZeroWindow:      meta.Analysis.IsZeroWindow,
+			IsKeepAlive:       meta.Analysis.IsKeepAlive,
+			DuplicateAckCount: meta.Analysis.DuplicateAckCount,
 		})
 		return true
 	}
@@ -1110,6 +1258,12 @@ func tryPortMatch(portIndex map[uint64][]*fingerprint, ph uint64, meta *packetMe
 			PacketIndex: meta.Index, Timestamp: meta.Timestamp.Format("15:04:05.000000"),
 			Length: meta.Length, Detail: "NAT translation detected (port+payload+time correlation)",
 			TCPFlags: meta.TCPFlags,
+			SeqNum:   meta.Key.SeqNum, AckNum: meta.AckNum, WindowSize: meta.Window, PayloadLen: meta.Payload,
+			IsRetransmission:  meta.Analysis.IsRetransmission,
+			IsDuplicateAck:    meta.Analysis.IsDuplicateAck,
+			IsZeroWindow:      meta.Analysis.IsZeroWindow,
+			IsKeepAlive:       meta.Analysis.IsKeepAlive,
+			DuplicateAckCount: meta.Analysis.DuplicateAckCount,
 		})
 		return true
 	}

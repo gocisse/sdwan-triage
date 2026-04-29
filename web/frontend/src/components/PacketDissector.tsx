@@ -10,6 +10,106 @@ import {
   Activity,
 } from 'lucide-react';
 import type { Discrepancy } from '../types';
+import { AnalysisBadges } from './AnalysisBadges';
+import { useContextMenu } from './GlobalContextMenu';
+import { GlossaryTerm, GLOSSARY } from './Glossary';
+
+// Helper to render text with glossary-linked terms
+function renderWithGlossaryTerms(text: string): React.ReactNode {
+  const glossaryTerms = Object.keys(GLOSSARY);
+  const parts: React.ReactNode[] = [];
+  let key = 0;
+
+  // Match common abbreviations
+  const abbrevRegex = /\b(TTL|DSCP|MSS|RTT|RTO|BFD|OMP|CWND|RWND|MTU|PMTUD|RST|FIN|SYN|ACK)\b/g;
+  let match;
+  let lastIndex = 0;
+
+  while ((match = abbrevRegex.exec(text)) !== null) {
+    // Add text before match
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    
+    // Find glossary key for this abbreviation
+    const abbrev = match[1];
+    const glossaryKey = glossaryTerms.find(t => {
+      const entry = GLOSSARY[t];
+      return entry.abbreviation?.toUpperCase() === abbrev || t.toUpperCase() === abbrev;
+    });
+
+    if (glossaryKey) {
+      parts.push(<GlossaryTerm key={key++} term={glossaryKey}>{abbrev}</GlossaryTerm>);
+    } else {
+      parts.push(abbrev);
+    }
+    
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+// fieldNameToFilterToken maps a dissector field label (e.g. "Source IP")
+// plus its enclosing layer name (e.g. "IPv4", "TCP") to a Wireshark-style
+// filter token that the FilterBuilder scratchpad understands. Unknown
+// fields fall back to a lower-cased dotted form so a "Copy Value" action
+// still works even when we cannot express a precise filter clause.
+function fieldNameToFilterToken(layerName: string, fieldName: string): string {
+  const key = `${layerName}/${fieldName}`;
+  switch (key) {
+    case 'Ethernet/Source MAC':
+      return 'eth.src';
+    case 'Ethernet/Destination MAC':
+      return 'eth.dst';
+    case 'Ethernet/EtherType':
+      return 'eth.type';
+    case 'IPv4/Source IP':
+    case 'IPv6/Source IP':
+      return 'ip.src';
+    case 'IPv4/Destination IP':
+    case 'IPv6/Destination IP':
+      return 'ip.dst';
+    case 'IPv4/TTL':
+      return 'ip.ttl';
+    case 'IPv4/Protocol':
+      return 'ip.proto';
+    case 'IPv4/DSCP':
+    case 'IPv4/Type of Service':
+      return 'ip.dsfield.dscp';
+    case 'IPv4/Total Length':
+      return 'ip.len';
+    case 'IPv4/Identification':
+    case 'IPv4/ID':
+      return 'ip.id';
+    case 'TCP/Source Port':
+      return 'tcp.srcport';
+    case 'TCP/Destination Port':
+      return 'tcp.dstport';
+    case 'TCP/Sequence Number':
+      return 'tcp.seq';
+    case 'TCP/Acknowledgment Number':
+    case 'TCP/Acknowledgement Number':
+      return 'tcp.ack';
+    case 'TCP/Window Size':
+      return 'tcp.window_size';
+    case 'TCP/Flags':
+      return 'tcp.flags';
+    case 'UDP/Source Port':
+      return 'udp.srcport';
+    case 'UDP/Destination Port':
+      return 'udp.dstport';
+    case 'UDP/Length':
+      return 'udp.length';
+  }
+  // Fallback: snake-case the layer and field name together.
+  return `${layerName}.${fieldName}`.replace(/\s+/g, '_').toLowerCase();
+}
 
 interface PacketDissectorProps {
   discrepancy: Discrepancy;
@@ -60,7 +160,10 @@ export const PacketDissector: React.FC<PacketDissectorProps> = ({ discrepancy, o
               <Layers className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Interactive Packet Dissector</h2>
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2 flex-wrap">
+                <span>Interactive Packet Dissector</span>
+                <AnalysisBadges d={discrepancy} />
+              </h2>
               <p className="text-xs text-slate-400">
                 Packet #{discrepancy.packet_index} • {discrepancy.protocol} • {discrepancy.length} bytes
               </p>
@@ -116,6 +219,7 @@ export const PacketDissector: React.FC<PacketDissectorProps> = ({ discrepancy, o
                           key={fieldIdx}
                           field={field}
                           depth={0}
+                          layerName={layer.name}
                           selectedField={selectedField}
                           onSelect={setSelectedField}
                           showExplanation={showExplanation}
@@ -171,7 +275,7 @@ export const PacketDissector: React.FC<PacketDissectorProps> = ({ discrepancy, o
                   </div>
                   <div className="mt-3 pt-3 border-t border-cyan-700/30">
                     <div className="text-xs font-medium text-cyan-400 mb-1">📚 What This Means:</div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{selectedField.explanation}</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{renderWithGlossaryTerms(selectedField.explanation)}</p>
                   </div>
                 </div>
               )}
@@ -201,6 +305,8 @@ export const PacketDissector: React.FC<PacketDissectorProps> = ({ discrepancy, o
 interface ProtocolFieldRowProps {
   field: ProtocolField;
   depth: number;
+  /** Enclosing layer (e.g. "IPv4", "TCP"); used to resolve filter tokens. */
+  layerName: string;
   selectedField: ProtocolField | null;
   onSelect: (field: ProtocolField) => void;
   showExplanation: string | null;
@@ -210,6 +316,7 @@ interface ProtocolFieldRowProps {
 const ProtocolFieldRow: React.FC<ProtocolFieldRowProps> = ({
   field,
   depth,
+  layerName,
   selectedField,
   onSelect,
   showExplanation,
@@ -219,6 +326,11 @@ const ProtocolFieldRow: React.FC<ProtocolFieldRowProps> = ({
   const isSelected = selectedField?.name === field.name && selectedField?.offset === field.offset;
   const hasChildren = field.children && field.children.length > 0;
 
+  // Right-click menu to feed the FilterBuilder scratchpad. Resolves to a
+  // best-effort Wireshark filter token based on layer + field name.
+  const { onContextMenu } = useContextMenu();
+  const filterToken = fieldNameToFilterToken(layerName, field.name);
+
   return (
     <div>
       <div
@@ -227,6 +339,11 @@ const ProtocolFieldRow: React.FC<ProtocolFieldRowProps> = ({
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={() => onSelect(field)}
+        onContextMenu={onContextMenu({
+          field: filterToken,
+          value: field.value,
+          label: field.name,
+        })}
       >
         {hasChildren && (
           <button
@@ -263,7 +380,7 @@ const ProtocolFieldRow: React.FC<ProtocolFieldRowProps> = ({
       {/* Inline Explanation */}
       {showExplanation === field.name && (
         <div className="ml-6 mt-1 mb-2 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-xs text-slate-300 leading-relaxed">
-          {field.explanation}
+          {renderWithGlossaryTerms(field.explanation)}
         </div>
       )}
 
@@ -275,6 +392,7 @@ const ProtocolFieldRow: React.FC<ProtocolFieldRowProps> = ({
               key={i}
               field={child}
               depth={depth + 1}
+              layerName={layerName}
               selectedField={selectedField}
               onSelect={onSelect}
               showExplanation={showExplanation}
@@ -590,6 +708,57 @@ function parsePacketLayers(d: Discrepancy): ProtocolLayer[] {
         },
       ],
       diagram: <UDPDiagram />,
+    });
+  }
+
+  // TLS Decrypted Data Layer (C4) — shown when decryption was successful
+  if (d.decrypted_protocol || d.decrypted_data) {
+    const tlsFields: ProtocolField[] = [];
+
+    if (d.tls_version) {
+      tlsFields.push({
+        name: 'TLS Version',
+        value: d.tls_version,
+        offset: 0,
+        length: 0,
+        explanation: `The TLS protocol version used for this connection. ${d.tls_version === 'TLS 1.3' ? 'TLS 1.3 is the latest version with improved security and performance.' : 'Consider upgrading to TLS 1.3 for better security.'}`,
+      });
+    }
+
+    if (d.decrypted_protocol) {
+      tlsFields.push({
+        name: 'Inner Protocol',
+        value: d.decrypted_protocol,
+        offset: 0,
+        length: 0,
+        explanation: `The application protocol inside the encrypted TLS tunnel. ${d.decrypted_protocol === 'HTTP' ? 'HTTP/1.1 request or response.' : d.decrypted_protocol === 'HTTP/2' ? 'HTTP/2 binary framing protocol.' : d.decrypted_protocol === 'gRPC' ? 'gRPC remote procedure call over HTTP/2.' : 'Application data.'}`,
+      });
+    }
+
+    if (d.decrypted_summary) {
+      tlsFields.push({
+        name: 'Summary',
+        value: d.decrypted_summary,
+        offset: 0,
+        length: 0,
+        explanation: 'A human-readable summary of the decrypted application data.',
+      });
+    }
+
+    if (d.decrypted_data) {
+      tlsFields.push({
+        name: 'Decrypted Content',
+        value: d.decrypted_data.length > 200 ? d.decrypted_data.substring(0, 200) + '...' : d.decrypted_data,
+        offset: 0,
+        length: 0,
+        explanation: 'The actual cleartext data from inside the TLS tunnel. This was decrypted using the SSL Key Log file you provided.',
+      });
+    }
+
+    layers.push({
+      name: '🔓 TLS Decrypted Data',
+      expanded: true,
+      fields: tlsFields,
     });
   }
 

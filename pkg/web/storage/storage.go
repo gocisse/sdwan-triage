@@ -35,6 +35,7 @@ type AnalysisJob struct {
 	FileName      string         `json:"file_name"`
 	FileSize      int64          `json:"file_size"`
 	FilePath      string         `json:"file_path"`
+	KeyLogPath    string         `json:"key_log_path,omitempty"` // Optional NSS SSL Key Log file for TLS decryption
 	Status        AnalysisStatus `json:"status"`
 	Progress      int            `json:"progress"`
 	CurrentStep   string         `json:"current_step"`

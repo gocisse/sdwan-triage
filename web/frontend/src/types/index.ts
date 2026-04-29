@@ -728,6 +728,14 @@ export interface StreamResponse {
   server_data: StreamSegmentView[];
   packets: PacketSummary[];
   wireshark_filter: string;
+  // Reassembled payload (P1)
+  reassembled_client_hex?: string;
+  reassembled_client_ascii?: string;
+  reassembled_server_hex?: string;
+  reassembled_server_ascii?: string;
+  reassembled_client_bytes?: number;
+  reassembled_server_bytes?: number;
+  is_truncated?: boolean;
 }
 
 // Stream segment view
@@ -840,7 +848,15 @@ export interface ComparisonReport {
   encrypted_count: number;
   tunnel_breakdown?: Record<string, number>;
   forensics?: ForensicSummary;
+  tls_decryption?: TLSDecryptionStats;
   analysis_duration_ms: number;
+}
+
+export interface TLSDecryptionStats {
+  keys_loaded: number;
+  records_decrypted: number;
+  records_failed: number;
+  sessions_matched: number;
 }
 
 export interface ForensicSummary {
@@ -890,9 +906,25 @@ export interface Discrepancy {
   length: number;
   detail: string;
   tcp_flags?: string;
+  // TCP Time-Sequence graph fields (populated for TCP only; zero/undefined for UDP/ICMP)
+  seq_num?: number;
+  ack_num?: number;
+  window_size?: number;
+  payload_len?: number;
+  // Wireshark-style TCP analysis flags (populated for TCP only)
+  is_retransmission?: boolean;
+  is_duplicate_ack?: boolean;
+  is_zero_window?: boolean;
+  is_keep_alive?: boolean;
+  duplicate_ack_count?: number; // 2, 3, 4, ...
   tunnel_type?: string;
   encrypted?: boolean;
   field_changes?: FieldChange[];
+  // TLS decryption (C4)
+  decrypted_protocol?: string;
+  decrypted_summary?: string;
+  decrypted_data?: string;
+  tls_version?: string;
 }
 
 export interface FieldChange {

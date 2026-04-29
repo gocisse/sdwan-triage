@@ -1,0 +1,105 @@
+{
+  "samples": [
+    {
+      "id": "handshake",
+      "name": "TCP 3-Way Handshake",
+      "filename": "handshake.pcap",
+      "description": "A successful TCP connection establishment between a client and server. Perfect for learning the SYN → SYN-ACK → ACK sequence.",
+      "category": "basics",
+      "difficulty": "beginner",
+      "learningObjectives": [
+        "Understand TCP connection establishment",
+        "Identify SYN, SYN-ACK, and ACK flags",
+        "Observe sequence number initialization"
+      ],
+      "challenge": {
+        "question": "What is the initial sequence number (ISN) chosen by the client, and what is the server's ISN?",
+        "hint": "Look at the Sequence Number field in the SYN and SYN-ACK packets.",
+        "answer": "The client's ISN is shown in the first SYN packet's Sequence Number field. The server's ISN is in the SYN-ACK packet. Both parties then acknowledge each other's ISN+1."
+      }
+    },
+    {
+      "id": "mtu_issue",
+      "name": "MTU Blackhole Issue",
+      "filename": "mtu_issue.pcap",
+      "description": "Demonstrates a Path MTU Discovery (PMTUD) blackhole where large packets are silently dropped due to MTU mismatch in the network path.",
+      "category": "troubleshooting",
+      "difficulty": "intermediate",
+      "learningObjectives": [
+        "Identify MTU-related packet drops",
+        "Understand PMTUD and ICMP 'Fragmentation Needed' messages",
+        "Recognize retransmission patterns caused by MTU issues"
+      ],
+      "challenge": {
+        "question": "Why are the large data packets being retransmitted? What is the likely MTU of the bottleneck link?",
+        "hint": "Compare the size of successful packets vs. dropped packets. Look for ICMP messages or their absence.",
+        "answer": "Large packets (>1400 bytes) are being dropped because an intermediate device has a lower MTU (likely 1400 due to tunnel overhead). The lack of ICMP 'Fragmentation Needed' messages indicates a PMTUD blackhole — the device is silently dropping oversized packets instead of sending ICMP errors."
+      }
+    },
+    {
+      "id": "dns_failure",
+      "name": "DNS Resolution Failure",
+      "filename": "dns_failure.pcap",
+      "description": "Shows a DNS query that fails due to the DNS server being unreachable or filtered by a firewall.",
+      "category": "troubleshooting",
+      "difficulty": "beginner",
+      "learningObjectives": [
+        "Understand DNS query/response structure",
+        "Identify DNS timeout patterns",
+        "Recognize firewall-blocked UDP traffic"
+      ],
+      "challenge": {
+        "question": "Why is the DNS resolution failing? Is the DNS server responding?",
+        "hint": "Count the number of DNS queries vs. responses. Look at the destination port and any ICMP messages.",
+        "answer": "The DNS queries (UDP port 53) are being sent but no responses are received. Multiple retries are visible. This indicates either the DNS server is down, or a firewall is blocking UDP/53 traffic. The absence of ICMP 'Port Unreachable' suggests a stateful firewall silently dropping the packets."
+      }
+    },
+    {
+      "id": "bfd_tunnel_drop",
+      "name": "BFD Session Failure",
+      "filename": "bfd_tunnel_drop.pcap",
+      "description": "Captures a BFD (Bidirectional Forwarding Detection) session that times out, causing an SD-WAN tunnel to drop.",
+      "category": "sdwan",
+      "difficulty": "advanced",
+      "learningObjectives": [
+        "Understand BFD keepalive mechanism",
+        "Identify BFD session state transitions",
+        "Correlate BFD failures with tunnel drops"
+      ],
+      "challenge": {
+        "question": "Why did the SD-WAN tunnel drop? What was the BFD detection time, and how many keepalives were missed?",
+        "hint": "Look at the BFD packet intervals and the 'Detect Mult' field. Calculate: Detection Time = Interval × Detect Mult.",
+        "answer": "The BFD session was configured with a 300ms interval and Detect Mult of 3, giving a detection time of 900ms. After 3 consecutive missed keepalives (no BFD packets for ~1 second), the session transitioned to 'Down' state, triggering the tunnel failover."
+      }
+    },
+    {
+      "id": "retransmission_storm",
+      "name": "TCP Retransmission Storm",
+      "filename": "retransmission_storm.pcap",
+      "description": "Shows a TCP connection experiencing severe packet loss, resulting in exponential backoff and retransmission storms.",
+      "category": "performance",
+      "difficulty": "intermediate",
+      "learningObjectives": [
+        "Identify TCP retransmissions and duplicate ACKs",
+        "Understand TCP congestion control behavior",
+        "Recognize the impact of packet loss on throughput"
+      ],
+      "challenge": {
+        "question": "What is causing the retransmissions? Is this congestion or packet loss? What's the approximate loss rate?",
+        "hint": "Look at the retransmission timing and duplicate ACK counts. Check if the retransmissions are for the same sequence numbers.",
+        "answer": "The capture shows ~15% packet loss based on retransmission ratio. The pattern of 3+ duplicate ACKs followed by fast retransmit indicates network congestion or a lossy link. The exponential backoff in RTO (Retransmission Timeout) values confirms the TCP stack is detecting persistent loss."
+      }
+    }
+  ],
+  "categories": {
+    "basics": { "name": "Network Basics", "color": "blue" },
+    "troubleshooting": { "name": "Troubleshooting", "color": "orange" },
+    "sdwan": { "name": "SD-WAN", "color": "purple" },
+    "performance": { "name": "Performance", "color": "green" }
+  },
+  "difficulties": {
+    "beginner": { "name": "Beginner", "color": "green" },
+    "intermediate": { "name": "Intermediate", "color": "yellow" },
+    "advanced": { "name": "Advanced", "color": "red" }
+  }
+}

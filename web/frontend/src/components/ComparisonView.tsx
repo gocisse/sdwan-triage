@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Upload,
   ArrowRightLeft,
@@ -13,6 +13,9 @@ import {
   Lock,
   Layers,
   MessageSquare,
+  Key,
+  X,
+  Filter,
 } from 'lucide-react';
 import type { ComparisonReport, Discrepancy, FlowComparisonSummary, ForensicSummary } from '../types';
 import { getAuthToken } from '../api/client';
@@ -24,18 +27,44 @@ import { PacketDissector } from './PacketDissector';
 import { StreamConversation } from './StreamConversation';
 import { FilterBuilderEducator } from './FilterBuilderEducator';
 import { GuidedTroubleshooting } from './GuidedTroubleshooting';
+import { AnalysisBadges } from './AnalysisBadges';
+import { FilterProvider } from './FilterContext';
+import { GlobalContextMenuProvider, useContextMenu } from './GlobalContextMenu';
+import { FilterAutocomplete } from './FilterAutocomplete';
+import { useKeyboardNavigation, getPacketRowColor, PacketColorLegend } from './useKeyboardNavigation';
+import { SamplePcapLoader, ChallengeMode, ChallengeModeToggle } from './SamplePcapLoader';
+import { GlossaryProvider } from './Glossary';
+import { ProtocolHierarchy } from './ProtocolHierarchy';
+import { IOGraph } from './IOGraph';
 
 interface ComparisonViewProps {
   onClose?: () => void;
 }
 
+// Sample PCAP type (matches SamplePcapLoader)
+interface SamplePcap {
+  id: string;
+  name: string;
+  filename: string;
+  description: string;
+  category: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  learningObjectives: string[];
+  challenge: { question: string; hint: string; answer: string };
+}
+
 const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
   const [fileA, setFileA] = useState<File | null>(null);
   const [fileB, setFileB] = useState<File | null>(null);
+  const [keyLogFile, setKeyLogFile] = useState<File | null>(null);
   const [report, setReport] = useState<ComparisonReport | null>(null);
+  
+  // Learning Platform State
+  const [challengeModeEnabled, setChallengeModeEnabled] = useState(false);
+  const [activeSample, setActiveSample] = useState<SamplePcap | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'summary' | 'flows' | 'discrepancies'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'flows' | 'discrepancies' | 'hierarchy' | 'throughput'>('summary');
   const [discrepancyFilter, setDiscrepancyFilter] = useState<string>('all');
   const [expandedFlows, setExpandedFlows] = useState<Set<number>>(new Set());
   const [visualizeFlow, setVisualizeFlow] = useState<FlowComparisonSummary | null>(null);
@@ -51,6 +80,9 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
       const formData = new FormData();
       formData.append('file_a', fileA);
       formData.append('file_b', fileB);
+      if (keyLogFile) {
+        formData.append('keylog', keyLogFile);
+      }
 
       const token = getAuthToken();
       const response = await fetch('/api/compare-pcap', {
@@ -82,9 +114,25 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
     });
   };
 
-  const filteredDiscrepancies = report?.discrepancies.filter(d =>
-    discrepancyFilter === 'all' || d.state === discrepancyFilter
-  ) ?? [];
+  // Discrepancy filter supports both state-based ('all', 'MISSING_B', 'MISSING_A',
+  // 'MODIFIED') and Wireshark-style analysis-flag filters ('retx', 'dup-ack',
+  // 'zero-window', 'keep-alive'). Flag filters ignore the state.
+  const filteredDiscrepancies = report?.discrepancies.filter(d => {
+    switch (discrepancyFilter) {
+      case 'all':
+        return true;
+      case 'retx':
+        return !!d.is_retransmission;
+      case 'dup-ack':
+        return !!d.is_duplicate_ack;
+      case 'zero-window':
+        return !!d.is_zero_window;
+      case 'keep-alive':
+        return !!d.is_keep_alive;
+      default:
+        return d.state === discrepancyFilter;
+    }
+  }) ?? [];
 
   // ── Upload Section ────────────────────────────────────────────
   if (!report) {
@@ -98,6 +146,38 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           <p className="text-slate-400 text-sm mb-6">
             Compare a LAN-side and WAN-side capture to find where packets are dropped, modified (NAT/QoS), or injected.
           </p>
+
+          {/* Learning Platform Controls */}
+          <div className="flex items-center justify-between mb-6 p-4 bg-slate-900/50 rounded-lg border border-slate-700/50">
+            <SamplePcapLoader
+              onLoadSample={(file, sample) => {
+                setFileA(file);
+                setActiveSample(sample);
+              }}
+            />
+            <ChallengeModeToggle
+              enabled={challengeModeEnabled}
+              onChange={setChallengeModeEnabled}
+            />
+          </div>
+
+          {/* Active Sample Info */}
+          {activeSample && (
+            <div className="mb-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm font-semibold text-purple-300">📚 Training Sample Loaded</span>
+                <span className={`px-1.5 py-0.5 text-[9px] rounded ${
+                  activeSample.difficulty === 'beginner' ? 'bg-green-500/20 text-green-400' :
+                  activeSample.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  {activeSample.difficulty}
+                </span>
+              </div>
+              <p className="text-sm text-purple-200">{activeSample.name}</p>
+              <p className="text-xs text-purple-300/70 mt-1">{activeSample.description}</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <FileDropZone
@@ -113,6 +193,15 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
               file={fileB}
               onFileSelect={setFileB}
               accentColor="purple"
+            />
+          </div>
+
+          {/* SSL Key Log File (Optional) for TLS Decryption */}
+          <div className="mb-6">
+            <KeyLogDropZone
+              file={keyLogFile}
+              onFileSelect={setKeyLogFile}
+              onClear={() => setKeyLogFile(null)}
             />
           </div>
 
@@ -158,6 +247,12 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
     'from-red-600/20 to-red-900/10 border-red-500/30';
 
   return (
+    // FilterProvider + GlobalContextMenuProvider + GlossaryProvider wrap the entire result
+    // view so right-click actions anywhere inside can push clauses into
+    // the FilterBuilder scratchpad, and glossary terms are clickable.
+    <GlossaryProvider>
+    <FilterProvider>
+      <GlobalContextMenuProvider>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -172,7 +267,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => { setReport(null); setFileA(null); setFileB(null); }}
+            onClick={() => { setReport(null); setFileA(null); setFileB(null); setActiveSample(null); }}
             className="px-3 py-1.5 text-sm rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
           >
             New Comparison
@@ -184,6 +279,14 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           )}
         </div>
       </div>
+
+      {/* Challenge Mode Panel (Learning Platform) */}
+      {activeSample && challengeModeEnabled && (
+        <ChallengeMode
+          sample={activeSample}
+          onClose={() => setActiveSample(null)}
+        />
+      )}
 
       {/* Educational Legend */}
       <EducationalLegend />
@@ -298,18 +401,24 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
       {/* Tabs */}
       <div className="border-b border-slate-700">
         <div className="flex gap-1">
-          {(['summary', 'flows', 'discrepancies'] as const).map(tab => (
+          {([
+              { key: 'summary' as const, label: 'Summary' },
+              { key: 'flows' as const, label: 'Flows' },
+              { key: 'discrepancies' as const, label: 'Discrepancies' },
+              { key: 'hierarchy' as const, label: 'Protocol Hierarchy' },
+              { key: 'throughput' as const, label: 'Throughput Graph' },
+            ]).map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize ${
-                activeTab === tab
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.key
                   ? 'border-blue-500 text-blue-400'
                   : 'border-transparent text-slate-500 hover:text-slate-300'
               }`}
             >
-              {tab}
-              {tab === 'discrepancies' && report.discrepancies.length > 0 && (
+              {tab.label}
+              {tab.key === 'discrepancies' && report.discrepancies.length > 0 && (
                 <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
                   {report.discrepancies.length}
                 </span>
@@ -320,7 +429,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'summary' && <GuidedTroubleshooting report={report} onSwitchTab={(tab) => setActiveTab(tab as 'summary' | 'flows' | 'discrepancies')} />}
+      {activeTab === 'summary' && <GuidedTroubleshooting report={report} onSwitchTab={(tab) => setActiveTab(tab as 'summary' | 'flows' | 'discrepancies' | 'hierarchy' | 'throughput')} />}
       {activeTab === 'flows' && (
         <FlowsTab
           flows={report.flow_summaries}
@@ -350,7 +459,23 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ onClose }) => {
           forensics={report.forensics}
         />
       )}
+      {activeTab === 'hierarchy' && (
+        <ProtocolHierarchy
+          discrepancies={report.discrepancies}
+          flows={report.flow_summaries}
+          totalPackets={report.total_packets_a + report.total_packets_b}
+          totalBytes={report.discrepancies.reduce((sum, d) => sum + (d.length || 0), 0)}
+        />
+      )}
+      {activeTab === 'throughput' && (
+        <IOGraph
+          discrepancies={report.discrepancies}
+        />
+      )}
     </div>
+      </GlobalContextMenuProvider>
+    </FilterProvider>
+    </GlossaryProvider>
   );
 };
 
@@ -386,6 +511,57 @@ function FileDropZone({ label, sublabel, file, onFileSelect, accentColor }: {
         }}
       />
     </label>
+  );
+}
+
+function KeyLogDropZone({ file, onFileSelect, onClear }: {
+  file: File | null;
+  onFileSelect: (f: File) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="border border-dashed border-emerald-500/30 hover:border-emerald-500/50 rounded-lg p-4 transition-colors">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-emerald-500/10 rounded-lg">
+            <Key className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <div className="text-sm font-medium text-white">SSL Key Log File <span className="text-slate-500 font-normal">(Optional)</span></div>
+            <div className="text-xs text-slate-500">
+              {file ? (
+                <span className="text-emerald-400">{file.name}</span>
+              ) : (
+                'NSS Key Log format for TLS decryption'
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {file && (
+            <button
+              onClick={onClear}
+              className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+              title="Remove key log file"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+          <label className="px-3 py-1.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 rounded-md cursor-pointer hover:bg-emerald-500/30 transition-colors">
+            {file ? 'Change' : 'Browse'}
+            <input
+              type="file"
+              accept=".log,.txt,.keys"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) onFileSelect(f);
+              }}
+            />
+          </label>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -532,6 +708,87 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
   const [deepDiveDiscrepancy, setDeepDiveDiscrepancy] = useState<Discrepancy | null>(null);
   const [dissectorDiscrepancy, setDissectorDiscrepancy] = useState<Discrepancy | null>(null);
   const [conversationFlow, setConversationFlow] = useState<FlowComparisonSummary | null>(null);
+  
+  // U1: Advanced filter with autocomplete
+  const [advancedFilter, setAdvancedFilter] = useState('');
+  const filterInputRef = useRef<HTMLInputElement>(null);
+  
+  // U3: Keyboard navigation
+  const [selectedRowIndex, setSelectedRowIndex] = useState(-1);
+  
+  // C3: Stream filter for "Follow Stream" highlighting
+  const [streamFilter, setStreamFilter] = useState<{ srcIp: string; dstIp: string; srcPort: number; dstPort: number; protocol: string } | null>(null);
+
+  // Right-click menu hook — the provider is mounted at the top of
+  // ComparisonView, so this is safe anywhere in the results tree.
+  const { onContextMenu } = useContextMenu();
+
+  // Filter discrepancies by stream if streamFilter is set (C3)
+  const streamFilteredDiscrepancies = streamFilter
+    ? discrepancies.filter(d =>
+        ((d.src_ip === streamFilter.srcIp && d.dst_ip === streamFilter.dstIp &&
+          d.src_port === streamFilter.srcPort && d.dst_port === streamFilter.dstPort) ||
+         (d.src_ip === streamFilter.dstIp && d.dst_ip === streamFilter.srcIp &&
+          d.src_port === streamFilter.dstPort && d.dst_port === streamFilter.srcPort)) &&
+        d.protocol === streamFilter.protocol
+      )
+    : discrepancies;
+
+  // Apply advanced filter (U1)
+  const filteredByAdvanced = advancedFilter.trim()
+    ? streamFilteredDiscrepancies.filter(d => {
+        const filterLower = advancedFilter.toLowerCase();
+        // Simple matching for now - can be extended with proper parser
+        if (filterLower.includes('ip.src')) {
+          const match = advancedFilter.match(/ip\.src\s*==\s*["']?([^"'\s]+)["']?/i);
+          if (match && d.src_ip !== match[1]) return false;
+        }
+        if (filterLower.includes('ip.dst')) {
+          const match = advancedFilter.match(/ip\.dst\s*==\s*["']?([^"'\s]+)["']?/i);
+          if (match && d.dst_ip !== match[1]) return false;
+        }
+        if (filterLower.includes('tcp.port')) {
+          const match = advancedFilter.match(/tcp\.port\s*==\s*(\d+)/i);
+          if (match) {
+            const port = parseInt(match[1]);
+            if (d.src_port !== port && d.dst_port !== port) return false;
+          }
+        }
+        if (filterLower.includes('tcp.flags')) {
+          const match = advancedFilter.match(/tcp\.flags\s+contains\s+["']?(\w+)["']?/i);
+          if (match && !d.tcp_flags?.toUpperCase().includes(match[1].toUpperCase())) return false;
+        }
+        return true;
+      })
+    : streamFilteredDiscrepancies;
+
+  // U3: Keyboard navigation hook
+  useKeyboardNavigation({
+    itemCount: Math.min(filteredByAdvanced.length, 500),
+    selectedIndex: selectedRowIndex,
+    onSelectionChange: setSelectedRowIndex,
+    onEnter: (idx) => {
+      if (idx >= 0 && idx < filteredByAdvanced.length) {
+        toggleRow(idx);
+      }
+    },
+    onEscape: () => {
+      if (dissectorDiscrepancy) setDissectorDiscrepancy(null);
+      else if (deepDiveDiscrepancy) setDeepDiveDiscrepancy(null);
+      else if (conversationFlow) setConversationFlow(null);
+      else setSelectedRowIndex(-1);
+    },
+    filterInputRef,
+    enabled: !dissectorDiscrepancy && !deepDiveDiscrepancy && !conversationFlow,
+  });
+
+  // Scroll selected row into view
+  useEffect(() => {
+    if (selectedRowIndex >= 0) {
+      const row = document.getElementById(`discrepancy-row-${selectedRowIndex}`);
+      row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedRowIndex]);
 
   const toggleRow = (idx: number) => {
     setExpandedRows(prev => {
@@ -554,10 +811,18 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
     info: 'bg-slate-800/60 border-slate-600/40',
   };
 
+  // Count how many discrepancies match each analysis flag for use in chip labels.
+  const flagCounts = {
+    retx: allDiscrepancies.filter(d => d.is_retransmission).length,
+    dupAck: allDiscrepancies.filter(d => d.is_duplicate_ack).length,
+    zeroWin: allDiscrepancies.filter(d => d.is_zero_window).length,
+    keepAlive: allDiscrepancies.filter(d => d.is_keep_alive).length,
+  };
+
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
-      <div className="flex items-center gap-2">
+      {/* Filter bar — state-based filters */}
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-slate-500">Filter:</span>
         {['all', 'MISSING_B', 'MISSING_A', 'MODIFIED'].map(f => (
           <button
@@ -572,7 +837,82 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
             {f === 'all' ? `All (${total})` : f.replace('_', ' ')}
           </button>
         ))}
+        {/* Analysis-flag filter chips — only rendered when at least one
+            discrepancy has that flag set, so the UI stays clean for
+            captures without TCP oddities. */}
+        {(flagCounts.retx + flagCounts.dupAck + flagCounts.zeroWin + flagCounts.keepAlive) > 0 && (
+          <>
+            <span className="text-xs text-slate-600 ml-2">|</span>
+            {flagCounts.retx > 0 && (
+              <FlagChip
+                active={filter === 'retx'}
+                onClick={() => onFilterChange('retx')}
+                label={`Retx (${flagCounts.retx})`}
+                color="red"
+              />
+            )}
+            {flagCounts.dupAck > 0 && (
+              <FlagChip
+                active={filter === 'dup-ack'}
+                onClick={() => onFilterChange('dup-ack')}
+                label={`Dup ACK (${flagCounts.dupAck})`}
+                color="orange"
+              />
+            )}
+            {flagCounts.zeroWin > 0 && (
+              <FlagChip
+                active={filter === 'zero-window'}
+                onClick={() => onFilterChange('zero-window')}
+                label={`Zero Win (${flagCounts.zeroWin})`}
+                color="amber"
+              />
+            )}
+            {flagCounts.keepAlive > 0 && (
+              <FlagChip
+                active={filter === 'keep-alive'}
+                onClick={() => onFilterChange('keep-alive')}
+                label={`Keep-Alive (${flagCounts.keepAlive})`}
+                color="purple"
+              />
+            )}
+          </>
+        )}
       </div>
+
+      {/* U1: Advanced Filter with Autocomplete */}
+      <div className="flex items-center gap-3">
+        <FilterAutocomplete
+          value={advancedFilter}
+          onChange={setAdvancedFilter}
+          placeholder="Wireshark-style filter: ip.src == 192.168.1.1 && tcp.port == 443"
+          className="flex-1"
+          inputRef={filterInputRef}
+        />
+        <span className="text-[10px] text-slate-500">Press / to focus</span>
+      </div>
+
+      {/* C3: Stream Filter Banner */}
+      {streamFilter && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-green-900/30 border border-green-700/40 rounded-lg">
+          <Filter className="w-4 h-4 text-green-400" />
+          <span className="text-sm text-green-400">
+            Following stream: {streamFilter.srcIp}:{streamFilter.srcPort} ↔ {streamFilter.dstIp}:{streamFilter.dstPort} ({streamFilter.protocol})
+          </span>
+          <span className="text-xs text-green-400/70">
+            ({streamFilteredDiscrepancies.length} packets)
+          </span>
+          <button
+            onClick={() => setStreamFilter(null)}
+            className="ml-auto px-3 py-1 text-xs bg-green-600/30 hover:bg-green-600/50 text-green-400 rounded transition-colors flex items-center gap-1"
+          >
+            <X className="w-3 h-3" />
+            Clear Filter
+          </button>
+        </div>
+      )}
+
+      {/* U2: Color Legend */}
+      <PacketColorLegend className="px-1" />
 
       {/* Discrepancy list */}
       <div className="bg-slate-800/80 rounded-xl border border-slate-700/50 overflow-hidden max-h-[600px] overflow-y-auto">
@@ -586,18 +926,32 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">Detail</th>
               <th className="px-3 py-2.5 text-left text-slate-500 font-medium">
                 Analysis
-                <InfoTooltip text="Click any row to see a plain-English explanation of why this packet is flagged and what to check." />
+                <InfoTooltip text="Click any row to see a plain-English explanation. Use j/k or arrows to navigate, Enter to expand." />
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/30">
-            {discrepancies.slice(0, 500).map((d, i) => {
+            {filteredByAdvanced.slice(0, 500).map((d, i) => {
               const analysis = getDiscrepancyAnalysis(d);
               const isExpanded = expandedRows.has(i);
+              const isSelected = selectedRowIndex === i;
+              const rowColor = getPacketRowColor(d);
               return (
                 <React.Fragment key={i}>
-                  <tr className="hover:bg-slate-700/20 cursor-pointer" onClick={() => toggleRow(i)}>
-                    <td className="px-3 py-2">
+                  <tr
+                    id={`discrepancy-row-${i}`}
+                    className={`cursor-pointer transition-colors ${rowColor.rowClass} ${
+                      isSelected ? 'ring-2 ring-blue-500 ring-inset' : ''
+                    }`}
+                    onClick={() => {
+                      setSelectedRowIndex(i);
+                      toggleRow(i);
+                    }}
+                  >
+                    <td
+                      className="px-3 py-2"
+                      onContextMenu={onContextMenu({ field: 'state', value: d.state, label: 'Discrepancy State' })}
+                    >
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${stateColors[d.state] || 'text-slate-400'}`}>
                         {d.state.replace('_', ' ')}
                       </span>
@@ -616,9 +970,54 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
                     </td>
                     <td className="px-3 py-2 text-slate-400 font-mono">{d.timestamp}</td>
                     <td className="px-3 py-2 font-mono text-slate-300">
-                      {d.src_ip}:{d.src_port}→{d.dst_ip}:{d.dst_port}
-                      <span className="ml-1 text-slate-500">{d.protocol}</span>
-                      {d.tcp_flags && <span className="ml-1 text-slate-600">[{d.tcp_flags}]</span>}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Each IP / port is independently right-clickable so the
+                            user can apply it as a filter clause. */}
+                        <span>
+                          <span
+                            onContextMenu={onContextMenu({ field: 'ip.src', value: d.src_ip, label: 'Source IP' })}
+                            className="hover:bg-slate-700/40 rounded px-0.5"
+                          >
+                            {d.src_ip}
+                          </span>
+                          :
+                          <span
+                            onContextMenu={onContextMenu({ field: 'tcp.srcport', value: d.src_port, label: 'Source Port' })}
+                            className="hover:bg-slate-700/40 rounded px-0.5"
+                          >
+                            {d.src_port}
+                          </span>
+                          →
+                          <span
+                            onContextMenu={onContextMenu({ field: 'ip.dst', value: d.dst_ip, label: 'Destination IP' })}
+                            className="hover:bg-slate-700/40 rounded px-0.5"
+                          >
+                            {d.dst_ip}
+                          </span>
+                          :
+                          <span
+                            onContextMenu={onContextMenu({ field: 'tcp.dstport', value: d.dst_port, label: 'Destination Port' })}
+                            className="hover:bg-slate-700/40 rounded px-0.5"
+                          >
+                            {d.dst_port}
+                          </span>
+                        </span>
+                        <span
+                          className="text-slate-500"
+                          onContextMenu={onContextMenu({ field: 'frame.protocol', value: d.protocol, label: 'Protocol' })}
+                        >
+                          {d.protocol}
+                        </span>
+                        {d.tcp_flags && (
+                          <span
+                            className="text-slate-600"
+                            onContextMenu={onContextMenu({ field: 'tcp.flags', value: d.tcp_flags, label: 'TCP Flags' })}
+                          >
+                            [{d.tcp_flags}]
+                          </span>
+                        )}
+                        <AnalysisBadges d={d} compact />
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-slate-400 max-w-[200px] truncate" title={d.detail}>{d.detail}</td>
                     <td className="px-3 py-2">
@@ -649,7 +1048,10 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
                           <div className="flex items-start gap-2">
                             <div className="mt-0.5 flex-shrink-0">{analysis.icon}</div>
                             <div>
-                              <div className="text-xs font-semibold text-white mb-1">{analysis.summary}</div>
+                              <div className="text-xs font-semibold text-white mb-1 flex items-center gap-2 flex-wrap">
+                                <span>{analysis.summary}</span>
+                                <AnalysisBadges d={d} />
+                              </div>
                               <p className="text-[11px] text-slate-400 leading-relaxed mb-2">{analysis.suggestion}</p>
                               {analysis.seniorTip && (
                                 <div className="mt-2 pt-2 border-t border-slate-600/30">
@@ -666,21 +1068,36 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
                                   ))}
                                 </div>
                               )}
-                              {/* Follow Stream Button */}
-                              <button
-                                onClick={() => setConversationFlow({
-                                  src_ip: d.src_ip, dst_ip: d.dst_ip,
-                                  src_port: d.src_port, dst_port: d.dst_port,
-                                  protocol: d.protocol,
-                                  packets_a: 0, packets_b: 0, matched: 0,
-                                  missing_b: 0, missing_a: 0, modified: 0,
-                                  match_rate: 0, has_nat: false, encapsulated: false,
-                                })}
-                                className="mt-2 px-3 py-1.5 text-[10px] font-medium rounded bg-green-600/20 text-green-400 hover:bg-green-600/40 transition-colors inline-flex items-center gap-1.5"
-                              >
-                                <MessageSquare className="w-3 h-3" />
-                                Follow This Stream — View Full Conversation
-                              </button>
+                              {/* Follow Stream Buttons (C3) */}
+                              <div className="mt-2 flex items-center gap-2">
+                                <button
+                                  onClick={() => setStreamFilter({
+                                    srcIp: d.src_ip, dstIp: d.dst_ip,
+                                    srcPort: d.src_port, dstPort: d.dst_port,
+                                    protocol: d.protocol,
+                                  })}
+                                  className="px-3 py-1.5 text-[10px] font-medium rounded bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/40 transition-colors inline-flex items-center gap-1.5"
+                                  title="Filter table to show only packets from this stream"
+                                >
+                                  <Filter className="w-3 h-3" />
+                                  Follow Stream (Filter)
+                                </button>
+                                <button
+                                  onClick={() => setConversationFlow({
+                                    src_ip: d.src_ip, dst_ip: d.dst_ip,
+                                    src_port: d.src_port, dst_port: d.dst_port,
+                                    protocol: d.protocol,
+                                    packets_a: 0, packets_b: 0, matched: 0,
+                                    missing_b: 0, missing_a: 0, modified: 0,
+                                    match_rate: 0, has_nat: false, encapsulated: false,
+                                  })}
+                                  className="px-3 py-1.5 text-[10px] font-medium rounded bg-green-600/20 text-green-400 hover:bg-green-600/40 transition-colors inline-flex items-center gap-1.5"
+                                  title="Open conversation view modal"
+                                >
+                                  <MessageSquare className="w-3 h-3" />
+                                  Conversation View
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -692,9 +1109,10 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
             })}
           </tbody>
         </table>
-        {discrepancies.length > 500 && (
+        {filteredByAdvanced.length > 500 && (
           <div className="px-4 py-2 text-xs text-slate-500 bg-slate-800 border-t border-slate-700/50">
-            Showing first 500 of {discrepancies.length} discrepancies
+            Showing first 500 of {filteredByAdvanced.length} discrepancies
+            {(streamFilter || advancedFilter) && ` (filtered from ${total})`}
           </div>
         )}
       </div>
@@ -725,6 +1143,51 @@ function DiscrepanciesTab({ discrepancies, filter, onFilterChange, total, allDis
         />
       )}
     </div>
+  );
+}
+
+// FlagChip renders a small filter button for a Wireshark-style analysis
+// flag. Colour is tied to the same palette used by <AnalysisBadges> so a
+// flag's chip and its badge look visually consistent.
+function FlagChip({
+  active,
+  onClick,
+  label,
+  color,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  color: 'red' | 'orange' | 'amber' | 'purple';
+}) {
+  const palette: Record<string, { active: string; idle: string }> = {
+    red: {
+      active: 'bg-red-600 text-white',
+      idle: 'bg-red-500/15 text-red-400 hover:bg-red-500/25',
+    },
+    orange: {
+      active: 'bg-orange-600 text-white',
+      idle: 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25',
+    },
+    amber: {
+      active: 'bg-amber-600 text-white',
+      idle: 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25',
+    },
+    purple: {
+      active: 'bg-purple-600 text-white',
+      idle: 'bg-purple-500/15 text-purple-400 hover:bg-purple-500/25',
+    },
+  };
+  const c = palette[color];
+  return (
+    <button
+      onClick={onClick}
+      className={`px-2.5 py-1 text-xs rounded-lg border border-transparent transition-colors ${
+        active ? c.active : c.idle
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

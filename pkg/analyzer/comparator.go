@@ -55,11 +55,28 @@ const (
 	viptelaPortHigh = 12426
 )
 
+// isTLSPort returns true if the port is commonly used for TLS traffic.
+func isTLSPort(port uint16) bool {
+	switch port {
+	case 443, 8443, 993, 995, 465, 636, 989, 990, 5061, 853:
+		// HTTPS, HTTPS-alt, IMAPS, POP3S, SMTPS, LDAPS, FTPS-data, FTPS-ctrl, SIPS, DNS-over-TLS
+		return true
+	default:
+		return false
+	}
+}
+
 // ─── Core Structs ───────────────────────────────────────────────
 
 // Comparator performs packet-level comparison between two PCAP files.
 type Comparator struct {
-	verbose bool
+	verbose    bool
+	KeyLogPath string // Optional path to NSS SSL Key Log file for TLS decryption (C4)
+
+	// TLS decryption state (C4) — initialized when KeyLogPath is set
+	tlsDecryptor  *TLSDecryptor
+	tlsStats      *TLSDecryptionStats
+	clientRandoms map[string][32]byte // flowKey → client random for session tracking
 }
 
 // NewComparator creates a new PCAP comparator.
@@ -96,12 +113,23 @@ type packetMeta struct {
 	DSCP      uint8
 	Checksum  uint16
 	TCPFlags  string
-	Payload   int // payload size
+	Payload   int    // payload size
+	AckNum    uint32 // TCP ack number (0 for non-TCP)
+	Window    uint16 // TCP advertised receive window (0 for non-TCP)
+
+	// Wireshark-style analysis flags (populated by the comparator's Pass 2
+	// analyzer before match helpers are invoked). Zero for non-TCP or when
+	// analysis has not been computed.
+	Analysis TCPAnalysisFlags
 
 	// Tunnel/encapsulation metadata
 	TunnelType string     // TunnelNone, TunnelESP, TunnelGRE, etc.
 	OuterKey   *packetKey // Outer 5-tuple (nil if not encapsulated)
 	Encrypted  bool       // True if inner payload is encrypted (ESP without keys)
+
+	// Raw TCP payload for TLS decryption (C4). Only populated when key log is provided.
+	// Limited to first 8KB to avoid memory bloat.
+	RawPayload []byte
 }
 
 // ─── Comparison Report ──────────────────────────────────────────
@@ -152,8 +180,19 @@ type ComparisonReport struct {
 	// Forensic Comparison Summary (streaming engine)
 	Forensics *ForensicSummary `json:"forensics,omitempty"`
 
+	// TLS Decryption stats (C4)
+	TLSDecryption *TLSDecryptionStats `json:"tls_decryption,omitempty"`
+
 	// Timing
 	AnalysisDuration time.Duration `json:"analysis_duration_ms"`
+}
+
+// TLSDecryptionStats reports how many TLS sessions/records were decrypted.
+type TLSDecryptionStats struct {
+	KeysLoaded       int `json:"keys_loaded"`       // Number of sessions in key log
+	RecordsDecrypted int `json:"records_decrypted"` // Application data records successfully decrypted
+	RecordsFailed    int `json:"records_failed"`    // Records where decryption was attempted but failed
+	SessionsMatched  int `json:"sessions_matched"`  // Sessions where client random was found in key log
 }
 
 // Discrepancy represents a single packet-level difference between the two captures.
@@ -170,9 +209,28 @@ type Discrepancy struct {
 	Detail      string `json:"detail"` // Human-readable explanation
 	TCPFlags    string `json:"tcp_flags,omitempty"`
 
+	// TCP Time-Sequence graph fields (populated for TCP only; zero for UDP/ICMP)
+	SeqNum     uint32 `json:"seq_num,omitempty"`     // TCP sequence number
+	AckNum     uint32 `json:"ack_num,omitempty"`     // TCP acknowledgement number
+	WindowSize uint16 `json:"window_size,omitempty"` // Advertised receive window (unscaled)
+	PayloadLen int    `json:"payload_len,omitempty"` // TCP payload bytes (segment height on graph)
+
+	// Wireshark-style per-packet TCP analysis flags. All false for non-TCP.
+	IsRetransmission  bool `json:"is_retransmission,omitempty"`
+	IsDuplicateAck    bool `json:"is_duplicate_ack,omitempty"`
+	IsZeroWindow      bool `json:"is_zero_window,omitempty"`
+	IsKeepAlive       bool `json:"is_keep_alive,omitempty"`
+	DuplicateAckCount int  `json:"duplicate_ack_count,omitempty"` // "Dup ACK #N"
+
 	// Tunnel metadata
 	TunnelType string `json:"tunnel_type,omitempty"` // e.g. "GRE", "ESP/IPsec"
 	Encrypted  bool   `json:"encrypted,omitempty"`   // True if ESP-encrypted
+
+	// TLS decryption (C4) — populated when key log is provided
+	DecryptedProtocol string `json:"decrypted_protocol,omitempty"` // "HTTP", "HTTP/2", "gRPC", etc.
+	DecryptedSummary  string `json:"decrypted_summary,omitempty"`  // Human-readable one-liner
+	DecryptedData     string `json:"decrypted_data,omitempty"`     // First 4KB of cleartext (base64 or UTF-8)
+	TLSVersion        string `json:"tls_version,omitempty"`        // "TLS 1.2", "TLS 1.3"
 
 	// For MODIFIED state
 	FieldChanges []FieldChange `json:"field_changes,omitempty"`
@@ -366,9 +424,26 @@ func (c *Comparator) streamFile(filePath string, onPacket func(*packetMeta)) (in
 				meta.Key.DstPort = uint16(t.DstPort)
 				meta.Key.Protocol = "TCP"
 				meta.Key.SeqNum = t.Seq
+				meta.AckNum = t.Ack
+				meta.Window = t.Window
 				meta.Checksum = t.Checksum
 				meta.Payload = len(t.Payload)
 				meta.TCPFlags = formatTCPFlags(t)
+
+				// TLS decryption (C4): capture raw payload for TLS ports
+				if c.tlsDecryptor != nil && len(t.Payload) > 0 {
+					dstP, srcP := uint16(t.DstPort), uint16(t.SrcPort)
+					if isTLSPort(dstP) || isTLSPort(srcP) {
+						// Limit to 8KB to avoid memory bloat
+						if len(t.Payload) <= 8192 {
+							meta.RawPayload = make([]byte, len(t.Payload))
+							copy(meta.RawPayload, t.Payload)
+						} else {
+							meta.RawPayload = make([]byte, 8192)
+							copy(meta.RawPayload, t.Payload[:8192])
+						}
+					}
+				}
 			} else if udp := pkt.Layer(layers.LayerTypeUDP); udp != nil {
 				u := udp.(*layers.UDP)
 				meta.Key.SrcPort = uint16(u.SrcPort)
@@ -404,6 +479,8 @@ type innerPacketInfo struct {
 	DSCP     uint8
 	IPId     uint16
 	SeqNum   uint32
+	AckNum   uint32 // TCP ack number (0 for non-TCP)
+	Window   uint16 // TCP advertised receive window (0 for non-TCP)
 	Checksum uint16
 	Payload  int
 	TCPFlags string
@@ -455,6 +532,8 @@ func (c *Comparator) decapsulateIP(data []byte) *innerPacketInfo {
 		info.SrcPort = binary.BigEndian.Uint16(transportData[0:2])
 		info.DstPort = binary.BigEndian.Uint16(transportData[2:4])
 		info.SeqNum = binary.BigEndian.Uint32(transportData[4:8])
+		info.AckNum = binary.BigEndian.Uint32(transportData[8:12])
+		info.Window = binary.BigEndian.Uint16(transportData[14:16])
 		info.Checksum = binary.BigEndian.Uint16(transportData[16:18])
 		tcpDataOff := int(transportData[12]>>4) * 4
 		if tcpDataOff >= 20 && tcpDataOff <= len(transportData) {
@@ -535,6 +614,8 @@ func (c *Comparator) applyInnerMeta(meta *packetMeta, inner *innerPacketInfo) {
 	meta.Checksum = inner.Checksum
 	meta.Payload = inner.Payload
 	meta.TCPFlags = inner.TCPFlags
+	meta.AckNum = inner.AckNum
+	meta.Window = inner.Window
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -590,4 +671,78 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// ─── TLS Decryption Integration (C4) ────────────────────────────
+
+// tryDecryptTLS attempts to decrypt TLS application data in the raw payload
+// and populates the discrepancy's decrypted fields if successful.
+// Returns true if decryption was attempted (regardless of success).
+func (c *Comparator) tryDecryptTLS(d *Discrepancy, rawPayload []byte, srcIP string, srcPort, dstPort uint16) bool {
+	if c.tlsDecryptor == nil || len(rawPayload) < 5 {
+		return false
+	}
+
+	// Only attempt on TLS ApplicationData records
+	if rawPayload[0] != TLSContentTypeApplicationData {
+		return false
+	}
+
+	// Find the client random for this flow (try both directions)
+	flowKey1 := fmt.Sprintf("%s:%d->%s:%d", srcIP, srcPort, d.DstIP, dstPort)
+	flowKey2 := fmt.Sprintf("%s:%d->%s:%d", d.DstIP, dstPort, srcIP, srcPort)
+
+	var clientRandom [32]byte
+	var found bool
+	if cr, ok := c.clientRandoms[flowKey1]; ok {
+		clientRandom = cr
+		found = true
+	} else if cr, ok := c.clientRandoms[flowKey2]; ok {
+		clientRandom = cr
+		found = true
+	}
+
+	if !found {
+		return false
+	}
+
+	c.tlsStats.SessionsMatched++
+
+	// Determine direction: fromServer if srcPort is a TLS port
+	fromServer := isTLSPort(srcPort)
+
+	result := c.tlsDecryptor.TryDecryptRecord(rawPayload, clientRandom, fromServer)
+	if result == nil {
+		c.tlsStats.RecordsFailed++
+		return true
+	}
+
+	c.tlsStats.RecordsDecrypted++
+
+	// Populate discrepancy fields
+	d.DecryptedProtocol = result.Protocol
+	d.DecryptedSummary = result.Summary
+	d.TLSVersion = result.TLSVersion
+
+	// Store first 4KB of decrypted data as UTF-8 if printable, else note binary
+	if len(result.Data) > 0 {
+		maxLen := 4096
+		if len(result.Data) < maxLen {
+			maxLen = len(result.Data)
+		}
+		// Check if data is mostly printable
+		printable := 0
+		for _, b := range result.Data[:maxLen] {
+			if b >= 0x20 && b < 0x7f || b == '\r' || b == '\n' || b == '\t' {
+				printable++
+			}
+		}
+		if float64(printable)/float64(maxLen) > 0.7 {
+			d.DecryptedData = string(result.Data[:maxLen])
+		} else {
+			d.DecryptedData = fmt.Sprintf("[binary: %d bytes]", len(result.Data))
+		}
+	}
+
+	return true
 }

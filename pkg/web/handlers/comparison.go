@@ -93,8 +93,22 @@ func (h *ComparisonHandlers) PostCompareUpload(c *gin.Context) {
 		return
 	}
 
+	// Optional: SSL Key Log file for TLS decryption (C4)
+	var keyLogPath string
+	if keyFile, keyHeader, err := c.Request.FormFile("keylog"); err == nil {
+		defer keyFile.Close()
+		keyExt := strings.ToLower(filepath.Ext(keyHeader.Filename))
+		if keyExt == ".log" || keyExt == ".txt" || keyExt == "" || keyExt == ".keys" {
+			keyPath := filepath.Join(tempDir, "sslkeylog_"+keyHeader.Filename)
+			if err := saveFile(keyFile, keyPath); err == nil {
+				keyLogPath = keyPath
+			}
+		}
+	}
+
 	// Run comparison
 	comp := analyzer.NewComparator(false)
+	comp.KeyLogPath = keyLogPath
 	report, err := comp.Compare(pathA, pathB)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Comparison failed: " + err.Error()})

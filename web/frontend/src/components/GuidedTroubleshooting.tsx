@@ -20,6 +20,45 @@ import {
   Layers,
 } from 'lucide-react';
 import type { ComparisonReport } from '../types';
+import { GlossaryTerm, GLOSSARY } from './Glossary';
+
+// Helper to render text with glossary-linked terms
+function renderWithGlossaryTerms(text: string): React.ReactNode {
+  const glossaryTerms = Object.keys(GLOSSARY);
+  const parts: React.ReactNode[] = [];
+  let key = 0;
+
+  // Match common abbreviations
+  const abbrevRegex = /\b(TTL|DSCP|MSS|RTT|RTO|BFD|OMP|CWND|RWND|MTU|PMTUD|RST|FIN|SYN|ACK)\b/g;
+  let match;
+  let lastIndex = 0;
+
+  while ((match = abbrevRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    
+    const abbrev = match[1];
+    const glossaryKey = glossaryTerms.find(t => {
+      const entry = GLOSSARY[t];
+      return entry.abbreviation?.toUpperCase() === abbrev || t.toUpperCase() === abbrev;
+    });
+
+    if (glossaryKey) {
+      parts.push(<GlossaryTerm key={key++} term={glossaryKey}>{abbrev}</GlossaryTerm>);
+    } else {
+      parts.push(abbrev);
+    }
+    
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -197,7 +236,7 @@ export const GuidedTroubleshooting: React.FC<GuidedTroubleshootingProps> = ({ re
                     </span>
                   </div>
                   <p className={`text-xs leading-relaxed ${isChecked ? 'text-slate-600' : 'text-slate-400'}`}>
-                    {item.description}
+                    {renderWithGlossaryTerms(item.description)}
                   </p>
 
                   {/* Status Badge + Metric */}
@@ -231,7 +270,7 @@ export const GuidedTroubleshooting: React.FC<GuidedTroubleshootingProps> = ({ re
                     {item.details && (
                       <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
                         <div className="text-[10px] font-semibold text-slate-400 mb-1">📋 Details:</div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">{item.details}</p>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">{renderWithGlossaryTerms(item.details)}</p>
                       </div>
                     )}
 

@@ -163,9 +163,13 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 
 		// ── Packet Inspection endpoints ──────────────────────────
 		protected.GET("/packets/:jobID", packetHandlers.ListPackets)
+		protected.GET("/packets/search/:jobID", packetHandlers.SearchPackets)
 		protected.GET("/packet/:jobID/:packetIndex", packetHandlers.GetPacket)
 		protected.GET("/streams/:jobID", packetHandlers.ListStreams)
 		protected.GET("/stream/:jobID/*streamID", packetHandlers.GetStream)
+		protected.GET("/stream-graph/:jobID/*streamID", packetHandlers.GetStreamGraph)
+		// Alias requested by product spec — same handler as /stream-graph.
+		protected.GET("/stream/graph-data/:jobID/*streamID", packetHandlers.GetStreamGraph)
 
 		// ── PCAP Export & Annotation endpoints ──────────────────
 		protected.POST("/export-pcap/:jobID", exportHandlers.PostExportPCAP)

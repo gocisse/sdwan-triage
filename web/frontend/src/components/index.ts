@@ -18,3 +18,19 @@ export { default as IOGraphView } from './IOGraphView';
 export { default as ExportButton } from './ExportButton';
 export { default as QosDashboard } from './QosDashboard';
 export { default as LatencyMatrix } from './LatencyMatrix';
+export { TCPSequenceGraph } from './TCPSequenceGraph';
+export type {
+  TCPGraphPoint,
+  TCPGraphRTTSample,
+  TCPGraphThroughputBin,
+} from './TCPSequenceGraph';
+export { TCPStreamGraphs } from './TCPStreamGraphs';
+export type { TCPStreamGraphsTab } from './TCPStreamGraphs';
+export { AnalysisBadges } from './AnalysisBadges';
+export { default as PacketSearchBar } from './PacketSearchBar';
+export type { SearchMode, SearchMatch } from './PacketSearchBar';
+export { FilterProvider, useFilterContext } from './FilterContext';
+export { GlobalContextMenuProvider, useContextMenu } from './GlobalContextMenu';
+export type { ContextMenuTarget } from './GlobalContextMenu';
+export { ProtocolHierarchy } from './ProtocolHierarchy';
+export { IOGraph } from './IOGraph';

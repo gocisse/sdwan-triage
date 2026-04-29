@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   X,
   MessageSquare,
@@ -12,8 +12,14 @@ import {
   HelpCircle,
   Copy,
   Filter,
+  TrendingUp,
+  FileText,
+  Loader2,
 } from 'lucide-react';
-import type { Discrepancy, FlowComparisonSummary, ForensicSummary } from '../types';
+import type { Discrepancy, FlowComparisonSummary, ForensicSummary, StreamResponse } from '../types';
+import type { TCPGraphPoint } from './TCPSequenceGraph';
+import { TCPStreamGraphs } from './TCPStreamGraphs';
+import { getAuthToken } from '../api/client';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -24,6 +30,8 @@ interface StreamConversationProps {
   flow: FlowComparisonSummary;
   /** Forensics data for latency information */
   forensics?: ForensicSummary;
+  /** Job ID for fetching stream data (optional - for payload tab) */
+  jobId?: string;
   onClose: () => void;
 }
 
@@ -51,11 +59,53 @@ export const StreamConversation: React.FC<StreamConversationProps> = ({
   allDiscrepancies,
   flow,
   forensics,
+  jobId,
   onClose,
 }) => {
   const [showExplanation, setShowExplanation] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const [copiedFilter, setCopiedFilter] = useState(false);
+  const [activeView, setActiveView] = useState<'conversation' | 'graph' | 'payload'>('conversation');
+  
+  // Payload tab state
+  const [streamData, setStreamData] = useState<StreamResponse | null>(null);
+  const [payloadLoading, setPayloadLoading] = useState(false);
+  const [payloadError, setPayloadError] = useState<string | null>(null);
+  const [payloadView, setPayloadView] = useState<'ascii' | 'hex'>('ascii');
+
+  // Fetch stream data when payload tab is selected
+  const fetchStreamData = useCallback(async () => {
+    if (!jobId) {
+      setPayloadError('Job ID not available for payload view');
+      return;
+    }
+
+    const streamId = `${flow.src_ip}:${flow.src_port}->${flow.dst_ip}:${flow.dst_port}/${flow.protocol}`;
+    setPayloadLoading(true);
+    setPayloadError(null);
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`/api/stream/${jobId}/${encodeURIComponent(streamId)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch stream data');
+      }
+      const data = await response.json();
+      setStreamData(data);
+    } catch (err) {
+      setPayloadError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setPayloadLoading(false);
+    }
+  }, [jobId, flow]);
+
+  useEffect(() => {
+    if (activeView === 'payload' && !streamData && !payloadLoading) {
+      fetchStreamData();
+    }
+  }, [activeView, streamData, payloadLoading, fetchStreamData]);
 
   // Filter discrepancies for this specific flow
   const flowPackets = useMemo(() => {
@@ -92,6 +142,80 @@ export const StreamConversation: React.FC<StreamConversationProps> = ({
     );
     return flowPackets;
   }, [flowPackets, filterType]);
+
+  // TCP sequence graph points derived from the in-memory Discrepancy list.
+  // Only TCP flows produce meaningful data; UDP/ICMP flows yield an empty array
+  // which the graph component renders as an empty-state panel.
+  const graphPoints = useMemo<TCPGraphPoint[]>(() => {
+    if (flow.protocol !== 'TCP' || flowPackets.length === 0) return [];
+
+    // Determine t=0 using the earliest timestamp seen on this flow.
+    // timestamps are stored as formatted strings ("15:04:05.000000"), so we
+    // compute a millisecond offset by parsing the HH:MM:SS.fraction structure.
+    const tsMs = (ts: string): number => {
+      // Accept "HH:MM:SS.ffffff" OR RFC3339. Fallback to 0 on parse failure.
+      const m = /^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(ts);
+      if (m) {
+        const h = parseInt(m[1], 10);
+        const mm = parseInt(m[2], 10);
+        const s = parseInt(m[3], 10);
+        const frac = m[4] ? parseFloat('0.' + m[4]) : 0;
+        return ((h * 3600 + mm * 60 + s) + frac) * 1000;
+      }
+      const parsed = Date.parse(ts);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const sorted = [...flowPackets].sort(
+      (a, b) => tsMs(a.discrepancy.timestamp) - tsMs(b.discrepancy.timestamp),
+    );
+    const t0 = tsMs(sorted[0].discrepancy.timestamp);
+
+    // Track seen (direction, seq, payload) tuples for retransmission detection.
+    const seen = new Set<string>();
+
+    return sorted
+      .filter(p => typeof p.discrepancy.seq_num === 'number')
+      .map<TCPGraphPoint>(p => {
+        const d = p.discrepancy;
+        const seq = d.seq_num ?? 0;
+        const ack = d.ack_num ?? 0;
+        const win = d.window_size ?? 0;
+        const payload = d.payload_len ?? 0;
+        const direction: 'forward' | 'reverse' = p.direction === 'client' ? 'forward' : 'reverse';
+        const flags = d.tcp_flags ?? '';
+        const isSyn = flags.includes('SYN');
+        const isFin = flags.includes('FIN');
+        const isRst = flags.includes('RST');
+        const isDropped = d.state === 'MISSING_B';
+
+        // Retransmission = same (direction, seq, payload) seen more than once;
+        // ignore pure ACKs (payload=0) since they legitimately share seq.
+        let isRetx = false;
+        if (payload > 0) {
+          const key = `${direction}|${seq}|${payload}`;
+          if (seen.has(key)) isRetx = true;
+          else seen.add(key);
+        }
+
+        return {
+          packet_index: d.packet_index,
+          relative_time: Math.max(0, (tsMs(d.timestamp) - t0) / 1000),
+          absolute_time: d.timestamp,
+          direction,
+          seq_num: seq,
+          ack_num: ack,
+          window_size: win,
+          payload_len: payload,
+          flags,
+          is_retransmission: isRetx,
+          is_syn: isSyn,
+          is_fin: isFin,
+          is_rst: isRst,
+          is_dropped: isDropped,
+        };
+      });
+  }, [flowPackets, flow.protocol]);
 
   const wiresharkFilter = `(ip.addr == ${flow.src_ip} && ip.addr == ${flow.dst_ip}) && (${
     flow.protocol === 'TCP' ? 'tcp' : 'udp'
@@ -134,9 +258,58 @@ export const StreamConversation: React.FC<StreamConversationProps> = ({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* View Tabs — Conversation / Graph */}
+            <div className="flex items-center rounded-lg border border-slate-700 bg-slate-800/60 p-0.5">
+              <button
+                onClick={() => setActiveView('conversation')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                  activeView === 'conversation'
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Chat-style conversation view"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Conversation
+              </button>
+              <button
+                onClick={() => setActiveView('graph')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                  activeView === 'graph'
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="TCP performance graphs — Time-Sequence, RTT, Throughput"
+                disabled={flow.protocol !== 'TCP'}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                Graphs
+                {flow.protocol !== 'TCP' && (
+                  <span className="text-[9px] text-slate-500 ml-0.5">(TCP only)</span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveView('payload')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                  activeView === 'payload'
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Reassembled TCP payload — view raw data"
+                disabled={flow.protocol !== 'TCP' || !jobId}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Payload
+                {(flow.protocol !== 'TCP' || !jobId) && (
+                  <span className="text-[9px] text-slate-500 ml-0.5">(TCP only)</span>
+                )}
+              </button>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-slate-400" />
+            </button>
+          </div>
         </div>
 
         {/* Toolbar */}
@@ -185,54 +358,74 @@ export const StreamConversation: React.FC<StreamConversationProps> = ({
           )}
         </div>
 
-        {/* Conversation Timeline */}
+        {/* Body — Conversation Timeline OR TCP Performance Graphs OR Payload */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {/* Endpoint Labels */}
-          <div className="flex items-center justify-between mb-4 px-2">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500/60" />
-              <span className="text-xs font-medium text-red-400">
-                Client: {flow.src_ip}:{flow.src_port}
-              </span>
-            </div>
-            <div className="text-xs text-slate-600">← Time →</div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-blue-400">
-                Server: {flow.dst_ip}:{flow.dst_port}
-              </span>
-              <div className="w-3 h-3 rounded-full bg-blue-500/60" />
-            </div>
-          </div>
-
-          {/* Packets */}
-          <div className="space-y-2">
-            {filteredPackets.length === 0 ? (
-              <div className="text-center text-slate-500 py-8 text-sm">
-                No packets match the current filter
+          {activeView === 'graph' ? (
+            <TCPStreamGraphs
+              points={graphPoints}
+              forwardLabel={`Client → Server (${flow.src_ip}:${flow.src_port})`}
+              reverseLabel={`Server → Client (${flow.dst_ip}:${flow.dst_port})`}
+              title={`TCP Stream — ${flow.src_ip}:${flow.src_port} ↔ ${flow.dst_ip}:${flow.dst_port}`}
+            />
+          ) : activeView === 'payload' ? (
+            <PayloadView
+              streamData={streamData}
+              loading={payloadLoading}
+              error={payloadError}
+              view={payloadView}
+              onViewChange={setPayloadView}
+              flow={flow}
+            />
+          ) : (
+            <>
+              {/* Endpoint Labels */}
+              <div className="flex items-center justify-between mb-4 px-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500/60" />
+                  <span className="text-xs font-medium text-red-400">
+                    Client: {flow.src_ip}:{flow.src_port}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-600">← Time →</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-blue-400">
+                    Server: {flow.dst_ip}:{flow.dst_port}
+                  </span>
+                  <div className="w-3 h-3 rounded-full bg-blue-500/60" />
+                </div>
               </div>
-            ) : (
-              filteredPackets.map((packet, idx) => (
-                <ConversationBubble
-                  key={idx}
-                  packet={packet}
-                  index={idx}
-                  isCompareMode={!!forensics}
-                  showExplanation={showExplanation === idx}
-                  onToggleExplanation={() =>
-                    setShowExplanation(showExplanation === idx ? null : idx)
-                  }
-                />
-              ))
-            )}
-          </div>
 
-          {/* End of Stream Marker */}
-          {filteredPackets.length > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-slate-700/30">
-              <div className="h-px flex-1 bg-slate-700/50" />
-              <span className="text-[10px] text-slate-600 px-2">End of Conversation ({filteredPackets.length} packets shown)</span>
-              <div className="h-px flex-1 bg-slate-700/50" />
-            </div>
+              {/* Packets */}
+              <div className="space-y-2">
+                {filteredPackets.length === 0 ? (
+                  <div className="text-center text-slate-500 py-8 text-sm">
+                    No packets match the current filter
+                  </div>
+                ) : (
+                  filteredPackets.map((packet, idx) => (
+                    <ConversationBubble
+                      key={idx}
+                      packet={packet}
+                      index={idx}
+                      isCompareMode={!!forensics}
+                      showExplanation={showExplanation === idx}
+                      onToggleExplanation={() =>
+                        setShowExplanation(showExplanation === idx ? null : idx)
+                      }
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* End of Stream Marker */}
+              {filteredPackets.length > 0 && (
+                <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-slate-700/30">
+                  <div className="h-px flex-1 bg-slate-700/50" />
+                  <span className="text-[10px] text-slate-600 px-2">End of Conversation ({filteredPackets.length} packets shown)</span>
+                  <div className="h-px flex-1 bg-slate-700/50" />
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -619,4 +812,174 @@ function estimateLatency(d: Discrepancy, forensics: ForensicSummary): number | u
     return forensics.avg_one_way_latency_ms > 0 ? forensics.avg_one_way_latency_ms : undefined;
   }
   return undefined;
+}
+
+// ─── Payload View Component (P1) ──────────────────────────────────
+
+interface PayloadViewProps {
+  streamData: StreamResponse | null;
+  loading: boolean;
+  error: string | null;
+  view: 'ascii' | 'hex';
+  onViewChange: (view: 'ascii' | 'hex') => void;
+  flow: FlowComparisonSummary;
+}
+
+function PayloadView({ streamData, loading, error, view, onViewChange, flow }: PayloadViewProps) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+        <span className="ml-3 text-slate-400">Loading stream data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-6 text-center">
+        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
+        <p className="text-red-400 font-medium">Failed to load payload</p>
+        <p className="text-red-400/70 text-sm mt-1">{error}</p>
+      </div>
+    );
+  }
+
+  if (!streamData) {
+    return (
+      <div className="text-center text-slate-500 py-16">
+        <FileText className="w-12 h-12 mx-auto mb-3 opacity-40" />
+        <p>No stream data available</p>
+      </div>
+    );
+  }
+
+  const hasClientData = streamData.reassembled_client_bytes && streamData.reassembled_client_bytes > 0;
+  const hasServerData = streamData.reassembled_server_bytes && streamData.reassembled_server_bytes > 0;
+
+  if (!hasClientData && !hasServerData) {
+    return (
+      <div className="text-center text-slate-500 py-16">
+        <FileText className="w-12 h-12 mx-auto mb-3 opacity-40" />
+        <p>No payload data in this stream</p>
+        <p className="text-xs mt-2">This may be a control-only stream (SYN/FIN/ACK only)</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* View Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-slate-400">
+          Reassembled TCP Payload
+          {streamData.is_truncated && (
+            <span className="ml-2 text-yellow-400 text-xs">(truncated to 64KB)</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0.5">
+          <button
+            onClick={() => onViewChange('ascii')}
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              view === 'ascii' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            ASCII
+          </button>
+          <button
+            onClick={() => onViewChange('hex')}
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              view === 'hex' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Hex
+          </button>
+        </div>
+      </div>
+
+      {/* Client → Server Payload */}
+      {hasClientData && (
+        <div className="border border-red-700/30 rounded-lg overflow-hidden">
+          <div className="bg-red-900/20 px-4 py-2 border-b border-red-700/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ArrowRight className="w-4 h-4 text-red-400" />
+              <span className="text-sm font-medium text-red-400">
+                Client → Server ({flow.src_ip}:{flow.src_port})
+              </span>
+            </div>
+            <span className="text-xs text-red-400/70">
+              {formatBytes(streamData.reassembled_client_bytes || 0)}
+            </span>
+          </div>
+          <div className="p-4 bg-slate-900/50 max-h-80 overflow-auto">
+            <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap break-all">
+              {view === 'ascii'
+                ? streamData.reassembled_client_ascii || '[No ASCII data]'
+                : formatHexDump(streamData.reassembled_client_hex || '')}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {/* Server → Client Payload */}
+      {hasServerData && (
+        <div className="border border-blue-700/30 rounded-lg overflow-hidden">
+          <div className="bg-blue-900/20 px-4 py-2 border-b border-blue-700/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4 text-blue-400" />
+              <span className="text-sm font-medium text-blue-400">
+                Server → Client ({flow.dst_ip}:{flow.dst_port})
+              </span>
+            </div>
+            <span className="text-xs text-blue-400/70">
+              {formatBytes(streamData.reassembled_server_bytes || 0)}
+            </span>
+          </div>
+          <div className="p-4 bg-slate-900/50 max-h-80 overflow-auto">
+            <pre className="text-xs font-mono text-slate-300 whitespace-pre-wrap break-all">
+              {view === 'ascii'
+                ? streamData.reassembled_server_ascii || '[No ASCII data]'
+                : formatHexDump(streamData.reassembled_server_hex || '')}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {/* Application Detection */}
+      {streamData.application && (
+        <div className="text-center text-xs text-slate-500">
+          Detected Application: <span className="text-slate-300">{streamData.application}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function formatHexDump(hex: string): string {
+  if (!hex) return '[No hex data]';
+  
+  const lines: string[] = [];
+  for (let i = 0; i < hex.length; i += 32) {
+    const chunk = hex.slice(i, i + 32);
+    const offset = (i / 2).toString(16).padStart(8, '0');
+    
+    // Format hex with spaces every 2 chars
+    const hexPart = chunk.match(/.{1,2}/g)?.join(' ') || '';
+    
+    // Convert to ASCII
+    const asciiPart = chunk.match(/.{1,2}/g)?.map(h => {
+      const code = parseInt(h, 16);
+      return code >= 32 && code < 127 ? String.fromCharCode(code) : '.';
+    }).join('') || '';
+    
+    lines.push(`${offset}  ${hexPart.padEnd(48)}  ${asciiPart}`);
+  }
+  
+  return lines.join('\n');
 }

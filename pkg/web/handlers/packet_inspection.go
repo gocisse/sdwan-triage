@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -51,6 +52,15 @@ type StreamResponse struct {
 	ServerData      []StreamSegmentView `json:"server_data"` // Server → Client
 	Packets         []PacketSummary     `json:"packets"`     // List of packet indices
 	WiresharkFilter string              `json:"wireshark_filter"`
+
+	// Reassembled payload (P1) — concatenated TCP payload in sequence order
+	ReassembledClientHex   string `json:"reassembled_client_hex,omitempty"`   // Client→Server payload as hex
+	ReassembledClientASCII string `json:"reassembled_client_ascii,omitempty"` // Client→Server payload as ASCII (printable)
+	ReassembledServerHex   string `json:"reassembled_server_hex,omitempty"`   // Server→Client payload as hex
+	ReassembledServerASCII string `json:"reassembled_server_ascii,omitempty"` // Server→Client payload as ASCII (printable)
+	ReassembledClientBytes int    `json:"reassembled_client_bytes"`           // Total client payload bytes
+	ReassembledServerBytes int    `json:"reassembled_server_bytes"`           // Total server payload bytes
+	IsTruncated            bool   `json:"is_truncated"`                       // True if payload was truncated (>64KB)
 }
 
 // StreamSegmentView represents a segment in the stream
@@ -165,6 +175,43 @@ func (h *PacketInspectionHandlers) GetStream(c *gin.Context) {
 	// Build response
 	response := h.buildStreamResponse(streamID, packets)
 	c.JSON(http.StatusOK, response)
+}
+
+// GetStreamGraph returns TCP time-sequence graph data for a single stream.
+// This powers the Stevens-style sequence graph in the frontend: each point
+// corresponds to one TCP segment with its relative time, sequence number,
+// ack number, advertised window, flags, payload length and retransmission
+// status. Only TCP streams yield meaningful data; non-TCP streams return an
+// empty points array.
+//
+// GET /api/stream/graph/:jobID/*streamID
+func (h *PacketInspectionHandlers) GetStreamGraph(c *gin.Context) {
+	jobID := c.Param("jobID")
+	streamID := c.Param("streamID")
+
+	streamID = strings.TrimPrefix(streamID, "/")
+
+	if h.ensurePacketsLoaded(c, jobID) == nil {
+		return
+	}
+
+	packets := h.packetStore.GetPacketsByStream(streamID)
+	if len(packets) == 0 {
+		normalized := normalizeStreamKey(streamID)
+		if normalized != streamID {
+			packets = h.packetStore.GetPacketsByStream(normalized)
+			if len(packets) > 0 {
+				streamID = normalized
+			}
+		}
+	}
+	if len(packets) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Stream not found"})
+		return
+	}
+
+	graph := analyzer.BuildTCPGraph(streamID, packets)
+	c.JSON(http.StatusOK, graph)
 }
 
 // GetPacket returns detailed packet information with hex dump
@@ -487,6 +534,33 @@ func (h *PacketInspectionHandlers) buildStreamResponse(streamID string, packets 
 		}
 	}
 
+	// TCP Stream Reassembly (P1) — concatenate payloads in sequence order
+	if protocol == "TCP" {
+		const maxPayloadBytes = 64 * 1024 // 64KB limit per direction
+
+		// Reassemble client → server payload
+		clientPayload := reassembleTCPPayload(packets, response.SrcIP, response.SrcPort, maxPayloadBytes)
+		if len(clientPayload) > 0 {
+			response.ReassembledClientBytes = len(clientPayload)
+			response.ReassembledClientHex = hex.EncodeToString(clientPayload)
+			response.ReassembledClientASCII = formatPrintableASCII(clientPayload)
+			if len(clientPayload) >= maxPayloadBytes {
+				response.IsTruncated = true
+			}
+		}
+
+		// Reassemble server → client payload
+		serverPayload := reassembleTCPPayload(packets, response.DstIP, response.DstPort, maxPayloadBytes)
+		if len(serverPayload) > 0 {
+			response.ReassembledServerBytes = len(serverPayload)
+			response.ReassembledServerHex = hex.EncodeToString(serverPayload)
+			response.ReassembledServerASCII = formatPrintableASCII(serverPayload)
+			if len(serverPayload) >= maxPayloadBytes {
+				response.IsTruncated = true
+			}
+		}
+	}
+
 	return response
 }
 
@@ -611,4 +685,116 @@ func (h *PacketInspectionHandlers) SavePacketStoreToJob(jobID string) error {
 		return err
 	}
 	return os.WriteFile(indexPath, data, 0644)
+}
+
+// ─── TCP Stream Reassembly Helpers (P1) ─────────────────────────────────
+
+// tcpSegment represents a TCP segment for reassembly
+type tcpSegment struct {
+	seqNum  uint32
+	payload []byte
+}
+
+// reassembleTCPPayload extracts and concatenates TCP payloads from packets
+// matching the given source IP and port, ordered by sequence number.
+// Handles out-of-order packets and removes duplicate/overlapping data.
+func reassembleTCPPayload(packets []*models.RawPacket, srcIP string, srcPort uint16, maxBytes int) []byte {
+	// Collect segments from matching packets
+	var segments []tcpSegment
+	for _, p := range packets {
+		if p.SrcIP != srcIP || p.SrcPort != srcPort {
+			continue
+		}
+		if p.TransportLayer == nil || p.TransportLayer.PayloadHex == "" {
+			continue
+		}
+
+		// Decode hex payload
+		payload, err := hex.DecodeString(p.TransportLayer.PayloadHex)
+		if err != nil || len(payload) == 0 {
+			continue
+		}
+
+		// Extract sequence number from fields
+		seqNum := extractSeqNum(p.TransportLayer.Fields)
+		segments = append(segments, tcpSegment{seqNum: seqNum, payload: payload})
+	}
+
+	if len(segments) == 0 {
+		return nil
+	}
+
+	// Sort by sequence number
+	sort.Slice(segments, func(i, j int) bool {
+		return segments[i].seqNum < segments[j].seqNum
+	})
+
+	// Reassemble: handle overlaps and gaps
+	var result []byte
+	var nextExpectedSeq uint32 = segments[0].seqNum
+
+	for _, seg := range segments {
+		if len(result) >= maxBytes {
+			break
+		}
+
+		segEnd := seg.seqNum + uint32(len(seg.payload))
+
+		// Skip if this segment is entirely before our expected position (duplicate/retransmit)
+		if segEnd <= nextExpectedSeq {
+			continue
+		}
+
+		// Handle partial overlap: skip already-seen bytes
+		startOffset := 0
+		if seg.seqNum < nextExpectedSeq {
+			startOffset = int(nextExpectedSeq - seg.seqNum)
+		}
+
+		// Append new data
+		newData := seg.payload[startOffset:]
+		remaining := maxBytes - len(result)
+		if len(newData) > remaining {
+			newData = newData[:remaining]
+		}
+		result = append(result, newData...)
+		nextExpectedSeq = seg.seqNum + uint32(len(seg.payload))
+	}
+
+	return result
+}
+
+// extractSeqNum extracts the TCP sequence number from layer fields
+func extractSeqNum(fields map[string]string) uint32 {
+	if fields == nil {
+		return 0
+	}
+	if seqStr, ok := fields["Sequence Number"]; ok {
+		var seq uint32
+		fmt.Sscanf(seqStr, "%d", &seq)
+		return seq
+	}
+	if seqStr, ok := fields["Seq"]; ok {
+		var seq uint32
+		fmt.Sscanf(seqStr, "%d", &seq)
+		return seq
+	}
+	return 0
+}
+
+// formatPrintableASCII converts bytes to a printable ASCII string,
+// replacing non-printable characters with dots.
+func formatPrintableASCII(data []byte) string {
+	var result strings.Builder
+	result.Grow(len(data))
+	for _, b := range data {
+		if b >= 32 && b < 127 {
+			result.WriteByte(b)
+		} else if b == '\n' || b == '\r' || b == '\t' {
+			result.WriteByte(b)
+		} else {
+			result.WriteByte('.')
+		}
+	}
+	return result.String()
 }

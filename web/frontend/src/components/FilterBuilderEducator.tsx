@@ -15,6 +15,7 @@ import {
   Play,
 } from 'lucide-react';
 import type { Discrepancy } from '../types';
+import { useFilterContext } from './FilterContext';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -334,11 +335,26 @@ export const FilterBuilderEducator: React.FC<FilterBuilderEducatorProps> = ({ di
 // ─── Filter Scratchpad ────────────────────────────────────────────
 
 const FilterScratchpad: React.FC<{ discrepancies: Discrepancy[] }> = ({ discrepancies }) => {
-  const [filterText, setFilterText] = useState('');
+  // Filter text lives in a shared context so that right-click → "Apply as
+  // Filter" from anywhere in the comparison view can seed this scratchpad.
+  // When no FilterProvider is mounted (e.g. in tests) the hook returns a
+  // no-op implementation and the scratchpad falls back to local state.
+  const { filterText, setFilterText } = useFilterContext();
   const [verified, setVerified] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [copiedFilter, setCopiedFilter] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Re-verify and focus the scratchpad whenever filterText changes from
+  // an external source (e.g. a right-click "Apply as Filter" action).
+  // We use a ref to compare prior text so we only respond to true changes.
+  const prevFilterText = useRef(filterText);
+  useEffect(() => {
+    if (prevFilterText.current !== filterText) {
+      prevFilterText.current = filterText;
+      setVerified(null);
+    }
+  }, [filterText]);
 
   const parsed = useMemo(() => parseComparisonFilter(filterText), [filterText]);
   const englishTranslation = useMemo(() => translateFilterToEnglish(filterText), [filterText]);
