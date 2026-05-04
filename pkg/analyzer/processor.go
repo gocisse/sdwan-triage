@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -17,8 +18,15 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+// ErrOOM is returned when the OOM guard detects heap usage above MaxHeapBytes.
+var ErrOOM = fmt.Errorf("analysis aborted: input too large")
+
+// DefaultMaxHeapBytes is the default memory ceiling (1 GB).
+const DefaultMaxHeapBytes uint64 = 1 << 30
+
 // Processor handles PCAP file processing
 type Processor struct {
+	MaxHeapBytes         uint64 // OOM guard threshold; 0 = use DefaultMaxHeapBytes
 	dnsAnalyzer          *detector.DNSAnalyzer
 	tcpAnalyzer          *detector.TCPAnalyzer
 	arpAnalyzer          *detector.ARPAnalyzer
@@ -63,6 +71,13 @@ type Processor struct {
 	verbose              bool
 	skippedPackets       int
 	errorCount           int
+}
+
+func (p *Processor) maxHeap() uint64 {
+	if p.MaxHeapBytes > 0 {
+		return p.MaxHeapBytes
+	}
+	return DefaultMaxHeapBytes
 }
 
 // NewProcessor creates a new PCAP processor with all analyzers
@@ -240,6 +255,14 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		if packetCount%10000 == 0 {
 			elapsed := time.Since(startTime)
 			fmt.Printf("\rProcessed %d packets (%.0f pps)...", packetCount, float64(packetCount)/elapsed.Seconds())
+
+			// OOM guard: abort if heap usage exceeds MaxHeapBytes (default 1 GB)
+			var memStats runtime.MemStats
+			runtime.ReadMemStats(&memStats)
+			if memStats.HeapAlloc > p.maxHeap() {
+				return fmt.Errorf("%w: heap usage %d MB exceeds limit %d MB after %d packets",
+					ErrOOM, memStats.HeapAlloc/(1024*1024), p.maxHeap()/(1024*1024), packetCount)
+			}
 
 			// Periodic cleanup of stale stream data to prevent memory bloat
 			// Evict streams that haven't been seen for 30+ seconds
@@ -889,6 +912,7 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 	// Finalize GeoIP analysis
 	report.LocationSummary = p.geoipAnalyzer.GetLocationSummary()
 	report.LocationIPs = p.geoipAnalyzer.GetCountryIPs()
+	report.LocationDetails = p.geoipAnalyzer.GetLocationDetails()
 }
 
 // finalizeVoIPAnalysis populates VoIP analysis results

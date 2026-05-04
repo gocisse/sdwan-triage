@@ -457,6 +457,33 @@ func (g *GeoIPAnalyzer) GetIPLocation(ip string) *GeoLocation {
 	return g.ipLocationCache[ip]
 }
 
+// GetLocationDetails returns per-IP geo details (only public IPs with valid coords).
+// Capped at 500 entries to keep the JSON response manageable.
+func (g *GeoIPAnalyzer) GetLocationDetails() []models.GeoIPDetail {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	const maxEntries = 500
+	details := make([]models.GeoIPDetail, 0, len(g.ipLocationCache))
+	for ip, loc := range g.ipLocationCache {
+		if loc.IsPrivate || (loc.Latitude == 0 && loc.Longitude == 0) {
+			continue
+		}
+		details = append(details, models.GeoIPDetail{
+			IP:          ip,
+			Country:     loc.Country,
+			CountryCode: loc.CountryCode,
+			City:        loc.City,
+			Latitude:    loc.Latitude,
+			Longitude:   loc.Longitude,
+		})
+		if len(details) >= maxEntries {
+			break
+		}
+	}
+	return details
+}
+
 // isPrivateIP checks if an IP is in a private range
 func isPrivateIP(ip net.IP) bool {
 	if ip == nil {

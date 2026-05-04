@@ -1,1 +1,6 @@
 *.pcap
+node_modules/
+build/
+coverage.out
+coverage.html
+cmd/sdwan-triage/dist/

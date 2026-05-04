@@ -118,6 +118,12 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 
 	router.MaxMultipartMemory = maxUploadSize
 
+	// ── API Rate Limiting ──────────────────────────────────────
+	router.Use(middleware.RateLimitMiddleware(middleware.RateLimitConfig{
+		RequestsPerMinute: 100,
+	}))
+	log.Println("[INIT] API rate limiting enabled (100 req/min per IP)")
+
 	// ── Enterprise Integrations ─────────────────────────────────
 	intCfg := initIntegrations(store, intOpts)
 
@@ -152,6 +158,7 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 		protected.GET("/results/:id", h.GetResults)
 		protected.GET("/results/:id/json", h.DownloadJSON)
 		protected.GET("/results/:id/html", h.DownloadHTML)
+		protected.GET("/results/:id/pdf", h.DownloadPDF)
 		protected.GET("/history", h.ListHistory)
 		protected.DELETE("/history/:id", h.DeleteAnalysis)
 		protected.GET("/topology/:id", h.GetTopology)

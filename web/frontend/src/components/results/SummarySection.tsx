@@ -10,6 +10,7 @@ import {
   Loader2,
   Lightbulb,
   Download,
+  FileText,
   Sparkles,
   Map,
   HelpCircle,
@@ -49,7 +50,7 @@ export function SummarySection({
   onFilterChange,
   onOpenWizard,
 }: SummarySectionProps) {
-  const [downloading, setDownloading] = useState<'json' | 'html' | null>(null);
+  const [downloading, setDownloading] = useState<'json' | 'html' | 'pdf' | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showTopology, setShowTopology] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -138,6 +139,17 @@ export function SummarySection({
           >
             {downloading === 'html' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
             Report
+          </button>
+          <button
+            onClick={() => {
+              if (!id || downloading) return;
+              window.open(`/api/results/${id}/pdf`, '_blank');
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-slate-700/50 text-slate-400 border border-slate-600/30 hover:text-white transition-colors"
+            title="Open print-friendly report (use browser Print → Save as PDF)"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            PDF
           </button>
           <button
             onClick={() => setHelpOpen(true)}

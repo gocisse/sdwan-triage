@@ -36,6 +36,21 @@ function fireAuthExpired() {
   window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 }
 
+// ── Global error notification hook ───────────────────────────────
+// Set by ToastProvider at mount time so fetchApi can push errors
+// without importing React.
+let _onApiError: ((err: { title: string; message?: string }) => void) | null = null;
+
+export function setGlobalApiErrorHandler(
+  handler: ((err: { title: string; message?: string }) => void) | null
+) {
+  _onApiError = handler;
+}
+
+function notifyError(title: string, message?: string) {
+  _onApiError?.({ title, message });
+}
+
 // Custom error class for API errors
 export class ApiError extends Error {
   status: number;
@@ -103,23 +118,28 @@ async function fetchApi<T>(
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) {
+      notifyError(error.message, error.details);
       throw error;
     }
     
     // Network error or other fetch error
     if (error instanceof TypeError) {
-      throw new ApiError(
+      const err = new ApiError(
         'Network error. Please check your connection.',
         0,
         error.message
       );
+      notifyError(err.message, err.details);
+      throw err;
     }
     
-    throw new ApiError(
+    const err = new ApiError(
       'An unexpected error occurred',
       0,
       String(error)
     );
+    notifyError(err.message, err.details);
+    throw err;
   }
 }
 

@@ -67,12 +67,16 @@ func (r *DetectorRegistry) AnalyzePacket(packet gopacket.Packet, state *models.A
 		for _, analyzer := range r.IndependentAnalyzers {
 			go func(a PacketAnalyzer) {
 				defer wg.Done()
-				defer r.recoverDetector(a.Name())
 				// Lock report for the write phase — AnalysisState LRU caches
 				// are already thread-safe from Step 1 refactor.
+				// Use a nested func so defer Unlock runs before recoverDetector,
+				// preventing deadlock if the analyzer panics while holding the lock.
 				report.Mu.Lock()
-				a.Analyze(packet, state, report)
-				report.Mu.Unlock()
+				func() {
+					defer report.Mu.Unlock()
+					defer r.recoverDetector(a.Name())
+					a.Analyze(packet, state, report)
+				}()
 			}(analyzer)
 		}
 

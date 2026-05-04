@@ -3,7 +3,7 @@
 
 # ─── VARIABLES ──────────────────────────────────────────────
 BINARY_NAME  := sdwan-triage
-VERSION      ?= 6.0.0
+VERSION      ?= 6.0.0.2
 BUILD_DIR    := build
 DIST_DIR     := cmd/sdwan-triage/dist
 FRONTEND_DIR := web/frontend

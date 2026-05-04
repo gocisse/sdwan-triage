@@ -54,6 +54,7 @@ type TriageReport struct {
 	SDWANVendors    []SDWANVendor       `json:"sdwan_vendors,omitempty"`
 	LocationSummary map[string]int      `json:"location_summary,omitempty"`
 	LocationIPs     map[string][]string `json:"location_ips,omitempty"`
+	LocationDetails []GeoIPDetail       `json:"location_details,omitempty"`
 
 	// Packet Loss Metrics
 	PacketLoss *PacketLossMetrics `json:"packet_loss,omitempty"`
@@ -660,6 +661,16 @@ type SDWANVendor struct {
 	PacketCount int     `json:"packet_count"`
 	FirstSeen   float64 `json:"first_seen"`
 	LastSeen    float64 `json:"last_seen"`
+}
+
+// GeoIPDetail represents per-IP geographic location for the map visualization
+type GeoIPDetail struct {
+	IP          string  `json:"ip"`
+	Country     string  `json:"country"`
+	CountryCode string  `json:"country_code"`
+	City        string  `json:"city,omitempty"`
+	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
 }
 
 // LANProtocolFindings contains all LAN protocol detection results

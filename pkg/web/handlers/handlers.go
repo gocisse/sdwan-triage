@@ -369,6 +369,32 @@ func (h *Handlers) DownloadHTML(c *gin.Context) {
 	c.File(htmlPath)
 }
 
+// DownloadPDF serves the HTML report in a print-friendly window.
+// The browser's native Print-to-PDF handles conversion — no heavy Go PDF libs needed.
+func (h *Handlers) DownloadPDF(c *gin.Context) {
+	id := c.Param("id")
+
+	htmlPath, err := h.store.GetResultsFile(id, "html")
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "HTML report not found — cannot generate PDF",
+		})
+		return
+	}
+
+	htmlBytes, err := os.ReadFile(htmlPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read report"})
+		return
+	}
+
+	// Inject auto-print script at end of </body>
+	printScript := `<script>window.onload=function(){window.print()}</script></body>`
+	content := strings.Replace(string(htmlBytes), "</body>", printScript, 1)
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(content))
+}
+
 // ListHistory returns the analysis history
 func (h *Handlers) ListHistory(c *gin.Context) {
 	// Parse pagination parameters
