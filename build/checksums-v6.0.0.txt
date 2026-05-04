@@ -1,4 +1,0 @@
-a1bf9eeb9215ff077e6636eecf645ac13f03b7b0f66973d800d13aef5a88fcc2  sdwan-triage-v6.0.0-darwin-amd64.tar.gz
-8193f54000f0dbcd1c0202522e7c2fe3e736156b3e2edf73dde690c5d8369f5d  sdwan-triage-v6.0.0-darwin-arm64.tar.gz
-2d2a483f57bb1f51f024818b5a2abcfa5b2a437854e921457c4ad91488161d53  sdwan-triage-v6.0.0-linux-amd64.tar.gz
-eff112392aafd063b6fb2e24b7bf765a2333058f6ca6f3506e278461935f26d1  sdwan-triage-v6.0.0-windows-amd64.zip
