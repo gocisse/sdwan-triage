@@ -257,6 +257,8 @@ export interface TLSCertInfo {
   not_after?: string;
   is_expired?: boolean;
   is_self_signed?: boolean;
+  ja3_hash?: string;
+  ja3s_hash?: string;
 }
 
 // Bandwidth report
@@ -939,6 +941,9 @@ export interface Discrepancy {
   decrypted_summary?: string;
   decrypted_data?: string;
   tls_version?: string;
+  // JA3/JA3S TLS fingerprinting
+  ja3_hash?: string;
+  ja3s_hash?: string;
 }
 
 export interface FieldChange {

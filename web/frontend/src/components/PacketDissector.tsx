@@ -762,6 +762,37 @@ function parsePacketLayers(d: Discrepancy): ProtocolLayer[] {
     });
   }
 
+  // JA3/JA3S TLS Fingerprinting Layer — shown when hashes are available
+  if (d.ja3_hash || d.ja3s_hash) {
+    const ja3Fields: ProtocolField[] = [];
+
+    if (d.ja3_hash) {
+      ja3Fields.push({
+        name: 'JA3 Hash (Client)',
+        value: d.ja3_hash,
+        offset: 0,
+        length: 0,
+        explanation: 'JA3 is an MD5 fingerprint of the TLS ClientHello parameters (version, cipher suites, extensions, elliptic curves, point formats). It uniquely identifies the TLS client configuration — useful for detecting specific applications (Chrome, curl, Python requests) or malware families, even when traffic is encrypted. Identical JA3 hashes across different IPs may indicate the same software or malware variant.',
+      });
+    }
+
+    if (d.ja3s_hash) {
+      ja3Fields.push({
+        name: 'JA3S Hash (Server)',
+        value: d.ja3s_hash,
+        offset: 0,
+        length: 0,
+        explanation: 'JA3S is an MD5 fingerprint of the TLS ServerHello parameters (version, cipher suite, extensions). Combined with JA3, the JA3/JA3S pair creates a unique fingerprint for a specific client-server TLS negotiation. A known-malicious JA3S hash indicates a C2 server responding with a characteristic configuration.',
+      });
+    }
+
+    layers.push({
+      name: '🔐 TLS Fingerprinting (JA3)',
+      expanded: true,
+      fields: ja3Fields,
+    });
+  }
+
   return layers;
 }
 

@@ -13,6 +13,8 @@ import { DrillDownSection } from '../components/results/DrillDownSection';
 import { SummarySkeleton } from '../components/ui/Skeletons';
 import { KeyboardShortcutsModal } from '../components/ui/KeyboardShortcutsModal';
 import { OnboardingTour } from '../components/onboarding/OnboardingTour';
+import { TimeRangeProvider } from '../contexts/TimeRangeContext';
+import { TimelineScrubber } from '../components/ui/TimelineScrubber';
 
 export function ResultsPage() {
   const { id } = useParams<{ id: string }>();
@@ -67,6 +69,25 @@ export function ResultsPage() {
       clearFilter: () => setFilterText(''),
     };
   }, [filterText, parsedFilter, filteredResults, isFiltered, results]);
+
+  // Compute capture time span from timeline events for TimeRangeProvider
+  const captureSpan = useMemo(() => {
+    const events = results?.timeline || [];
+    let min = Infinity;
+    let max = -Infinity;
+    for (const ev of events) {
+      if (!ev.timestamp) continue;
+      const ts = new Date(ev.timestamp).getTime() / 1000;
+      if (ts > 0 && isFinite(ts)) {
+        if (ts < min) min = ts;
+        if (ts > max) max = ts;
+      }
+    }
+    if (!isFinite(min) || !isFinite(max) || max <= min) {
+      return { start: 0, end: 1 };
+    }
+    return { start: min, end: max };
+  }, [results?.timeline]);
 
   // Extract detected vendor names for runbook integration
   const detectedVendors = useMemo(() => {
@@ -137,6 +158,7 @@ export function ResultsPage() {
   }
 
   return (
+    <TimeRangeProvider captureStart={captureSpan.start} captureEnd={captureSpan.end}>
     <div className="space-y-6">
       {/* Onboarding Tour (first visit only) */}
       <OnboardingTour />
@@ -159,6 +181,11 @@ export function ResultsPage() {
         onOpenWizard={() => {}}
       />
 
+
+      {/* ─── Timeline Scrubber (global time filter) ─────────────── */}
+      {captureSpan.start > 0 && (
+        <TimelineScrubber results={results} />
+      )}
 
       {/* ─── View Mode Tabs: Findings | Forensic ───────────────── */}
       <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-800/60 border border-slate-700/50 w-fit">
@@ -234,5 +261,6 @@ export function ResultsPage() {
         />
       )}
     </div>
+    </TimeRangeProvider>
   );
 }

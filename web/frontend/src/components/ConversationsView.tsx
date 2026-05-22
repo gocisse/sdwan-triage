@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ArrowUpDown, ArrowRightLeft, Filter, Search } from 'lucide-react';
 import type { AnalysisResults } from '../types';
+import { useTimeFilteredData } from '../hooks/useTimeFilteredData';
 
 interface ConversationsViewProps {
   results: AnalysisResults;
@@ -27,6 +28,8 @@ interface ConversationRow {
   protocols: string;
   durationSec: number;
   throughputBps: number;
+  firstSeen: number;
+  lastSeen: number;
 }
 
 type SortKey = 'srcIp' | 'dstIp' | 'packets' | 'bytes' | 'durationSec' | 'throughputBps';
@@ -113,6 +116,8 @@ function buildConversations(results: AnalysisResults): ConversationRow[] {
       protocols: Array.from(conv.protocols).sort().join(', '),
       durationSec,
       throughputBps,
+      firstSeen: conv.firstSeen,
+      lastSeen: conv.lastSeen,
     });
   }
 
@@ -143,7 +148,15 @@ function formatThroughput(bps: number): string {
 }
 
 export default function ConversationsView({ results, onFilterConversation }: ConversationsViewProps) {
-  const allRows = useMemo(() => buildConversations(results), [results]);
+  const allRowsRaw = useMemo(() => buildConversations(results), [results]);
+
+  // Global time-range filter: include rows whose time span overlaps the selection
+  const getRowTimestamp = useCallback((r: ConversationRow) => {
+    // Use firstSeen as representative timestamp; items without timestamps pass through
+    return r.firstSeen > 0 ? r.firstSeen : 0;
+  }, []);
+  const allRows = useTimeFilteredData(allRowsRaw, getRowTimestamp);
+
   const [sortKey, setSortKey] = useState<SortKey>('bytes');
   const [sortAsc, setSortAsc] = useState(false);
   const [search, setSearch] = useState('');

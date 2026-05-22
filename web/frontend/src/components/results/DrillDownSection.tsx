@@ -107,7 +107,11 @@ export function DrillDownSection({
           />
         )}
         {forensicSubTab === 'geoip' && (
-          <GeoIPMap details={effectiveResults.location_details ?? []} />
+          <GeoIPMap
+            details={effectiveResults.location_details ?? []}
+            trafficFlows={effectiveResults.traffic_analysis}
+            timeline={effectiveResults.timeline}
+          />
         )}
         {forensicSubTab === 'search' && (
           <PacketSearchBar

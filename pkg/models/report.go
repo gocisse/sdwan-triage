@@ -362,6 +362,8 @@ type TLSCertInfo struct {
 	IsExpired    bool     `json:"is_expired"`
 	IsSelfSigned bool     `json:"is_self_signed"`
 	DNSNames     []string `json:"dns_names,omitempty"`
+	JA3Hash      string   `json:"ja3_hash,omitempty"`
+	JA3SHash     string   `json:"ja3s_hash,omitempty"`
 }
 
 type TrafficFlow struct {

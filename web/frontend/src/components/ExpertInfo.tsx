@@ -1,8 +1,9 @@
 // Expert Info Stream — aggregated anomaly list with click-to-jump to packet hex view
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { AlertTriangle, Shield, Activity, Search, ExternalLink, Wifi } from 'lucide-react';
 import type { AnalysisResults } from '../types';
+import { useTimeFilteredData } from '../hooks/useTimeFilteredData';
 
 interface ExpertInfoProps {
   results: AnalysisResults;
@@ -273,7 +274,16 @@ const catIcons: Record<string, typeof Shield> = {
 };
 
 export default function ExpertInfo({ results, onJumpToPacket, onFollowStream }: ExpertInfoProps) {
-  const allEntries = useMemo(() => buildExpertEntries(results), [results]);
+  const allEntriesRaw = useMemo(() => buildExpertEntries(results), [results]);
+
+  // Global time-range filter
+  const getEntryTimestamp = useCallback((e: ExpertEntry) => {
+    if (!e.timestamp) return 0;
+    const ts = new Date(e.timestamp).getTime() / 1000;
+    return ts > 0 && isFinite(ts) ? ts : 0;
+  }, []);
+  const allEntries = useTimeFilteredData(allEntriesRaw, getEntryTimestamp);
+
   const [sevFilter, setSevFilter] = useState<SeverityFilter>('all');
   const [catFilter, setCatFilter] = useState<CategoryFilter>('all');
   const [search, setSearch] = useState('');

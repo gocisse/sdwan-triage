@@ -4,6 +4,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { Activity, BarChart3, Clock, ZoomIn } from 'lucide-react';
 import type { AnalysisResults } from '../types';
+import { useTimeRangeOptional } from '../contexts/TimeRangeContext';
 
 interface IOGraphViewProps {
   results: AnalysisResults;
@@ -118,9 +119,11 @@ interface ChartProps {
   mode: MetricMode;
   onBucketClick?: (bucket: TimeBucket) => void;
   bucketSizeSec: number;
+  highlightStart?: number;
+  highlightEnd?: number;
 }
 
-function Chart({ buckets, mode, onBucketClick, bucketSizeSec }: ChartProps) {
+function Chart({ buckets, mode, onBucketClick, bucketSizeSec, highlightStart, highlightEnd }: ChartProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -213,6 +216,10 @@ function Chart({ buckets, mode, onBucketClick, bucketSizeSec }: ChartProps) {
         const intensity = v / maxVal;
         const fill = intensity > 0.8 ? '#ef4444' : intensity > 0.5 ? '#f59e0b' : intensity > 0.2 ? '#3b82f6' : '#22d3ee';
 
+        // Dim bars outside the time range selection
+        const inRange = highlightStart === undefined || highlightEnd === undefined ||
+          (b.time + bucketSizeSec >= highlightStart && b.time <= highlightEnd);
+
         return (
           <g key={i}>
             {/* Invisible hover target (full height) */}
@@ -229,7 +236,7 @@ function Chart({ buckets, mode, onBucketClick, bucketSizeSec }: ChartProps) {
               x={x} y={y} width={Math.max(barW - 0.5, 1)} height={barH}
               fill={isHovered ? '#a78bfa' : fill}
               rx={barW > 3 ? 1 : 0}
-              opacity={isHovered ? 1 : 0.85}
+              opacity={isHovered ? 1 : inRange ? 0.85 : 0.2}
               className="transition-all duration-75"
             />
           </g>
@@ -296,6 +303,7 @@ function formatBytesShort(bytes: number): string {
 export default function IOGraphView({ results, onTimeDrillDown }: IOGraphViewProps) {
   const [mode, setMode] = useState<MetricMode>('packets');
   const [bucketSizeSec, setBucketSizeSec] = useState<number>(() => autoBucketSize(results));
+  const timeCtx = useTimeRangeOptional();
 
   const buckets = useMemo(
     () => buildTimeSeries(results, bucketSizeSec),
@@ -399,6 +407,8 @@ export default function IOGraphView({ results, onTimeDrillDown }: IOGraphViewPro
           mode={mode}
           onBucketClick={handleBucketClick}
           bucketSizeSec={bucketSizeSec}
+          highlightStart={timeCtx?.isTimeFiltered ? timeCtx.timeRange.start : undefined}
+          highlightEnd={timeCtx?.isTimeFiltered ? timeCtx.timeRange.end : undefined}
         />
       </div>
 

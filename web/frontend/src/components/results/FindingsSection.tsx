@@ -8,11 +8,55 @@ import {
   X,
   ArrowRightLeft,
   Info,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import type { AnalysisResults } from '../../types';
 import { FindingCard, IssueSidebar, type CategoryId, VirtualizedFlowTable, type Column } from '../dashboard';
 import { issueKnowledgeBase, getSeverityConfig } from '../../data/knowledgeBase';
 import { getActiveFindings, wizardSymptoms } from '../../data/wizardData';
+import { useTimeRangeOptional } from '../../contexts/TimeRangeContext';
+import { applyTimeFilter } from '../../hooks/applyTimeFilter';
+
+// ─── JA3 Hash Cell ────────────────────────────────────────────
+
+function JA3HashCell({ hash, type }: { hash: string; type: 'ja3' | 'ja3s' }) {
+  const [copied, setCopied] = useState(false);
+  const abuseUrl = type === 'ja3'
+    ? `https://sslbl.abuse.ch/ja3-fingerprints/${hash}/`
+    : `https://sslbl.abuse.ch/ja3s-fingerprints/${hash}/`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(hash).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="font-mono text-cyan-300 text-[11px] truncate max-w-[120px]" title={hash}>
+        {hash}
+      </span>
+      <button
+        onClick={handleCopy}
+        className="p-0.5 hover:bg-slate-600/50 rounded transition-colors flex-shrink-0"
+        title={copied ? 'Copied!' : 'Copy hash'}
+      >
+        <Copy className="w-3 h-3 text-slate-400" />
+      </button>
+      <a
+        href={abuseUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="p-0.5 hover:bg-slate-600/50 rounded transition-colors flex-shrink-0"
+        title={`Lookup on abuse.ch (${type.toUpperCase()})`}
+      >
+        <ExternalLink className="w-3 h-3 text-blue-400" />
+      </a>
+    </div>
+  );
+}
 
 // ─── Main Exported Component ──────────────────────────────────
 
@@ -40,6 +84,15 @@ export function FindingsSection({
   onFollowStream,
 }: FindingsSectionProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Apply global time-range filter
+  const timeCtx = useTimeRangeOptional();
+  const timeFilteredResults = useMemo(() => {
+    if (!timeCtx?.isTimeFiltered) return results;
+    return applyTimeFilter(results, timeCtx.timeRange);
+  }, [results, timeCtx?.isTimeFiltered, timeCtx?.timeRange]);
+
+  const effectiveResults = isFiltered && filteredResults ? filteredResults : timeFilteredResults;
 
   return (
     <>
@@ -71,7 +124,7 @@ export function FindingsSection({
         {/* Findings List */}
         <div className="flex-1 min-w-0 space-y-4">
           <FindingsPanel
-            results={isFiltered && filteredResults ? filteredResults : results}
+            results={effectiveResults}
             category={activeCategory}
             eli5Mode={eli5Mode}
             detectedVendors={detectedVendors}
@@ -210,14 +263,14 @@ function TroubleshootingGuidance({ results, onOpenWizard }: TroubleshootingGuida
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
                         {info.count} occurrence{info.count !== 1 ? 's' : ''}
-                        {knowledge?.eli5 ? ` — ${knowledge.eli5.slice(0, 80)}${knowledge.eli5.length > 80 ? '...' : ''}` : ''}
+                        {knowledge?.eli5 ? ` — ${knowledge.eli5}` : ''}
                       </p>
                       {knowledge?.how?.[0] && (
-                        <p className="text-[10px] text-slate-500 mt-1.5 flex items-start gap-1">
-                          <span className="text-green-500 font-bold">1.</span>
-                          <span className="truncate">{knowledge.how[0]}</span>
+                        <p className="text-[10px] text-slate-500 mt-1.5 flex items-start gap-1 leading-relaxed">
+                          <span className="text-green-500 font-bold shrink-0">1.</span>
+                          <span>{knowledge.how[0]}</span>
                         </p>
                       )}
                     </div>
@@ -363,6 +416,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           eli5Mode={eli5Mode}
           findingKey="ddos_syn_flood"
           detectedVendors={detectedVendors}
+          packetContext={ddos[0] ? { srcIp: ddos[0].source_ip, dstIp: ddos[0].target_ip } : undefined}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -413,6 +467,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           description={`${portScans.length} port scanning activit${portScans.length > 1 ? 'ies' : 'y'} from ${[...new Set(portScans.map(p => p.source_ip))].length} source${[...new Set(portScans.map(p => p.source_ip))].length > 1 ? 's' : ''}`}
           knowledge={issueKnowledgeBase.port_scan}
           eli5Mode={eli5Mode}
+          packetContext={portScans[0] ? { srcIp: portScans[0].source_ip, dstIp: portScans[0].target_ip } : undefined}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -646,6 +701,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           description={`${c2.length} host${c2.length > 1 ? 's are' : ' is'} exhibiting Command-and-Control beaconing patterns`}
           knowledge={issueKnowledgeBase.c2_beaconing}
           eli5Mode={eli5Mode}
+          packetContext={c2[0] ? { srcIp: c2[0].source_ip, dstIp: c2[0].dest_ip, dstPort: c2[0].dest_port } : undefined}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -696,6 +752,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           description={`${retrans.length.toLocaleString()} retransmitted packets detected across ${[...new Set(retrans.map(r => r.src_ip))].length} sources`}
           knowledge={issueKnowledgeBase.tcp_retransmission}
           eli5Mode={eli5Mode}
+          packetContext={retrans[0] ? { srcIp: retrans[0].src_ip, dstIp: retrans[0].dst_ip, srcPort: retrans[0].src_port, dstPort: retrans[0].dst_port } : undefined}
           details={
             <div className="space-y-4">
               {/* Summary stats */}
@@ -819,6 +876,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           description={`${failedH.length} failed out of ${total} total handshakes (${failRate}% failure rate)`}
           knowledge={issueKnowledgeBase.tcp_handshake_failure}
           eli5Mode={eli5Mode}
+          packetContext={failedH[0] ? { srcIp: failedH[0].src_ip, dstIp: failedH[0].dst_ip, srcPort: failedH[0].src_port, dstPort: failedH[0].dst_port } : undefined}
           details={
             <div className="space-y-4">
               <div className="grid grid-cols-4 gap-3">
@@ -1646,18 +1704,71 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
       );
     }
 
-    // TLS Certs (all)
+    // TLS Certs (all) — with JA3/JA3S fingerprinting display
     const allCerts = results.tls_certs || [];
+    const certsWithJA3 = allCerts.filter(c => c.ja3_hash || c.ja3s_hash);
     if (allCerts.length > 0 && category === 'application') {
       findings.push(
         <FindingCard
           key="all-certs"
-          title="TLS Certificates Observed"
+          title="TLS Certificates &amp; JA3 Fingerprints"
           severity="Info"
           count={allCerts.length}
-          description={`${allCerts.length} TLS certificate${allCerts.length > 1 ? 's' : ''} observed in the capture`}
+          description={`${allCerts.length} TLS certificate${allCerts.length > 1 ? 's' : ''} observed${certsWithJA3.length > 0 ? `, ${certsWithJA3.length} with JA3 fingerprints` : ''}`}
           knowledge={null}
           eli5Mode={eli5Mode}
+          details={
+            <div className="space-y-3">
+              {/* JA3 explanation banner */}
+              {certsWithJA3.length > 0 && (
+                <div className="flex items-start gap-2 p-2.5 bg-cyan-900/20 border border-cyan-700/30 rounded-lg text-xs text-slate-300">
+                  <span className="text-cyan-400 flex-shrink-0 mt-0.5">🔐</span>
+                  <span>
+                    <strong className="text-cyan-300">JA3/JA3S</strong> fingerprints identify TLS client &amp; server configurations.
+                    Use them to detect specific applications (Chrome, curl, Python) or known malware families — even in encrypted traffic.
+                  </span>
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Server</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">Subject</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">JA3 (Client)</th>
+                      <th className="px-3 py-2 text-left text-slate-500 font-medium">JA3S (Server)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {allCerts.map((cert, i) => (
+                      <tr key={i} className="hover:bg-slate-700/20">
+                        <td className="px-3 py-2 font-mono text-slate-400">
+                          {cert.server_name || cert.server_ip}:{cert.server_port}
+                        </td>
+                        <td className="px-3 py-2 text-slate-400 max-w-[200px] truncate" title={cert.subject}>
+                          {cert.subject || '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          {cert.ja3_hash ? (
+                            <JA3HashCell hash={cert.ja3_hash} type="ja3" />
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {cert.ja3s_hash ? (
+                            <JA3HashCell hash={cert.ja3s_hash} type="ja3s" />
+                          ) : (
+                            <span className="text-slate-600">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
         />
       );
     }

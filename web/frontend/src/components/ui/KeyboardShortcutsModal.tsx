@@ -12,11 +12,13 @@ const shortcuts: { key: string; label: string; description: string }[] = [
   { key: 'j', label: 'j', description: 'Move to next finding / packet row' },
   { key: 'k', label: 'k', description: 'Move to previous finding / packet row' },
   { key: 'Enter', label: 'Enter', description: 'Open / expand selected item' },
-  { key: 'Escape', label: 'Esc', description: 'Close modal or deselect' },
+  { key: 'Escape', label: 'Esc', description: 'Close modal / reset time range' },
   { key: '/', label: '/', description: 'Focus the filter bar' },
   { key: '?', label: '?', description: 'Toggle this help overlay' },
   { key: 'f', label: 'f', description: 'Switch to Findings view' },
   { key: 'd', label: 'd', description: 'Switch to Forensic Drill-Down view' },
+  { key: '[', label: '[', description: 'Nudge time range start forward 1s' },
+  { key: ']', label: ']', description: 'Nudge time range end backward 1s' },
 ];
 
 export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps) {

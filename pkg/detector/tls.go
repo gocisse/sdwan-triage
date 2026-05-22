@@ -13,11 +13,19 @@ import (
 )
 
 // TLSAnalyzer handles TLS packet analysis
-type TLSAnalyzer struct{}
+type TLSAnalyzer struct {
+	// ja3PerFlow stores JA3 hash keyed by "dstIP:dstPort" (server-side flow key)
+	ja3PerFlow map[string]string
+	// ja3sPerFlow stores JA3S hash keyed by "srcIP:srcPort" (server-side flow key)
+	ja3sPerFlow map[string]string
+}
 
 // NewTLSAnalyzer creates a new TLS analyzer
 func NewTLSAnalyzer() *TLSAnalyzer {
-	return &TLSAnalyzer{}
+	return &TLSAnalyzer{
+		ja3PerFlow:  make(map[string]string),
+		ja3sPerFlow: make(map[string]string),
+	}
 }
 
 // Analyze processes TLS packets and extracts certificate info
@@ -71,6 +79,18 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		state.SetTLSSNI(flowKey, sni)
 	}
 
+	// Compute JA3 from ClientHello
+	if ja3 := ComputeJA3(payload); ja3 != nil {
+		t.ja3PerFlow[flowKey] = ja3.Hash
+	}
+
+	// Compute JA3S from ServerHello
+	if ja3s := ComputeJA3S(payload); ja3s != nil {
+		// ServerHello comes from server → src is server
+		serverFlowKey := fmt.Sprintf("%s:%d", srcIP, srcPort)
+		t.ja3sPerFlow[serverFlowKey] = ja3s.Hash
+	}
+
 	// Extract ALPN protocols and detect HTTP/2
 	alpnProtocols := extractALPN(payload)
 	for _, proto := range alpnProtocols {
@@ -122,6 +142,8 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				IsExpired:    time.Now().After(cert.NotAfter),
 				IsSelfSigned: cert.Issuer.String() == cert.Subject.String(),
 				DNSNames:     cert.DNSNames,
+				JA3Hash:      t.ja3PerFlow[flowKey],
+				JA3SHash:     t.ja3sPerFlow[flowKey],
 			}
 
 			report.TLSCerts = append(report.TLSCerts, certInfo)
