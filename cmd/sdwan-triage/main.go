@@ -20,7 +20,7 @@ import (
 
 // Build-time variables — stamped via -ldflags "-X main.version=... -X main.buildCommit=... -X main.buildDate=..."
 var (
-	version     = "6.0.0"
+	version     = "6.1.0.0"
 	buildCommit = "unknown"
 	buildDate   = "unknown"
 )

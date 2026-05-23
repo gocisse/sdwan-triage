@@ -4,3 +4,4 @@ build/
 coverage.out
 coverage.html
 cmd/sdwan-triage/dist/
+cmd/sdwan-triage/data/

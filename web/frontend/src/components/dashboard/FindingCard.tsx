@@ -24,7 +24,13 @@ export function FindingCard({ title, severity, count, description, details, know
   const [expanded, setExpanded] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [wsModalData, setWsModalData] = useState<WiresharkComparisonData | null>(null);
-  const [checkedSteps, setCheckedSteps] = useState<Set<string>>(new Set());
+  const [checkedSteps, setCheckedSteps] = useState<Set<string>>(() => {
+    if (!findingKey) return new Set();
+    try {
+      const saved = localStorage.getItem(`forensic-checklist-${findingKey}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
   const [showWhyDetail, setShowWhyDetail] = useState(false);
   const sev = getSeverityConfig(severity);
 
@@ -77,6 +83,9 @@ export function FindingCard({ title, severity, count, description, details, know
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      if (findingKey) {
+        try { localStorage.setItem(`forensic-checklist-${findingKey}`, JSON.stringify([...next])); } catch {}
+      }
       return next;
     });
   };
@@ -285,9 +294,40 @@ export function FindingCard({ title, severity, count, description, details, know
                     </div>
                   )}
 
-                  {/* Fallback: no commands available */}
+                  {/* Generic CLI fallback when no vendor runbook and no specific commands */}
                   {!vendorRunbookData && (!knowledge.commands || knowledge.commands.length === 0) && (
-                    <p className="text-xs text-slate-500 italic ml-6">No specific CLI commands available for this finding. Check your device logs and interface counters.</p>
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-slate-500 italic mb-2">No vendor-specific commands detected. Use these generic diagnostics:</p>
+                      {getGenericCLICommands(findingKey).map((cmd, i) => {
+                        const stepId = `cmd-${i}`;
+                        return (
+                          <div key={i} className="flex items-start gap-2 group">
+                            <input
+                              type="checkbox"
+                              checked={checkedSteps.has(stepId)}
+                              onChange={() => toggleCheck(stepId)}
+                              className="w-3.5 h-3.5 mt-1.5 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30 shrink-0"
+                            />
+                            <div className="flex-1 flex items-center gap-2">
+                              <code className="flex-1 text-xs bg-slate-950 text-green-300 px-3 py-2 rounded font-mono border border-slate-800">
+                                {cmd}
+                              </code>
+                              <button
+                                onClick={() => copyCommand(cmd)}
+                                className="p-1.5 rounded hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Copy command"
+                              >
+                                {copiedCmd === cmd ? (
+                                  <Check className="w-3.5 h-3.5 text-green-400" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5 text-slate-500" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -428,4 +468,104 @@ function getRiskWarning(findingKey: string): string | null {
     ntp_amplification: 'Do not block NTP entirely — disable monlist/mode 7 on your NTP servers instead.',
   };
   return warnings[findingKey] || null;
+}
+
+// ─── Generic CLI Fallback Commands ──────────────────────────
+
+function getGenericCLICommands(findingKey?: string): string[] {
+  const category = findingKey?.split('_')[0] || '';
+  const categoryCommands: Record<string, string[]> = {
+    ddos: [
+      'show interface counters (check for high input rates)',
+      'show access-lists (verify ACL hit counters)',
+      'show policy-map interface (check QoS drops)',
+      'show connection count (session table utilization)',
+    ],
+    tcp: [
+      'show interface <intf> (check CRC errors, input/output drops)',
+      'show running-config | include mtu (verify MTU settings)',
+      'show ip route (check routing for blackholes)',
+      'show log | include err (recent error messages)',
+    ],
+    packet: [
+      'show interface <intf> (check input/output errors and drops)',
+      'show buffers (check for buffer misses)',
+      'show controllers <intf> (hardware-level counters)',
+      'show running-config interface <intf> (verify config)',
+    ],
+    dns: [
+      'show ip dns view (verify DNS config)',
+      'nslookup <suspicious_domain> (test resolution)',
+      'show ip name-server (check configured resolvers)',
+      'show logging | include DNS (DNS-related log events)',
+    ],
+    tls: [
+      'show crypto session (verify active sessions)',
+      'show running-config | section crypto (TLS/SSL config)',
+      'openssl s_client -connect <host>:443 (test TLS from CLI)',
+      'show log | include TLS|SSL (TLS-related errors)',
+    ],
+    arp: [
+      'show arp (view ARP table for duplicates)',
+      'show mac address-table (find MAC to port mapping)',
+      'show ip dhcp snooping binding (verify IP-MAC bindings)',
+      'show spanning-tree (check for loops causing ARP issues)',
+    ],
+    port: [
+      'show access-lists (check for blocked traffic)',
+      'show log | include denied (recent ACL denies)',
+      'show connection (active session table)',
+      'show interface summary (traffic overview)',
+    ],
+    high: [
+      'show interface <intf> (check utilization and errors)',
+      'traceroute <destination> (identify slow hop)',
+      'show ip sla statistics (SLA probe results)',
+      'show policy-map interface (QoS queue drops)',
+    ],
+    c2: [
+      'show connection address <suspect_ip> (active sessions)',
+      'show log | include <suspect_ip> (historical activity)',
+      'show arp | include <suspect_ip> (find MAC address)',
+      'show mac address-table address <mac> (find switch port)',
+    ],
+    vrrp: [
+      'show vrrp brief (VRRP state on all interfaces)',
+      'show vrrp detail (timers, priority, preempt config)',
+      'show log | include VRRP (state change history)',
+      'show interface <vrrp_intf> (check link for errors)',
+    ],
+    hsrp: [
+      'show standby brief (HSRP state summary)',
+      'show standby detail (timers, priority, preempt)',
+      'show log | include HSRP (state change events)',
+      'show interface <hsrp_intf> (link health)',
+    ],
+    bfd: [
+      'show bfd neighbors detail (session state and timers)',
+      'show interface <intf> counters errors (link errors)',
+      'show log | include BFD (flap history)',
+      'show ip route (verify routing convergence)',
+    ],
+    ike: [
+      'show crypto ikev2 sa detail (IKE tunnel status)',
+      'show crypto ipsec sa (IPsec SA counters)',
+      'show log | include CRYPTO|IKE (tunnel events)',
+      'show interface tunnel <n> (tunnel interface state)',
+    ],
+    ntp: [
+      'show ntp status (synchronization state)',
+      'show ntp associations detail (peer list)',
+      'show running-config | include ntp (NTP config)',
+      'show log | include NTP (NTP events)',
+    ],
+  };
+
+  return categoryCommands[category] || [
+    'show running-config (full device configuration)',
+    'show interface summary (all interfaces status)',
+    'show log (recent system events)',
+    'show version (device model and software version)',
+    'show ip route summary (routing table overview)',
+  ];
 }

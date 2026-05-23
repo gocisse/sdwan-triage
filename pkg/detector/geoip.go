@@ -11,6 +11,16 @@ import (
 	"github.com/oschwald/maxminddb-golang"
 )
 
+// embeddedGeoIPData holds the MMDB bytes when embedded in the binary.
+// Set via SetEmbeddedGeoIPData() from main's init().
+var embeddedGeoIPData []byte
+
+// SetEmbeddedGeoIPData stores the embedded MMDB database bytes for use
+// by NewGeoIPAnalyzer. Call this before any analyzer is created (e.g. in init()).
+func SetEmbeddedGeoIPData(data []byte) {
+	embeddedGeoIPData = data
+}
+
 // Common paths where the GeoIP MMDB database may be located
 var geoIPSearchPaths = []string{
 	"./data/GeoLite2-City.mmdb",
@@ -83,8 +93,20 @@ func NewGeoIPAnalyzer() *GeoIPAnalyzer {
 	return g
 }
 
-// tryLoadMMDB searches common paths for a MaxMind MMDB database
+// tryLoadMMDB attempts to load the MMDB from embedded data first,
+// then searches common disk paths as a fallback.
 func (g *GeoIPAnalyzer) tryLoadMMDB() {
+	// Try embedded data first (self-contained binary)
+	if len(embeddedGeoIPData) > 0 {
+		db, err := maxminddb.FromBytes(embeddedGeoIPData)
+		if err == nil {
+			g.mmdb = db
+			g.mmdbPath = "(embedded)"
+			return
+		}
+	}
+
+	// Fall back to disk-based lookup
 	for _, path := range geoIPSearchPaths {
 		if path == "" {
 			continue

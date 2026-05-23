@@ -41,6 +41,132 @@ const HIGHLIGHT_STYLES: Record<string, string> = {
   blue: 'bg-blue-900/40 text-blue-200',
 };
 
+// ─── TCP Header Diagram ─────────────────────────────────────
+
+interface TCPHeaderDiagramProps {
+  findingKey: string;
+}
+
+function getHighlightFields(findingKey: string): { field: string; color: string }[] {
+  switch (findingKey) {
+    case 'ddos_syn_flood':
+    case 'tcp_handshake_failure':
+      return [
+        { field: 'flags', color: '#ef4444' },
+        { field: 'syn', color: '#ef4444' },
+      ];
+    case 'tcp_retransmission':
+    case 'packet_loss':
+      return [
+        { field: 'seq', color: '#f59e0b' },
+        { field: 'ack', color: '#f59e0b' },
+      ];
+    case 'high_latency':
+      return [
+        { field: 'window', color: '#8b5cf6' },
+      ];
+    case 'tls_weakness':
+      return [
+        { field: 'dstport', color: '#ef4444' },
+      ];
+    case 'port_scan':
+      return [
+        { field: 'dstport', color: '#ef4444' },
+        { field: 'flags', color: '#f59e0b' },
+        { field: 'syn', color: '#f59e0b' },
+      ];
+    default:
+      return [];
+  }
+}
+
+function TCPHeaderDiagram({ findingKey }: TCPHeaderDiagramProps) {
+  const highlights = getHighlightFields(findingKey);
+  const isHighlighted = (field: string) => highlights.find(h => h.field === field);
+
+  const hl = (field: string, defaultFill: string) => {
+    const match = isHighlighted(field);
+    return match ? match.color : defaultFill;
+  };
+
+  const hlStroke = (field: string) => {
+    const match = isHighlighted(field);
+    return match ? match.color : '#475569';
+  };
+
+  const hlText = (field: string, defaultColor: string) => {
+    const match = isHighlighted(field);
+    return match ? '#ffffff' : defaultColor;
+  };
+
+  // Only show for TCP-related findings
+  const tcpFindings = ['ddos_syn_flood', 'tcp_handshake_failure', 'tcp_retransmission', 'packet_loss', 'high_latency', 'tls_weakness', 'port_scan'];
+  if (!tcpFindings.includes(findingKey)) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-700/60 bg-slate-900/80 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">TCP Header Structure</span>
+        {highlights.length > 0 && (
+          <span className="text-[9px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
+            Highlighted = relevant to this finding
+          </span>
+        )}
+      </div>
+      <svg viewBox="0 0 480 200" className="w-full" style={{ maxHeight: '180px' }}>
+        {/* Bit scale */}
+        <text x="0" y="12" fontSize="8" fill="#64748b" fontFamily="monospace">0</text>
+        <text x="112" y="12" fontSize="8" fill="#64748b" fontFamily="monospace" textAnchor="middle">4</text>
+        <text x="150" y="12" fontSize="8" fill="#64748b" fontFamily="monospace" textAnchor="middle">8</text>
+        <text x="240" y="12" fontSize="8" fill="#64748b" fontFamily="monospace" textAnchor="middle">16</text>
+        <text x="360" y="12" fontSize="8" fill="#64748b" fontFamily="monospace" textAnchor="middle">24</text>
+        <text x="475" y="12" fontSize="8" fill="#64748b" fontFamily="monospace" textAnchor="end">31</text>
+
+        {/* Row 1: Source Port | Destination Port */}
+        <rect x="0" y="18" width="240" height="28" rx="2" fill={hl('srcport', '#1e293b')} fillOpacity="0.6" stroke={hlStroke('srcport')} strokeWidth="1" />
+        <text x="120" y="36" fontSize="9" fill={hlText('srcport', '#94a3b8')} textAnchor="middle" fontFamily="monospace">Source Port (16 bits)</text>
+        <rect x="240" y="18" width="240" height="28" rx="2" fill={hl('dstport', '#1e293b')} fillOpacity="0.6" stroke={hlStroke('dstport')} strokeWidth="1" />
+        <text x="360" y="36" fontSize="9" fill={hlText('dstport', '#94a3b8')} textAnchor="middle" fontFamily="monospace">Destination Port (16 bits)</text>
+
+        {/* Row 2: Sequence Number */}
+        <rect x="0" y="48" width="480" height="28" rx="2" fill={hl('seq', '#1e293b')} fillOpacity="0.6" stroke={hlStroke('seq')} strokeWidth="1" />
+        <text x="240" y="66" fontSize="9" fill={hlText('seq', '#94a3b8')} textAnchor="middle" fontFamily="monospace">Sequence Number (32 bits)</text>
+
+        {/* Row 3: Acknowledgment Number */}
+        <rect x="0" y="78" width="480" height="28" rx="2" fill={hl('ack', '#1e293b')} fillOpacity="0.6" stroke={hlStroke('ack')} strokeWidth="1" />
+        <text x="240" y="96" fontSize="9" fill={hlText('ack', '#94a3b8')} textAnchor="middle" fontFamily="monospace">Acknowledgment Number (32 bits)</text>
+
+        {/* Row 4: Data Offset | Reserved | Flags | Window Size */}
+        <rect x="0" y="108" width="60" height="28" rx="2" fill="#1e293b" fillOpacity="0.6" stroke="#475569" strokeWidth="1" />
+        <text x="30" y="126" fontSize="7" fill="#64748b" textAnchor="middle" fontFamily="monospace">Offset</text>
+        <rect x="60" y="108" width="40" height="28" rx="2" fill="#1e293b" fillOpacity="0.6" stroke="#475569" strokeWidth="1" />
+        <text x="80" y="126" fontSize="7" fill="#64748b" textAnchor="middle" fontFamily="monospace">Rsvd</text>
+        <rect x="100" y="108" width="140" height="28" rx="2" fill={hl('flags', '#1e293b')} fillOpacity={isHighlighted('flags') ? '0.3' : '0.6'} stroke={hlStroke('flags')} strokeWidth={isHighlighted('flags') ? '2' : '1'} />
+        <text x="170" y="122" fontSize="8" fill={hlText('flags', '#94a3b8')} textAnchor="middle" fontFamily="monospace" fontWeight={isHighlighted('flags') ? 'bold' : 'normal'}>Flags (9 bits)</text>
+        {/* Individual flag bits */}
+        <text x="110" y="133" fontSize="6" fill={hlText('flags', '#64748b')} fontFamily="monospace">URG ACK PSH RST</text>
+        <text x="175" y="133" fontSize="6" fill={hlText('syn', isHighlighted('syn') ? '#ffffff' : '#64748b')} fontFamily="monospace" fontWeight={isHighlighted('syn') ? 'bold' : 'normal'}>SYN</text>
+        <text x="197" y="133" fontSize="6" fill={hlText('flags', '#64748b')} fontFamily="monospace">FIN</text>
+        {isHighlighted('syn') && (
+          <rect x="172" y="126" width="22" height="10" rx="2" fill={hl('syn', 'none')} fillOpacity="0.25" stroke={hl('syn', 'none')} strokeWidth="1" />
+        )}
+        <rect x="240" y="108" width="240" height="28" rx="2" fill={hl('window', '#1e293b')} fillOpacity="0.6" stroke={hlStroke('window')} strokeWidth="1" />
+        <text x="360" y="126" fontSize="9" fill={hlText('window', '#94a3b8')} textAnchor="middle" fontFamily="monospace">Window Size (16 bits)</text>
+
+        {/* Row 5: Checksum | Urgent Pointer */}
+        <rect x="0" y="138" width="240" height="28" rx="2" fill="#1e293b" fillOpacity="0.6" stroke="#475569" strokeWidth="1" />
+        <text x="120" y="156" fontSize="9" fill="#94a3b8" textAnchor="middle" fontFamily="monospace">Checksum (16 bits)</text>
+        <rect x="240" y="138" width="240" height="28" rx="2" fill="#1e293b" fillOpacity="0.6" stroke="#475569" strokeWidth="1" />
+        <text x="360" y="156" fontSize="9" fill="#94a3b8" textAnchor="middle" fontFamily="monospace">Urgent Pointer (16 bits)</text>
+
+        {/* Row 6: Options */}
+        <rect x="0" y="168" width="480" height="24" rx="2" fill="#1e293b" fillOpacity="0.4" stroke="#334155" strokeWidth="1" strokeDasharray="3,2" />
+        <text x="240" y="184" fontSize="8" fill="#64748b" textAnchor="middle" fontFamily="monospace" fontStyle="italic">Options (variable length, padded to 32 bits)</text>
+      </svg>
+    </div>
+  );
+}
+
 // ─── Component ──────────────────────────────────────────────
 
 export function WiresharkComparisonModal({ data, onClose }: WiresharkComparisonModalProps) {
@@ -163,6 +289,9 @@ export function WiresharkComparisonModal({ data, onClose }: WiresharkComparisonM
               <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Wireshark View</h3>
               <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded">Mock Packet List</span>
             </div>
+
+            {/* TCP Header Diagram */}
+            <TCPHeaderDiagram findingKey={data.findingKey} />
 
             {/* Mock Wireshark Packet List */}
             <div className="rounded-lg border border-slate-700/60 overflow-hidden">

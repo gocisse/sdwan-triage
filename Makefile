@@ -3,7 +3,7 @@
 
 # ─── VARIABLES ──────────────────────────────────────────────
 BINARY_NAME  := sdwan-triage
-VERSION      ?= 6.0.0.2
+VERSION      ?= 6.1.0.0
 BUILD_DIR    := build
 DIST_DIR     := cmd/sdwan-triage/dist
 FRONTEND_DIR := web/frontend
@@ -40,8 +40,21 @@ copy-dist: build-frontend
 	cp -r $(FRONTEND_DIR)/dist/* $(DIST_DIR)/
 	@echo "✓ Frontend copied to $(DIST_DIR)"
 
+# ─── GEOIP EMBED ──────────────────────────────────────────
+copy-geoip:
+	@if [ -f "$(GEOIP_DB)" ]; then \
+		echo "🌍 Embedding GeoIP database into binary..."; \
+		mkdir -p cmd/sdwan-triage/data; \
+		cp $(GEOIP_DB) cmd/sdwan-triage/data/GeoLite2-City.mmdb; \
+		echo "✓ GeoIP database staged for embed"; \
+	else \
+		echo "⚠️  GeoIP database not found at $(GEOIP_DB) — binary will use disk fallback"; \
+		mkdir -p cmd/sdwan-triage/data; \
+		touch cmd/sdwan-triage/data/.gitkeep; \
+	fi
+
 # ─── BACKEND ───────────────────────────────────────────────
-build-backend:
+build-backend: copy-geoip
 	@echo "🔨 Building $(BINARY_NAME) v$(VERSION) ($(COMMIT))..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/sdwan-triage
@@ -130,7 +143,7 @@ github-release: release
 		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-darwin-arm64.tar.gz \
 		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-windows-amd64.zip \
 		$(BUILD_DIR)/checksums-v$(VERSION).txt \
-		--title "v$(VERSION) - Forensic Gold Standard" \
+		--title "v$(VERSION) - The Wireshark Academy Release" \
 		--notes-file RELEASE_NOTES.md \
 		--draft
 	@echo "✓ GitHub release v$(VERSION) created (draft)"
