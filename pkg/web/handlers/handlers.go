@@ -24,17 +24,19 @@ import (
 // IntegrationConfig holds optional enterprise integration components.
 // All fields are optional — if nil, the corresponding integration is skipped.
 type IntegrationConfig struct {
-	Metrics      *metrics.MetricsCollector
-	Automation   *integration.AutomationEngine
-	Intelligence *intelligence.CustomerDB
-	Ticketing    integration.TicketingSystem
+	Metrics        *metrics.MetricsCollector
+	Automation     *integration.AutomationEngine
+	Intelligence   *intelligence.CustomerDB
+	Ticketing      integration.TicketingSystem
+	ThreatIntelDir string // Directory containing STIX 2.1 feed JSON files
 }
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
-	store        *storage.Storage
-	upgrader     websocket.Upgrader
-	integrations *IntegrationConfig
+	store          *storage.Storage
+	upgrader       websocket.Upgrader
+	integrations   *IntegrationConfig
+	threatIntelDir string
 }
 
 // NewHandlers creates a new handlers instance
@@ -60,6 +62,19 @@ func (h *Handlers) SetIntegrations(cfg *IntegrationConfig) {
 	if cfg != nil {
 		h.integrations = cfg
 	}
+}
+
+// SetThreatIntelDir configures the directory containing STIX 2.1 threat feeds.
+func (h *Handlers) SetThreatIntelDir(dir string) {
+	h.threatIntelDir = dir
+	if h.integrations != nil {
+		h.integrations.ThreatIntelDir = dir
+	}
+}
+
+// GetThreatIntelDir returns the configured threat intel feeds directory.
+func (h *Handlers) GetThreatIntelDir() string {
+	return h.threatIntelDir
 }
 
 // HealthResponse represents the health check response

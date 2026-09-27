@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Lightbulb, Terminal, BookOpen, Copy, Check, Zap, Eye, Wrench, Shield, AlertTriangle, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lightbulb, Terminal, BookOpen, Copy, Check, Zap, Eye, Wrench, Shield, ShieldAlert, AlertTriangle, ChevronRight } from 'lucide-react';
+import type { ThreatIntelMatch } from '../../types';
 import { getSeverityConfig, type IssueKnowledge } from '../../data/knowledgeBase';
 import { ConfidenceBadge, computeConfidence, type ConfidenceLevel } from './ConfidenceBadge';
 import { VendorRunbookPanel } from './VendorRunbook';
@@ -18,9 +19,10 @@ interface FindingCardProps {
   detectedVendors?: string[];
   wiresharkFilter?: string;
   packetContext?: { srcIp?: string; dstIp?: string; srcPort?: number; dstPort?: number; protocol?: string };
+  threatIntelMatches?: ThreatIntelMatch[];
 }
 
-export function FindingCard({ title, severity, count, description, details, knowledge, eli5Mode, findingKey, detectedVendors, wiresharkFilter: wiresharkFilterOverride, packetContext }: FindingCardProps) {
+export function FindingCard({ title, severity, count, description, details, knowledge, eli5Mode, findingKey, detectedVendors, wiresharkFilter: wiresharkFilterOverride, packetContext, threatIntelMatches }: FindingCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [wsModalData, setWsModalData] = useState<WiresharkComparisonData | null>(null);
@@ -120,6 +122,12 @@ export function FindingCard({ title, severity, count, description, details, know
                 </span>
               )}
               {confidenceLevel && <ConfidenceBadge level={confidenceLevel} />}
+              {threatIntelMatches && threatIntelMatches.length > 0 && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+                  <ShieldAlert className="w-3 h-3" />
+                  Threat Intel
+                </span>
+              )}
             </div>
             <p className="text-slate-400 text-xs mt-1 line-clamp-1">{description}</p>
           </div>
@@ -384,6 +392,57 @@ export function FindingCard({ title, severity, count, description, details, know
                   )}
                 </div>
               </div>
+
+              {/* ═══════════════ Threat Intelligence ═══════════════ */}
+              {threatIntelMatches && threatIntelMatches.length > 0 && (
+                <div className="rounded-lg border border-red-500/30 overflow-hidden">
+                  <div className="bg-red-500/10 px-4 py-3 border-b border-red-500/20 flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                      <ShieldAlert className="w-4 h-4 text-red-400" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Threat Intelligence Match</h4>
+                      <p className="text-[10px] text-red-300/70">{threatIntelMatches.length} indicator{threatIntelMatches.length !== 1 ? 's' : ''} matched from feeds</p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3 bg-slate-900/40">
+                    {threatIntelMatches.map((match, idx) => (
+                      <div key={idx} className="bg-slate-800/60 rounded-lg p-3 border border-slate-700/40 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <code className="text-xs font-mono text-red-300 bg-red-500/10 px-2 py-0.5 rounded">{match.value}</code>
+                          <span className="text-[10px] text-slate-500">({match.type})</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                          <div>
+                            <span className="text-slate-500">Threat Type: </span>
+                            <span className="text-red-300 font-medium">{match.threat_type}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Confidence: </span>
+                            <span className={`font-medium ${
+                              match.confidence === 'High' ? 'text-red-400' :
+                              match.confidence === 'Medium' ? 'text-amber-400' : 'text-slate-400'
+                            }`}>{match.confidence}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Source: </span>
+                            <span className="text-blue-300">{match.source}</span>
+                          </div>
+                          {match.first_seen && (
+                            <div>
+                              <span className="text-slate-500">First Seen: </span>
+                              <span className="text-slate-300">{match.first_seen.split('T')[0]}</span>
+                            </div>
+                          )}
+                        </div>
+                        {match.description && (
+                          <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-700/30 pt-2 mt-1">{match.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* ═══════════════ Confidence + Actions ═══════════════ */}
               <div className="flex items-center gap-3 flex-wrap">

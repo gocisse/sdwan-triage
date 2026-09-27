@@ -14,11 +14,23 @@ import { SummarySkeleton } from '../components/ui/Skeletons';
 import { KeyboardShortcutsModal } from '../components/ui/KeyboardShortcutsModal';
 import { OnboardingTour } from '../components/onboarding/OnboardingTour';
 import { TimeRangeProvider } from '../contexts/TimeRangeContext';
+import { FilterProvider, useGlobalFilter } from '../contexts/FilterContext';
 import { TimelineScrubber } from '../components/ui/TimelineScrubber';
+import { GlobalFilterBar } from '../components/GlobalFilterBar';
+import { filterResults } from '../utils/filterResults';
 
 export function ResultsPage() {
+  return (
+    <FilterProvider>
+      <ResultsPageInner />
+    </FilterProvider>
+  );
+}
+
+function ResultsPageInner() {
   const { id } = useParams<{ id: string }>();
   const { results, isLoading, error, loadStatus, loadResults } = useAnalysis();
+  const { filters, isActive: isGlobalFilterActive } = useGlobalFilter();
   const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
   const [eli5Mode, setEli5Mode] = useState(false);
 
@@ -51,11 +63,17 @@ export function ResultsPage() {
 
   // Parse filter and compute filtered results
   const parsedFilter = useMemo(() => parseFilter(filterText), [filterText]);
-  const filteredResults = useMemo(
-    () => results ? applyFilter(results, parsedFilter) : null,
-    [results, parsedFilter]
+
+  // Apply global IP/port/protocol filter first, then forensic display filter on top
+  const globallyFiltered = useMemo(
+    () => results ? filterResults(results, filters) : null,
+    [results, filters]
   );
-  const isFiltered = parsedFilter.valid && parsedFilter.tokens.length > 0;
+  const filteredResults = useMemo(
+    () => globallyFiltered ? applyFilter(globallyFiltered, parsedFilter) : null,
+    [globallyFiltered, parsedFilter]
+  );
+  const isFiltered = (parsedFilter.valid && parsedFilter.tokens.length > 0) || isGlobalFilterActive;
 
   // Filter context value
   const filterCtxValue = useMemo<ForensicFilterContextValue | null>(() => {
@@ -166,6 +184,9 @@ export function ResultsPage() {
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
+      {/* ─── Global Filter Bar (IP / Port / Protocol) ─────────── */}
+      <GlobalFilterBar />
+
       {/* ─── Summary Section (top bar, exec summary, topology, filter bar) ─── */}
       <SummarySection
         id={id}
@@ -264,3 +285,4 @@ export function ResultsPage() {
     </TimeRangeProvider>
   );
 }
+

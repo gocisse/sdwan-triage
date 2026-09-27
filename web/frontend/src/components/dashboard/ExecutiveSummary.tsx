@@ -4,6 +4,7 @@ import { getSeverityConfig } from '../../data/knowledgeBase';
 
 interface ExecutiveSummaryProps {
   results: AnalysisResults;
+  isFiltered?: boolean;
 }
 
 interface IssueSummary {
@@ -104,7 +105,7 @@ function generateSummary(results: AnalysisResults, issues: IssueSummary[]): stri
   return parts.join('. ') + '.';
 }
 
-export function ExecutiveSummary({ results }: ExecutiveSummaryProps) {
+export function ExecutiveSummary({ results, isFiltered }: ExecutiveSummaryProps) {
   const issues = computeIssues(results);
   const summary = generateSummary(results, issues);
   const criticalCount = issues.filter(i => i.severity === 'Critical').length;
@@ -132,6 +133,9 @@ export function ExecutiveSummary({ results }: ExecutiveSummaryProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-lg font-semibold text-white">Network Health Assessment</h2>
+                {isFiltered && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Filtered</span>
+                )}
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getSeverityConfig(riskLevel).bg} ${getSeverityConfig(riskLevel).text}`}>
                   {riskLevel} Risk
                 </span>

@@ -208,7 +208,7 @@ export function SummarySection({
 
       {/* Executive Summary */}
       <div data-tour="summary">
-        <ExecutiveSummary results={results} />
+        <ExecutiveSummary results={isFiltered && filteredResults ? filteredResults : results} isFiltered={isFiltered} />
       </div>
 
       {/* Network Topology Map */}

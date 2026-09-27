@@ -1,0 +1,101 @@
+{
+  "type": "bundle",
+  "id": "bundle--example-threat-feed-001",
+  "objects": [
+    {
+      "type": "indicator",
+      "id": "indicator--001",
+      "name": "Known C2 Server",
+      "description": "Command and Control server associated with APT campaigns",
+      "pattern": "[ipv4-addr:value = '185.220.101.1']",
+      "pattern_type": "stix",
+      "valid_from": "2025-01-15T00:00:00Z",
+      "created": "2025-01-15T12:00:00Z",
+      "modified": "2025-06-01T00:00:00Z",
+      "labels": ["malicious-activity", "command-and-control"],
+      "confidence": 85,
+      "external_references": [
+        {
+          "source_name": "AlienVault OTX",
+          "url": "https://otx.alienvault.com"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--002",
+      "name": "Ransomware Distribution Domain",
+      "description": "Domain used for ransomware payload distribution",
+      "pattern": "[domain-name:value = 'malware.testcategory.com']",
+      "pattern_type": "stix",
+      "valid_from": "2025-03-10T00:00:00Z",
+      "created": "2025-03-10T08:00:00Z",
+      "modified": "2025-05-20T00:00:00Z",
+      "labels": ["ransomware"],
+      "confidence": 92,
+      "external_references": [
+        {
+          "source_name": "Abuse.ch URLhaus",
+          "url": "https://urlhaus.abuse.ch"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--003",
+      "name": "Botnet C2 Node",
+      "description": "Known Mirai botnet command node",
+      "pattern": "[ipv4-addr:value = '45.33.32.156']",
+      "pattern_type": "stix",
+      "valid_from": "2024-11-01T00:00:00Z",
+      "created": "2024-11-01T00:00:00Z",
+      "modified": "2025-04-15T00:00:00Z",
+      "labels": ["botnet", "malicious-activity"],
+      "confidence": 70,
+      "external_references": [
+        {
+          "source_name": "Shadowserver Foundation",
+          "url": "https://www.shadowserver.org"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--004",
+      "name": "Phishing Campaign Domain",
+      "description": "Domain impersonating legitimate banking service for credential theft",
+      "pattern": "[domain-name:value = 'phishing.testcategory.com']",
+      "pattern_type": "stix",
+      "valid_from": "2025-02-20T00:00:00Z",
+      "created": "2025-02-20T14:30:00Z",
+      "modified": "2025-05-01T00:00:00Z",
+      "labels": ["phishing"],
+      "confidence": 95,
+      "external_references": [
+        {
+          "source_name": "PhishTank",
+          "url": "https://www.phishtank.com"
+        }
+      ]
+    },
+    {
+      "type": "indicator",
+      "id": "indicator--005",
+      "name": "Malware Hash - Emotet Loader",
+      "description": "SHA-256 hash of Emotet malware loader binary",
+      "pattern": "[file:hashes.'SHA-256' = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855']",
+      "pattern_type": "stix",
+      "valid_from": "2025-04-01T00:00:00Z",
+      "created": "2025-04-01T00:00:00Z",
+      "modified": "2025-04-01T00:00:00Z",
+      "labels": ["malware", "trojan"],
+      "confidence": 99,
+      "external_references": [
+        {
+          "source_name": "VirusTotal",
+          "url": "https://www.virustotal.com"
+        }
+      ]
+    }
+  ]
+}

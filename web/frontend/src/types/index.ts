@@ -138,6 +138,9 @@ export interface AnalysisResults {
   // Interface Stability / Flapping Detection
   stability_findings?: StabilityFinding[];
 
+  // Threat Intelligence Matches (STIX 2.1 feeds)
+  threat_intel_matches?: ThreatIntelMatch[];
+
   // VoIP
   voip_analysis?: VoIPAnalysis;
 
@@ -661,6 +664,20 @@ export interface ICMPFinding {
   count: number;
   is_anomaly: boolean;
   description?: string;
+}
+
+// Threat Intelligence match from STIX 2.1 feeds
+export interface ThreatIntelMatch {
+  timestamp: number;
+  type: string;        // "IP", "Domain", "Hash"
+  value: string;       // The matched indicator
+  threat_type: string; // "C2 Server", "Malware", "Phishing", "Botnet", "Scanner"
+  confidence: string;  // "High", "Medium", "Low"
+  source: string;      // Feed name, e.g. "AlienVault OTX"
+  first_seen: string;  // When the indicator was first reported
+  description: string;
+  source_ip?: string;
+  dest_ip?: string;
 }
 
 // Plain English Summary

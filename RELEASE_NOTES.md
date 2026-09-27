@@ -1,64 +1,78 @@
-# SD-WAN Triage v6.1.0.0 — The Wireshark Academy Release
+# SD-WAN Triage v6.2.0 — The Security Forensics Release
 
-> **A single binary that transforms raw PCAP files into actionable, educational network forensics.**
+> **Bridging the gap between network troubleshooting and security forensics. One binary, zero dependencies.**
 
 ---
 
 ## Highlights
 
+### Threat Intelligence Integration (NEW)
+Cross-reference observed IPs, domains, and hashes against known threat feeds in **STIX 2.1 format**:
+
+- **STIX 2.1 Parser** — loads indicator bundles from any directory of JSON feed files
+- **O(1) Map Lookups** — 10,000+ IOCs matched against every packet with zero performance penalty
+- **Rich Metadata** — Threat Type (C2, Malware, Botnet, Phishing, Ransomware), Confidence, Source attribution, First Seen date
+- **Red Shield Badge** — instant visual indicator on any FindingCard with a threat intel hit
+- **Expanded Detail View** — per-indicator breakdown with type, confidence, source feed, and description
+- **CLI & Web** — `--threat-intel feeds/` flag works in both CLI and web server modes
+
+```bash
+# Load STIX feeds and analyze
+./sdwan-triage --threat-intel feeds/ capture.pcap
+
+# Web mode with feeds
+./sdwan-triage -web --threat-intel feeds/
+```
+
+### Global Web Filtering (NEW)
+Real-time packet filtering by IP, Port, and Protocol directly in the Web UI:
+
+- **FilterContext** — React Context managing global filter state (Source IP, Dest IP, Port/Service, Protocol)
+- **GlobalFilterBar** — horizontal bar with instant Apply/Clear, Enter-to-submit, amber "Filtered" badge
+- **Partial Match** — typing `10.0` matches all IPs in that subnet; typing `https` resolves to port 443
+- **Composable** — global filter stacks with the existing forensic display filter and timeline scrubber
+- **Filtered Badge** — Network Health Assessment shows "(Filtered)" indicator when active
+
 ### Interactive Forensic Workflow
-Every finding card is now a **"mentor in a box"** — a guided 3-step troubleshooting workflow:
+Every finding card is a **guided 3-step troubleshooting workflow**:
 
 | Step | Focus | What It Does |
 |------|-------|--------------|
-| **1. Verify** (Eye) | Wireshark | Provides the exact display filter, copy button, and mock packet visualization |
-| **2. Diagnose** (Hands) | Device CLI | Vendor-specific or generic CLI commands as a checklist with copy-to-clipboard |
+| **1. Verify** (Eye) | Wireshark | Exact display filter with copy button and mock packet visualization |
+| **2. Diagnose** (Hands) | Device CLI | Vendor-specific or generic CLI commands as a checklist |
 | **3. Resolve** (Fix) | Action | Concrete resolution steps with risk warnings and progress tracking |
 
-- **Persistent checklists** — progress is saved to localStorage, survives page refresh
-- **Risk warnings** — 18 finding-specific "what NOT to do" cautions to prevent mistakes
-- **Generic CLI fallback** — when no vendor runbook exists, category-appropriate diagnostic commands are generated automatically
+- Persistent checklists (localStorage), 18 risk warnings, generic CLI fallback
 
 ### Wireshark Academy
-A new educational modal for Junior Engineers:
+Educational modal for Junior Engineers:
 
-- **Split-panel view** — "Our Analysis" vs "Wireshark View" side-by-side
-- **TCP Header SVG Diagram** — interactive visualization with dynamic field highlighting based on finding type (SYN flag red for floods, Seq/Ack amber for retransmissions, Window purple for latency)
-- **Mock Packet List** — color-coded (red/yellow/green/grey) Wireshark-style rows for 13 finding types with real IP/port context
-- **Wireshark Tips** — per-finding-type guidance on what to look for in the real tool
+- Split-panel "Our Analysis" vs "Wireshark View" comparison
+- TCP Header SVG with dynamic field highlighting (SYN red, Seq/Ack amber, Window purple)
+- Color-coded mock packet list for 13 finding types
+- Per-finding Wireshark tips
 
-### Embedded GeoIP Database
-- **Self-contained binary** — GeoLite2-City.mmdb (63MB) is compiled into the binary via `//go:embed`
-- **Zero external dependencies** — no need to download or place the database file separately
-- **Automatic fallback** — if embedded data fails, searches standard disk paths (`./data/`, `/usr/share/GeoIP/`)
-- **Full geolocation** — country, city, coordinates for map visualization
-
-### JA3/JA3S Fingerprinting
-- Extracts JA3 client and JA3S server fingerprints from TLS handshakes
-- Matches against known malware, bot, and application fingerprint databases
-- Displays fingerprint hashes with confidence scores in the findings panel
-
-### Timeline Scrubber
-- Cross-panel time range synchronization
-- Click and drag to filter all panels (findings, conversations, protocol stats) to a specific time window
-- Visual packet-rate histogram overlay
-- Press Escape to reset time filter
+### Self-Contained Binary
+- **~97MB** binary includes: React frontend, GeoIP database (63MB), all Go analyzers
+- `CGO_ENABLED=0` — fully static, no shared library dependencies
+- Embedded GeoIP with automatic fallback to disk paths
 
 ---
 
-## What's New Since v6.0
+## What's New Since v6.1
 
 | Feature | Status |
 |---------|--------|
-| Interactive Forensic Workflow (3-step) | New |
-| Persistent checklist state (localStorage) | New |
-| Wireshark Comparison Modal | New |
-| TCP Header SVG with dynamic highlights | New |
-| Embedded GeoIP in binary | New |
-| Generic CLI fallback commands | New |
-| Risk warnings per finding type | New |
-| Full ELI5 text (no truncation) | Fixed |
-| packetContext propagation to FindingCards | New |
+| STIX 2.1 Threat Intel Parser & Matcher | **New** |
+| `--threat-intel` CLI/Web flag | **New** |
+| Threat Intel red shield badge on FindingCards | **New** |
+| Threat Intel expanded detail section | **New** |
+| Global Web Filtering (IP/Port/Protocol) | **New** |
+| FilterContext + GlobalFilterBar components | **New** |
+| Partial IP/Service name matching | **New** |
+| "Filtered" badge on Network Health Assessment | **New** |
+| filterResults utility for all data structures | **New** |
+| Sample STIX feed (`feeds/example-threat-feed.json`) | **New** |
 
 ---
 
@@ -66,36 +80,58 @@ A new educational modal for Junior Engineers:
 
 | Platform | Architecture | Binary |
 |----------|-------------|--------|
-| Linux | amd64 | `sdwan-triage-linux-amd64` |
-| macOS | Intel (amd64) | `sdwan-triage-darwin-amd64` |
-| macOS | Apple Silicon (arm64) | `sdwan-triage-darwin-arm64` |
-| Windows | amd64 | `sdwan-triage-windows-amd64.exe` |
+| Linux | amd64 | `sdwan-triage-v6.2.0.0-linux-amd64` |
+| macOS | Intel (amd64) | `sdwan-triage-v6.2.0.0-darwin-amd64` |
+| macOS | Apple Silicon (arm64) | `sdwan-triage-v6.2.0.0-darwin-arm64` |
+| Windows | amd64 | `sdwan-triage-v6.2.0.0-windows-amd64.exe` |
 
-All binaries are statically linked (`CGO_ENABLED=0`) and include the embedded frontend + GeoIP database.
+All binaries are statically linked and include the embedded frontend + GeoIP database.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Download the binary for your platform and make it executable
+# Download the binary for your platform
 chmod +x sdwan-triage-darwin-arm64
 
-# Run web mode (opens browser)
+# Web mode (opens browser automatically)
 ./sdwan-triage -web
 
-# Run web mode on custom port, no browser
-./sdwan-triage -web -port 9090 -no-browser
+# Web mode with threat intel feeds
+./sdwan-triage -web --threat-intel ./feeds/ -port 9090
 
-# CLI mode — analyze a PCAP directly
-./sdwan-triage -lan capture-lan.pcap -wan capture-wan.pcap
+# CLI analysis with threat intel
+./sdwan-triage --threat-intel ./feeds/ capture.pcap
+
+# CLI analysis with filters
+./sdwan-triage -src-ip 10.0.0.1 -protocol tcp capture.pcap
 ```
 
 ---
 
-## Binary Size
+## Threat Intel Feed Format
 
-~97MB (includes embedded React frontend + 63MB GeoIP database + Go binary)
+Place STIX 2.1 JSON bundle files in a directory and point `--threat-intel` at it:
+
+```json
+{
+  "type": "bundle",
+  "id": "bundle--example",
+  "objects": [
+    {
+      "type": "indicator",
+      "pattern": "[ipv4-addr:value = '185.220.101.1']",
+      "pattern_type": "stix",
+      "labels": ["command-and-control"],
+      "confidence": 85,
+      "external_references": [{"source_name": "AlienVault OTX"}]
+    }
+  ]
+}
+```
+
+Supported indicator types: `ipv4-addr`, `ipv6-addr`, `domain-name`, `file:hashes`, `url:value`
 
 ---
 
@@ -104,8 +140,8 @@ chmod +x sdwan-triage-darwin-arm64
 ```bash
 git clone https://github.com/gocisse/sdwan-triage.git
 cd sdwan-triage
-make build        # Build for current platform
-make release      # Cross-compile for all platforms
+make build           # Build for current platform
+make release         # Cross-compile for all platforms
 make github-release  # Create GitHub release (requires gh CLI)
 ```
 
@@ -113,4 +149,4 @@ make github-release  # Create GitHub release (requires gh CLI)
 
 ## Full Changelog
 
-See [commit history](https://github.com/gocisse/sdwan-triage/compare/v6.0.0...v6.1.0.0) for all changes.
+See [commit history](https://github.com/gocisse/sdwan-triage/compare/v6.1.0.0...v6.2.0.0) for all changes.

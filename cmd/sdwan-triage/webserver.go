@@ -73,6 +73,7 @@ type IntegrationOptions struct {
 	ServiceNowURL      string
 	ServiceNowUser     string
 	ServiceNowPassword string
+	ThreatIntelDir     string
 }
 
 // runWebServer starts the unified web server with embedded React frontend.
@@ -130,6 +131,12 @@ func runWebServer(port int, noBrowser bool, intOpts *IntegrationOptions) {
 	// Wire up API handlers (reuses existing web/backend/handlers)
 	h := handlers.NewHandlers(store)
 	h.SetIntegrations(intCfg)
+
+	// Configure threat intelligence feeds for analysis
+	if intOpts != nil && intOpts.ThreatIntelDir != "" {
+		h.SetThreatIntelDir(intOpts.ThreatIntelDir)
+		log.Printf("[INIT] Threat intel feeds directory: %s", intOpts.ThreatIntelDir)
+	}
 
 	// Wire up packet inspection handlers
 	packetHandlers := handlers.NewPacketInspectionHandlers(store)
@@ -318,6 +325,11 @@ func initIntegrations(store *storage.Storage, opts *IntegrationOptions) *handler
 		log.Printf("[INIT] ServiceNow integration enabled (URL: %s)", opts.ServiceNowURL)
 	} else {
 		log.Println("[INIT] ServiceNow integration disabled (no credentials provided)")
+	}
+
+	// 5. Threat Intelligence Feeds — directory of STIX 2.1 JSON bundles
+	if opts != nil && opts.ThreatIntelDir != "" {
+		cfg.ThreatIntelDir = opts.ThreatIntelDir
 	}
 
 	return cfg

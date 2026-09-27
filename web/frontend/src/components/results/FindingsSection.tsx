@@ -11,7 +11,7 @@ import {
   Copy,
   ExternalLink,
 } from 'lucide-react';
-import type { AnalysisResults } from '../../types';
+import type { AnalysisResults, ThreatIntelMatch } from '../../types';
 import { FindingCard, IssueSidebar, type CategoryId, VirtualizedFlowTable, type Column } from '../dashboard';
 import { issueKnowledgeBase, getSeverityConfig } from '../../data/knowledgeBase';
 import { getActiveFindings, wizardSymptoms } from '../../data/wizardData';
@@ -398,10 +398,104 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
     },
   ], []);
 
+  // ─── Threat Intel Lookup ──────────────────────────────────────
+  const threatIntelIndex = useMemo(() => {
+    const matches = results.threat_intel_matches || [];
+    const byIP = new Map<string, ThreatIntelMatch[]>();
+    const byDomain = new Map<string, ThreatIntelMatch[]>();
+    for (const m of matches) {
+      if (m.type === 'IP') {
+        const existing = byIP.get(m.value) || [];
+        existing.push(m);
+        byIP.set(m.value, existing);
+      } else if (m.type === 'Domain') {
+        const existing = byDomain.get(m.value.toLowerCase()) || [];
+        existing.push(m);
+        byDomain.set(m.value.toLowerCase(), existing);
+      }
+      // Also index by source/dest IPs from the match
+      if (m.source_ip) {
+        const existing = byIP.get(m.source_ip) || [];
+        if (!existing.some(e => e.value === m.value)) { existing.push(m); }
+        byIP.set(m.source_ip, existing);
+      }
+      if (m.dest_ip) {
+        const existing = byIP.get(m.dest_ip) || [];
+        if (!existing.some(e => e.value === m.value)) { existing.push(m); }
+        byIP.set(m.dest_ip, existing);
+      }
+    }
+    return { byIP, byDomain, all: matches };
+  }, [results.threat_intel_matches]);
+
+  /** Get threat intel matches relevant to a set of IPs */
+  function getThreatIntelForIPs(...ips: (string | undefined)[]): ThreatIntelMatch[] | undefined {
+    const found: ThreatIntelMatch[] = [];
+    const seen = new Set<string>();
+    for (const ip of ips) {
+      if (!ip) continue;
+      const matches = threatIntelIndex.byIP.get(ip);
+      if (matches) {
+        for (const m of matches) {
+          if (!seen.has(m.value)) { found.push(m); seen.add(m.value); }
+        }
+      }
+    }
+    return found.length > 0 ? found : undefined;
+  }
+
   const findings: React.ReactNode[] = [];
 
   // ─── SECURITY FINDINGS ─────────────────────────────────────
   if (category === 'all' || category === 'security') {
+    // Threat Intelligence Matches (STIX feeds)
+    const tiMatches = threatIntelIndex.all;
+    if (tiMatches.length > 0) {
+      findings.push(
+        <FindingCard
+          key="threat-intel"
+          title="Threat Intelligence Matches"
+          severity="Critical"
+          findingKey="ioc_match"
+          detectedVendors={detectedVendors}
+          count={tiMatches.length}
+          description={`${tiMatches.length} indicator${tiMatches.length !== 1 ? 's' : ''} matched against loaded STIX 2.1 threat feeds`}
+          knowledge={issueKnowledgeBase.ioc_match}
+          eli5Mode={eli5Mode}
+          threatIntelMatches={tiMatches}
+          details={
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-700/50">
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Indicator</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Type</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Threat</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Confidence</th>
+                    <th className="px-3 py-2 text-left text-slate-500 font-medium">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/30">
+                  {tiMatches.slice(0, 20).map((m, i) => (
+                    <tr key={i} className="hover:bg-slate-700/20">
+                      <td className="px-3 py-2 font-mono text-red-400">{m.value}</td>
+                      <td className="px-3 py-2 text-slate-300">{m.type}</td>
+                      <td className="px-3 py-2 text-red-300">{m.threat_type}</td>
+                      <td className={`px-3 py-2 font-medium ${
+                        m.confidence === 'High' ? 'text-red-400' :
+                        m.confidence === 'Medium' ? 'text-amber-400' : 'text-blue-400'
+                      }`}>{m.confidence}</td>
+                      <td className="px-3 py-2 text-blue-300">{m.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+        />
+      );
+    }
+
     // DDoS
     const ddos = results.security?.ddos_findings || [];
     if (ddos.length > 0) {
@@ -417,6 +511,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           findingKey="ddos_syn_flood"
           detectedVendors={detectedVendors}
           packetContext={ddos[0] ? { srcIp: ddos[0].source_ip, dstIp: ddos[0].target_ip } : undefined}
+          threatIntelMatches={getThreatIntelForIPs(...ddos.flatMap(d => [d.source_ip, d.target_ip]))}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -468,6 +563,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           knowledge={issueKnowledgeBase.port_scan}
           eli5Mode={eli5Mode}
           packetContext={portScans[0] ? { srcIp: portScans[0].source_ip, dstIp: portScans[0].target_ip } : undefined}
+          threatIntelMatches={getThreatIntelForIPs(...portScans.flatMap(p => [p.source_ip, p.target_ip]))}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -657,6 +753,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           description={`${dnsTunnel.length} suspected DNS tunneling activit${dnsTunnel.length > 1 ? 'ies' : 'y'} — data may be exfiltrated via DNS`}
           knowledge={issueKnowledgeBase.dns_tunneling}
           eli5Mode={eli5Mode}
+          threatIntelMatches={getThreatIntelForIPs(...dnsTunnel.map(t => t.source_ip))}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -702,6 +799,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           knowledge={issueKnowledgeBase.c2_beaconing}
           eli5Mode={eli5Mode}
           packetContext={c2[0] ? { srcIp: c2[0].source_ip, dstIp: c2[0].dest_ip, dstPort: c2[0].dest_port } : undefined}
+          threatIntelMatches={getThreatIntelForIPs(...c2.flatMap(b => [b.source_ip, b.dest_ip]))}
           details={
             <div className="overflow-x-auto">
               <table className="w-full text-xs">

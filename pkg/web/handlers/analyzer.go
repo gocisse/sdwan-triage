@@ -62,6 +62,16 @@ func AnalyzePCAP(store *storage.Storage, job *storage.AnalysisJob, integrations 
 	// Create processor with options (qosEnabled=true, verbose=false)
 	processor := analyzer.NewProcessorWithOptions(true, false)
 
+	// Load threat intelligence feeds if configured
+	if intCfg != nil && intCfg.ThreatIntelDir != "" {
+		feeds, iocs, err := processor.LoadThreatIntelFeeds(intCfg.ThreatIntelDir)
+		if err != nil {
+			log.Printf("[ANALYSIS] Warning: threat intel feed error: %v", err)
+		} else if feeds > 0 {
+			log.Printf("[ANALYSIS] Loaded %d threat intel feed(s) with %d indicators", feeds, iocs)
+		}
+	}
+
 	// Initialize analysis state and report
 	state := models.NewAnalysisState()
 	report := &models.TriageReport{}
