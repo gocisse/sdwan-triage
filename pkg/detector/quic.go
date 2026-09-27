@@ -77,7 +77,7 @@ func (q *QUICAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisSta
 	dstPortPtr := dstPort
 	event.SourcePort = &srcPortPtr
 	event.DestinationPort = &dstPortPtr
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // isQUICPacket checks if payload looks like QUIC

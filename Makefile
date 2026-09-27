@@ -3,7 +3,7 @@
 
 # ─── VARIABLES ──────────────────────────────────────────────
 BINARY_NAME  := sdwan-triage
-VERSION      ?= 6.1.0.0
+VERSION      ?= 6.3.0.0
 BUILD_DIR    := build
 DIST_DIR     := cmd/sdwan-triage/dist
 FRONTEND_DIR := web/frontend
@@ -143,7 +143,7 @@ github-release: release
 		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-darwin-arm64.tar.gz \
 		$(BUILD_DIR)/$(BINARY_NAME)-v$(VERSION)-windows-amd64.zip \
 		$(BUILD_DIR)/checksums-v$(VERSION).txt \
-		--title "v$(VERSION) - The Wireshark Academy Release" \
+		--title "v$(VERSION) - The Security Forensics Release" \
 		--notes-file RELEASE_NOTES.md \
 		--draft
 	@echo "✓ GitHub release v$(VERSION) created (draft)"

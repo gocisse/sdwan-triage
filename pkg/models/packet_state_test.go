@@ -124,23 +124,19 @@ func TestFilter_IsEmpty(t *testing.T) {
 }
 
 func TestTCPFlowState_Initialization(t *testing.T) {
-	flowState := &TCPFlowState{
-		SeqSeen:   make(map[uint32]bool),
-		SentTimes: make(map[uint32]time.Time),
+	flowState := NewTCPFlowState()
+
+	if flowState.Seq == nil {
+		t.Fatal("Seq history is nil")
 	}
 
-	if flowState.SeqSeen == nil {
-		t.Error("SeqSeen map is nil")
+	ts := time.Unix(1700000000, 0)
+	flowState.Seq.Record(12345, ts)
+	if !flowState.Seq.Seen(12345) {
+		t.Error("Failed to record sequence number")
 	}
-
-	if flowState.SentTimes == nil {
-		t.Error("SentTimes map is nil")
-	}
-
-	// Test adding to maps
-	flowState.SeqSeen[12345] = true
-	if !flowState.SeqSeen[12345] {
-		t.Error("Failed to add to SeqSeen map")
+	if got, ok := flowState.Seq.Lookup(12345); !ok || !got.Equal(ts) {
+		t.Errorf("Lookup(12345) = %v,%v want %v,true", got, ok, ts)
 	}
 
 	flowState.TotalBytes = 1000
@@ -148,9 +144,60 @@ func TestTCPFlowState_Initialization(t *testing.T) {
 		t.Errorf("TotalBytes = %d, want %d", flowState.TotalBytes, 1000)
 	}
 
-	flowState.RTTSamples = append(flowState.RTTSamples, 10.5, 15.2, 12.8)
+	for _, s := range []float64{10.5, 15.2, 12.8} {
+		flowState.AddRTTSample(s)
+	}
 	if len(flowState.RTTSamples) != 3 {
 		t.Errorf("RTTSamples length = %d, want %d", len(flowState.RTTSamples), 3)
+	}
+	count, min, max, avg := flowState.RTTStats()
+	if count != 3 || min != 10.5 || max != 15.2 || avg < 12.8 || avg > 12.9 {
+		t.Errorf("RTTStats() = %d,%v,%v,%v", count, min, max, avg)
+	}
+}
+
+func TestSeqHistory_BoundedFIFO(t *testing.T) {
+	h := NewSeqHistory(4)
+	base := time.Unix(1700000000, 0)
+	for i := uint32(0); i < 6; i++ {
+		h.Record(i*1000, base.Add(time.Duration(i)*time.Millisecond))
+	}
+	if h.Len() != 4 {
+		t.Fatalf("Len() = %d, want 4", h.Len())
+	}
+	// Oldest two evicted, newest four retained
+	for _, seq := range []uint32{0, 1000} {
+		if h.Seen(seq) {
+			t.Errorf("seq %d should have been evicted", seq)
+		}
+	}
+	for _, seq := range []uint32{2000, 3000, 4000, 5000} {
+		if !h.Seen(seq) {
+			t.Errorf("seq %d should be retained", seq)
+		}
+	}
+	// Re-recording keeps the original timestamp (RTT measured from first send)
+	orig, _ := h.Lookup(5000)
+	h.Record(5000, base.Add(time.Hour))
+	if got, _ := h.Lookup(5000); !got.Equal(orig) {
+		t.Errorf("re-record changed timestamp: %v -> %v", orig, got)
+	}
+	if h.Len() != 4 {
+		t.Errorf("re-record grew history to %d", h.Len())
+	}
+}
+
+func TestTCPFlowState_RTTSamplesBounded(t *testing.T) {
+	fs := NewTCPFlowState()
+	for i := 0; i < MaxRTTSamplesPerFlow+500; i++ {
+		fs.AddRTTSample(float64(i))
+	}
+	if len(fs.RTTSamples) != MaxRTTSamplesPerFlow {
+		t.Errorf("RTTSamples len = %d, want %d", len(fs.RTTSamples), MaxRTTSamplesPerFlow)
+	}
+	count, min, max, _ := fs.RTTStats()
+	if count != MaxRTTSamplesPerFlow+500 || min != 0 || max != float64(MaxRTTSamplesPerFlow+499) {
+		t.Errorf("aggregate stats lost samples: count=%d min=%v max=%v", count, min, max)
 	}
 }
 

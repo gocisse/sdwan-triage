@@ -7,14 +7,128 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
+// Per-flow bounds. A flow's memory must not scale with its packet count.
+const (
+	// DefaultSeqHistorySize is how many recent sequence-consuming segments are
+	// remembered per direction for retransmission/RTT matching. 512 segments
+	// covers ≈750 KB in flight at a 1460-byte MSS, well beyond typical
+	// retransmission distance.
+	DefaultSeqHistorySize = 512
+
+	// MaxRTTSamplesPerFlow caps the retained per-flow RTT sample slice used for
+	// histograms. Running min/max/sum/count are kept for the full flow.
+	MaxRTTSamplesPerFlow = 1024
+)
+
 // TCPFlowState tracks state for TCP flow analysis
 type TCPFlowState struct {
-	LastSeq    uint32
-	LastAck    uint32
-	SeqSeen    map[uint32]bool
+	LastSeq uint32
+	LastAck uint32
+
+	// Seq remembers recently sent sequence-consuming segments (bounded FIFO).
+	Seq *SeqHistory
+
+	// RTTSamples keeps the first MaxRTTSamplesPerFlow samples (for histograms);
+	// the aggregate fields below cover every sample observed on the flow.
 	RTTSamples []float64
-	SentTimes  map[uint32]time.Time
+	RTTCount   int
+	RTTSum     float64
+	RTTMin     float64
+	RTTMax     float64
+
 	TotalBytes uint64
+}
+
+// NewTCPFlowState creates a TCP flow state with bounded internal storage.
+func NewTCPFlowState() *TCPFlowState {
+	return &TCPFlowState{Seq: NewSeqHistory(DefaultSeqHistorySize)}
+}
+
+// AddRTTSample records an RTT measurement (milliseconds) for the flow.
+func (s *TCPFlowState) AddRTTSample(ms float64) {
+	if s.RTTCount == 0 || ms < s.RTTMin {
+		s.RTTMin = ms
+	}
+	if s.RTTCount == 0 || ms > s.RTTMax {
+		s.RTTMax = ms
+	}
+	s.RTTCount++
+	s.RTTSum += ms
+	if len(s.RTTSamples) < MaxRTTSamplesPerFlow {
+		s.RTTSamples = append(s.RTTSamples, ms)
+	}
+}
+
+// RTTStats returns count, min, max and mean RTT (ms) over all samples observed.
+func (s *TCPFlowState) RTTStats() (count int, min, max, avg float64) {
+	if s.RTTCount == 0 {
+		return 0, 0, 0, 0
+	}
+	return s.RTTCount, s.RTTMin, s.RTTMax, s.RTTSum / float64(s.RTTCount)
+}
+
+// SeqHistory is a bounded FIFO of recently transmitted TCP sequence numbers and
+// the capture time at which they were first sent. When full, the oldest entry
+// is evicted. Lookups are O(1); memory is O(capacity) regardless of flow length.
+type SeqHistory struct {
+	capacity int
+	ring     []uint32
+	head     int
+	index    map[uint32]time.Time
+}
+
+// NewSeqHistory creates a history remembering up to capacity sequence numbers.
+func NewSeqHistory(capacity int) *SeqHistory {
+	if capacity < 1 {
+		capacity = 1
+	}
+	return &SeqHistory{
+		capacity: capacity,
+		ring:     make([]uint32, 0, minInt(capacity, 16)),
+		index:    make(map[uint32]time.Time, minInt(capacity, 16)),
+	}
+}
+
+// Record remembers seq as sent at ts. Re-recording an already-remembered seq
+// (a retransmission) keeps the ORIGINAL send time so RTT is measured from the
+// first transmission, matching the previous map-based behaviour.
+func (h *SeqHistory) Record(seq uint32, ts time.Time) {
+	if _, exists := h.index[seq]; exists {
+		return
+	}
+	if len(h.ring) < h.capacity {
+		h.ring = append(h.ring, seq)
+	} else {
+		delete(h.index, h.ring[h.head])
+		h.ring[h.head] = seq
+		h.head = (h.head + 1) % h.capacity
+	}
+	h.index[seq] = ts
+}
+
+// Seen reports whether seq is within the remembered window.
+func (h *SeqHistory) Seen(seq uint32) bool {
+	_, ok := h.index[seq]
+	return ok
+}
+
+// Lookup returns the first-send time of seq if it is still remembered.
+func (h *SeqHistory) Lookup(seq uint32) (time.Time, bool) {
+	ts, ok := h.index[seq]
+	return ts, ok
+}
+
+// Len returns the number of remembered sequence numbers.
+func (h *SeqHistory) Len() int { return len(h.index) }
+
+// Cap returns the maximum number of remembered sequence numbers.
+func (h *SeqHistory) Cap() int { return h.capacity }
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // UDPFlowState tracks state for UDP flow analysis
@@ -164,10 +278,14 @@ func NewBoundedAnalysisState(maxFlows, maxSYN int) *AnalysisState {
 // NewSecurityState creates a new initialized security state
 func NewSecurityState() *SecurityState {
 	return &SecurityState{
-		SYNCountPerIP:        make(map[string]*FloodCounter),
-		UDPCountPerIP:        make(map[string]*FloodCounter),
-		ICMPCountPerIP:       make(map[string]*FloodCounter),
-		LastResetTime:        time.Now(),
+		SYNCountPerIP:  make(map[string]*FloodCounter),
+		UDPCountPerIP:  make(map[string]*FloodCounter),
+		ICMPCountPerIP: make(map[string]*FloodCounter),
+		// LastResetTime is zero until the first packet establishes the capture
+		// time base (see DDoSAnalyzer.maybeResetCounters). Using wall-clock here
+		// made every window comparison against historical capture timestamps
+		// negative, so the window never reset.
+		LastResetTime:        time.Time{},
 		ResetIntervalSecs:    10.0,
 		ScannedPortsPerIP:    make(map[string]map[string]map[uint16]bool),
 		ScanAttemptsPerIP:    make(map[string]int),

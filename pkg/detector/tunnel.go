@@ -452,7 +452,7 @@ func (t *TunnelAnalyzer) analyzeIPsecNATT(payload []byte, ipInfo *PacketIPInfo, 
 			SDWANPath:       fmt.Sprintf("udp.port == 4500 && ip.addr == %s", ipInfo.DstIP),
 		}
 		// Track for correlation with ESP
-		t.trackIPsecSession(ipInfo.SrcIP, ipInfo.DstIP, "NAT-T")
+		t.trackIPsecSession(ipInfo.SrcIP, ipInfo.DstIP, "NAT-T", timestamp)
 	}
 }
 
@@ -480,7 +480,7 @@ func (t *TunnelAnalyzer) analyzeIKE(payload []byte, ipInfo *PacketIPInfo, srcPor
 			SDWANPath:       fmt.Sprintf("udp.port == 500 && ip.addr == %s", ipInfo.DstIP),
 		}
 		// Track for correlation with ESP/NAT-T
-		t.trackIPsecSession(ipInfo.SrcIP, ipInfo.DstIP, "IKE")
+		t.trackIPsecSession(ipInfo.SrcIP, ipInfo.DstIP, "IKE", timestamp)
 	}
 }
 
@@ -530,7 +530,7 @@ func (t *TunnelAnalyzer) analyzeIPSecWithContext(ipInfo *PacketIPInfo, protocol 
 }
 
 // trackIPsecSession tracks IPsec session components for correlation
-func (t *TunnelAnalyzer) trackIPsecSession(srcIP, dstIP, component string) {
+func (t *TunnelAnalyzer) trackIPsecSession(srcIP, dstIP, component string, timestamp time.Time) {
 	sessionKey := fmt.Sprintf("ipsec-session-%s-%s", srcIP, dstIP)
 	if session, exists := t.vpnSessions[sessionKey]; exists {
 		switch component {
@@ -541,11 +541,11 @@ func (t *TunnelAnalyzer) trackIPsecSession(srcIP, dstIP, component string) {
 		case "ESP":
 			session.DataPackets++
 		}
-		session.LastSeen = time.Now()
+		session.LastSeen = timestamp
 	} else {
 		t.vpnSessions[sessionKey] = &VPNSessionTracker{
-			FirstSeen: time.Now(),
-			LastSeen:  time.Now(),
+			FirstSeen: timestamp,
+			LastSeen:  timestamp,
 		}
 		switch component {
 		case "IKE":

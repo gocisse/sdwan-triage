@@ -43,12 +43,13 @@ func (sr *StreamReassembler) SetMaxBytesPerFlow(maxBytes int) {
 }
 
 // CleanupStaleFlows removes streams that haven't been seen for the specified duration
-// This should be called periodically (e.g., every 10,000 packets) to prevent memory bloat
-func (sr *StreamReassembler) CleanupStaleFlows(maxAge time.Duration) int {
+// This should be called periodically (e.g., every 10,000 packets) to prevent memory bloat.
+// now must be the capture timestamp of the current packet: stream.LastSeen is
+// capture time, so comparing it with the wall clock evicted every stream.
+func (sr *StreamReassembler) CleanupStaleFlows(maxAge time.Duration, now time.Time) int {
 	sr.mu.Lock()
 	defer sr.mu.Unlock()
 
-	now := time.Now()
 	evicted := 0
 
 	for flowID, stream := range sr.state.Streams {

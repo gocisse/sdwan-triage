@@ -14,11 +14,11 @@ import (
 
 // LatencyMatrix is the top-level result returned by BuildLatencyMatrix.
 type LatencyMatrix struct {
-	Subnets []string             `json:"subnets"`           // Ordered list of /24 (or /64) subnets
-	Cells   map[string]*CellStat `json:"cells"`             // Key: "srcSubnet->dstSubnet"
-	Flows   int                  `json:"total_flows"`       // Total flow count contributing data
-	MaxRTT  float64              `json:"max_rtt_ms"`        // Global max RTT (for colour normalisation)
-	MaxLoss float64              `json:"max_loss_pct"`      // Global max loss %
+	Subnets []string             `json:"subnets"`      // Ordered list of /24 (or /64) subnets
+	Cells   map[string]*CellStat `json:"cells"`        // Key: "srcSubnet->dstSubnet"
+	Flows   int                  `json:"total_flows"`  // Total flow count contributing data
+	MaxRTT  float64              `json:"max_rtt_ms"`   // Global max RTT (for colour normalisation)
+	MaxLoss float64              `json:"max_loss_pct"` // Global max loss %
 }
 
 // CellStat holds aggregated latency/loss stats for a subnet pair.
@@ -47,11 +47,11 @@ type CellStat struct {
 // Subnets are /24 for IPv4, /64 for IPv6.
 func BuildLatencyMatrix(report *models.TriageReport, state *models.AnalysisState) *LatencyMatrix {
 	type accumulator struct {
-		sumRTT   float64
-		minRTT   float64
-		maxRTT   float64
-		samples  int
-		lossPct  float64 // weighted accumulator
+		sumRTT    float64
+		minRTT    float64
+		maxRTT    float64
+		samples   int
+		lossPct   float64 // weighted accumulator
 		lossFlows int
 	}
 
@@ -84,26 +84,15 @@ func BuildLatencyMatrix(report *models.TriageReport, state *models.AnalysisState
 	// ── 1. Collect RTT from AnalysisState (ALL flows, not just >100ms) ──
 	if state != nil {
 		state.ForEachTCPFlow(func(flowKey string, fs *models.TCPFlowState) bool {
-			if len(fs.RTTSamples) == 0 {
+			count, minR, maxR, avg := fs.RTTStats()
+			if count == 0 {
 				return true
 			}
 			srcIP, dstIP := parseFlowKey(flowKey)
 			if srcIP == "" {
 				return true
 			}
-			var minR, maxR, sumR float64
-			minR = fs.RTTSamples[0]
-			for _, r := range fs.RTTSamples {
-				sumR += r
-				if r < minR {
-					minR = r
-				}
-				if r > maxR {
-					maxR = r
-				}
-			}
-			avg := sumR / float64(len(fs.RTTSamples))
-			addRTT(srcIP, dstIP, avg, minR, maxR, len(fs.RTTSamples))
+			addRTT(srcIP, dstIP, avg, minR, maxR, count)
 			return true
 		})
 	}

@@ -124,14 +124,7 @@ func (sp *StreamingProcessor) performFinalCleanup(state *models.AnalysisState) {
 // Note: With bounded LRU caches, cleanup is automatic via eviction
 // This method now focuses on cleaning up internal flow state
 func (sp *StreamingProcessor) cleanupOldFlows(state *models.AnalysisState) {
-	// Clean up old sent times to prevent memory bloat within flows
-	// Using bounded cache iterator
-	state.ForEachTCPFlow(func(_ string, flow *models.TCPFlowState) bool {
-		if len(flow.SentTimes) > 1000 {
-			flow.SentTimes = make(map[uint32]time.Time)
-		}
-		return true // continue iteration
-	})
-
+	// Per-flow sequence history is now bounded (models.SeqHistory), so no
+	// per-flow cleanup is required here.
 	sp.logDebug("Cleaned up flow state (TCP flows: %d)", state.TCPFlowCount())
 }

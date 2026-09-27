@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-VERSION="v4.3.2"
+VERSION="v6.3.0.0"
 VERSION_NUM="${VERSION#v}"  # Strip 'v' prefix for ldflags (main.go format strings add 'v')
 COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

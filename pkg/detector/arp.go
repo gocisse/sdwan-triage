@@ -67,7 +67,7 @@ func (a *ARPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 					Protocol:  "ARP",
 					Detail:    "IP address claimed by multiple MAC addresses: " + existingMAC + " and " + srcMAC,
 				}
-				report.Timeline = append(report.Timeline, event)
+				report.AddTimelineEvent(event)
 			}
 		}
 	} else {

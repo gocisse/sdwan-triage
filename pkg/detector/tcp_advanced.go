@@ -9,12 +9,17 @@ import (
 )
 
 // TCP Advanced analysis thresholds
+// maxAdvancedTrackedFlows caps the per-flow window/out-of-order tracker maps.
+// Trackers are ~64 bytes, so 100k flows ≈ 6 MB per map; matches
+// models.DefaultMaxFlows used by AnalysisState.
+const maxAdvancedTrackedFlows = 100000
+
 const (
-	ZeroWindowThreshold    = 3   // Number of zero-window events to report
-	SmallWindowThreshold   = 5   // Number of small-window events to report
-	SmallWindowSize        = 1024 // Window size considered "small"
-	OutOfOrderMinCount     = 10  // Minimum OOO packets to report
-	OutOfOrderMinPercent   = 2.0 // Minimum OOO percentage to report
+	ZeroWindowThreshold  = 3    // Number of zero-window events to report
+	SmallWindowThreshold = 5    // Number of small-window events to report
+	SmallWindowSize      = 1024 // Window size considered "small"
+	OutOfOrderMinCount   = 10   // Minimum OOO packets to report
+	OutOfOrderMinPercent = 2.0  // Minimum OOO percentage to report
 )
 
 // TCPAdvancedAnalyzer detects TCP window issues and out-of-order packets
@@ -24,13 +29,13 @@ type TCPAdvancedAnalyzer struct {
 }
 
 type tcpWindowTracker struct {
-	SrcIP       string
-	DstIP       string
-	SrcPort     uint16
-	DstPort     uint16
-	ZeroCount   int
-	SmallCount  int
-	LastWindow  uint16
+	SrcIP      string
+	DstIP      string
+	SrcPort    uint16
+	DstPort    uint16
+	ZeroCount  int
+	SmallCount int
+	LastWindow uint16
 }
 
 type tcpOOOTracker struct {
@@ -91,6 +96,9 @@ func (t *TCPAdvancedAnalyzer) analyzeWindow(tcp *layers.TCP, ipInfo *PacketIPInf
 
 	tracker, exists := t.windowIssues[flowKey]
 	if !exists {
+		if len(t.windowIssues) >= maxAdvancedTrackedFlows {
+			return
+		}
 		tracker = &tcpWindowTracker{
 			SrcIP:   ipInfo.SrcIP,
 			DstIP:   ipInfo.DstIP,
@@ -144,6 +152,9 @@ func (t *TCPAdvancedAnalyzer) analyzeWindow(tcp *layers.TCP, ipInfo *PacketIPInf
 func (t *TCPAdvancedAnalyzer) analyzeOutOfOrder(tcp *layers.TCP, ipInfo *PacketIPInfo, srcPort, dstPort uint16, flowKey string, report *models.TriageReport) {
 	tracker, exists := t.oooFlows[flowKey]
 	if !exists {
+		if len(t.oooFlows) >= maxAdvancedTrackedFlows {
+			return
+		}
 		tracker = &tcpOOOTracker{
 			SrcIP:   ipInfo.SrcIP,
 			DstIP:   ipInfo.DstIP,

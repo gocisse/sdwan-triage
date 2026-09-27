@@ -1,15 +1,27 @@
 package detectors
 
 import (
+	"strconv"
+
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+)
+
+// Bounds. Per-flow memory must not grow with the number of segments, and the
+// number of tracked flows must not grow without limit on flow-heavy captures.
+const (
+	// maxTrackedFlows caps the per-flow table. Beyond this, new flows still count
+	// toward totals but are not tracked individually (they cannot be judged for
+	// retransmission without state, so they contribute zero loss).
+	maxTrackedFlows = 100000
 )
 
 type PacketLossDetector struct {
 	tcpFlows        map[string]*tcpFlowState
 	totalPackets    uint64
 	retransmissions uint64
+	untrackedFlows  uint64 // flows dropped because maxTrackedFlows was reached
 }
 
 type tcpFlowState struct {
@@ -17,7 +29,7 @@ type tcpFlowState struct {
 	dstIP           string
 	srcPort         uint16
 	dstPort         uint16
-	seqNumbers      map[uint32]bool
+	seq             *models.SeqHistory // bounded recent sequence-number history
 	packetsSent     uint64
 	retransmissions uint64
 	outOfOrder      uint64
@@ -61,30 +73,41 @@ func (d *PacketLossDetector) ProcessPacket(packet gopacket.Packet) {
 
 	flow, exists := d.tcpFlows[flowKey]
 	if !exists {
+		if len(d.tcpFlows) >= maxTrackedFlows {
+			d.untrackedFlows++
+			return
+		}
 		flow = &tcpFlowState{
-			srcIP:      srcIP,
-			dstIP:      dstIP,
-			srcPort:    uint16(tcp.SrcPort),
-			dstPort:    uint16(tcp.DstPort),
-			seqNumbers: make(map[uint32]bool),
+			srcIP:   srcIP,
+			dstIP:   dstIP,
+			srcPort: uint16(tcp.SrcPort),
+			dstPort: uint16(tcp.DstPort),
+			seq:     models.NewSeqHistory(models.DefaultSeqHistorySize),
 		}
 		d.tcpFlows[flowKey] = flow
 	}
 
 	flow.packetsSent++
 
-	// Check for retransmission
+	// Control segments are never counted as retransmissions.
 	if tcp.SYN || tcp.FIN || tcp.RST {
 		return
 	}
 
+	// Only data segments consume sequence space. Pure ACKs legitimately repeat
+	// the same sequence number (and share it with the next data segment), so
+	// counting them here reported ~25% "loss" on healthy captures.
+	if len(tcp.Payload) == 0 {
+		return
+	}
+
 	seqNum := tcp.Seq
-	if _, seen := flow.seqNumbers[seqNum]; seen {
+	if flow.seq.Seen(seqNum) {
 		// Duplicate or retransmission
 		flow.retransmissions++
 		d.retransmissions++
 	} else {
-		flow.seqNumbers[seqNum] = true
+		flow.seq.Record(seqNum, packet.Metadata().Timestamp)
 	}
 }
 
@@ -124,6 +147,12 @@ func (d *PacketLossDetector) GetMetrics() *models.PacketLossMetrics {
 	return metrics
 }
 
+// UntrackedFlows reports how many flows were not tracked because the flow table
+// limit was reached.
+func (d *PacketLossDetector) UntrackedFlows() uint64 { return d.untrackedFlows }
+
 func getFlowKey(srcIP, dstIP string, srcPort, dstPort uint16) string {
-	return srcIP + ":" + string(rune(srcPort)) + "->" + dstIP + ":" + string(rune(dstPort))
+	// Decimal ports: the previous string(rune(port)) encoding collided for
+	// ports in the surrogate range and produced control characters.
+	return srcIP + ":" + strconv.Itoa(int(srcPort)) + "->" + dstIP + ":" + strconv.Itoa(int(dstPort))
 }

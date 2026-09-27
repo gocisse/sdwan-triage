@@ -108,8 +108,49 @@ type TriageReport struct {
 	// Interface Stability / Flapping Detection
 	StabilityFindings []StabilityFinding `json:"stability_findings,omitempty"`
 
+	// Threat Intelligence Matches (from STIX 2.1 feeds)
+	ThreatIntelMatches []ThreatIntelMatch `json:"threat_intel_matches,omitempty"`
+
 	// PCAP Export Info
 	SourcePCAPPath string `json:"source_pcap_path,omitempty"`
+
+	// TimelineTruncated is the number of timeline events that were NOT retained
+	// because MaxTimelineEvents was reached. Retained events are a uniform,
+	// deterministic sample across the whole capture (see AddTimelineEvent).
+	TimelineTruncated int `json:"timeline_truncated,omitempty"`
+
+	timelineSeen int    // total events offered to AddTimelineEvent
+	timelineRNG  uint64 // deterministic xorshift state for reservoir sampling
+}
+
+// MaxTimelineEvents bounds report.Timeline. The timeline feeds the UI's
+// packet-rate histogram/time scrubber, so when the bound is hit events are
+// reservoir-sampled uniformly over the capture rather than truncated at the
+// start, preserving the temporal distribution. 20k events ≈ 3 MB of JSON.
+const MaxTimelineEvents = 20000
+
+// AddTimelineEvent appends a timeline event, keeping the slice bounded by
+// MaxTimelineEvents using deterministic reservoir sampling (Algorithm R with a
+// fixed-seed xorshift generator, so identical captures yield identical output).
+func (r *TriageReport) AddTimelineEvent(e TimelineEvent) {
+	r.timelineSeen++
+	if len(r.Timeline) < MaxTimelineEvents {
+		r.Timeline = append(r.Timeline, e)
+		return
+	}
+	r.TimelineTruncated++
+	// Replace a random retained element with probability MaxTimelineEvents/seen.
+	if r.timelineRNG == 0 {
+		r.timelineRNG = 0x9E3779B97F4A7C15
+	}
+	x := r.timelineRNG
+	x ^= x << 13
+	x ^= x >> 7
+	x ^= x << 17
+	r.timelineRNG = x
+	if j := int(x % uint64(r.timelineSeen)); j < MaxTimelineEvents {
+		r.Timeline[j] = e
+	}
 }
 
 // StabilityFinding represents a detected interface flapping or instability event.
@@ -128,6 +169,20 @@ type StabilityFinding struct {
 	PeerIP        string  `json:"peer_ip,omitempty"`
 	Protocol      string  `json:"protocol"`        // "BFD", "IKE", "HSRP", "VRRP", "STP"
 	RootCauseHint string  `json:"root_cause_hint"` // Suggested root cause
+}
+
+// ThreatIntelMatch represents a match from STIX 2.1 threat intelligence feeds
+type ThreatIntelMatch struct {
+	Timestamp   float64 `json:"timestamp"`
+	Type        string  `json:"type"`        // "IP", "Domain", "Hash"
+	Value       string  `json:"value"`       // The matched indicator value
+	ThreatType  string  `json:"threat_type"` // "C2 Server", "Malware", "Phishing", "Botnet", "Scanner", "Ransomware"
+	Confidence  string  `json:"confidence"`  // "High", "Medium", "Low"
+	Source      string  `json:"source"`      // Feed name, e.g. "AlienVault OTX"
+	FirstSeen   string  `json:"first_seen"`  // When the indicator was first reported
+	Description string  `json:"description"`
+	SourceIP    string  `json:"source_ip,omitempty"`
+	DestIP      string  `json:"dest_ip,omitempty"`
 }
 
 // TrafficGapInfo represents a gap in network traffic

@@ -37,6 +37,33 @@ type c2FlowTracker struct {
 	LastSeen     time.Time
 }
 
+// c2MaxHistory bounds the per-destination timestamp/payload histories. Beacon
+// detection needs C2MinConnections (15) consecutive observations; a sliding
+// window of the most recent 512 keeps every interval the detector can use while
+// making a long-lived busy flow cost a fixed ~12 KB instead of one entry per
+// packet.
+const c2MaxHistory = 512
+
+// c2MaxTrackedDestinations caps the number of (src, dst, port) trackers.
+const c2MaxTrackedDestinations = 100000
+
+// record appends an observation, keeping the histories bounded (oldest dropped).
+func (f *c2FlowTracker) record(timestamp time.Time, payloadSize int) {
+	if len(f.Timestamps) >= c2MaxHistory {
+		copy(f.Timestamps, f.Timestamps[1:])
+		f.Timestamps = f.Timestamps[:len(f.Timestamps)-1]
+	}
+	f.Timestamps = append(f.Timestamps, timestamp)
+	if payloadSize > 0 {
+		if len(f.PayloadSizes) >= c2MaxHistory {
+			copy(f.PayloadSizes, f.PayloadSizes[1:])
+			f.PayloadSizes = f.PayloadSizes[:len(f.PayloadSizes)-1]
+		}
+		f.PayloadSizes = append(f.PayloadSizes, payloadSize)
+	}
+	f.LastSeen = timestamp
+}
+
 // NewC2BeaconingAnalyzer creates a new C2 beaconing analyzer
 func NewC2BeaconingAnalyzer() *C2BeaconingAnalyzer {
 	return &C2BeaconingAnalyzer{
@@ -87,6 +114,9 @@ func (c *C2BeaconingAnalyzer) AnalyzeTCP(packet gopacket.Packet, state *models.A
 
 	flow, exists := c.flows[key]
 	if !exists {
+		if len(c.flows) >= c2MaxTrackedDestinations {
+			return
+		}
 		flow = &c2FlowTracker{
 			SrcIP:     ipInfo.SrcIP,
 			DstIP:     ipInfo.DstIP,
@@ -97,11 +127,7 @@ func (c *C2BeaconingAnalyzer) AnalyzeTCP(packet gopacket.Packet, state *models.A
 		c.flows[key] = flow
 	}
 
-	flow.Timestamps = append(flow.Timestamps, timestamp)
-	if payloadSize > 0 {
-		flow.PayloadSizes = append(flow.PayloadSizes, payloadSize)
-	}
-	flow.LastSeen = timestamp
+	flow.record(timestamp, payloadSize)
 
 	// Check for beaconing when we have enough data
 	if len(flow.Timestamps) >= C2MinConnections {
@@ -143,6 +169,9 @@ func (c *C2BeaconingAnalyzer) AnalyzeUDP(packet gopacket.Packet, state *models.A
 
 	flow, exists := c.flows[key]
 	if !exists {
+		if len(c.flows) >= c2MaxTrackedDestinations {
+			return
+		}
 		flow = &c2FlowTracker{
 			SrcIP:     ipInfo.SrcIP,
 			DstIP:     ipInfo.DstIP,
@@ -153,11 +182,7 @@ func (c *C2BeaconingAnalyzer) AnalyzeUDP(packet gopacket.Packet, state *models.A
 		c.flows[key] = flow
 	}
 
-	flow.Timestamps = append(flow.Timestamps, timestamp)
-	if payloadSize > 0 {
-		flow.PayloadSizes = append(flow.PayloadSizes, payloadSize)
-	}
-	flow.LastSeen = timestamp
+	flow.record(timestamp, payloadSize)
 
 	if len(flow.Timestamps) >= C2MinConnections {
 		c.checkBeaconing(key, flow, report)

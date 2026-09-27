@@ -16,6 +16,15 @@ const (
 	TotalScanThreshold      = 100 // Total connection attempts from single IP
 )
 
+// Bounds on the SYN-target tracking maps (SecurityState.ScannedPortsPerIP).
+// Per (source, target) the port set is inherently ≤ 65536 entries; these caps
+// bound the two outer dimensions. 10k sources × 10k targets is far beyond any
+// realistic single capture while keeping worst-case memory predictable.
+const (
+	maxScanSources          = 10000
+	maxScanTargetsPerSource = 10000
+)
+
 // PortScanAnalyzer handles port scanning detection
 type PortScanAnalyzer struct {
 	horizontalThreshold int
@@ -77,11 +86,18 @@ func (p *PortScanAnalyzer) trackConnectionAttempt(srcIP, dstIP string, dstPort u
 	secState.Lock()
 	defer secState.Unlock()
 
-	// Initialize nested maps if needed
+	// Initialize nested maps if needed, within bounds. Sources or targets
+	// beyond the caps are not tracked (they cannot be judged without state).
 	if secState.ScannedPortsPerIP[srcIP] == nil {
+		if len(secState.ScannedPortsPerIP) >= maxScanSources {
+			return
+		}
 		secState.ScannedPortsPerIP[srcIP] = make(map[string]map[uint16]bool)
 	}
 	if secState.ScannedPortsPerIP[srcIP][dstIP] == nil {
+		if len(secState.ScannedPortsPerIP[srcIP]) >= maxScanTargetsPerSource {
+			return
+		}
 		secState.ScannedPortsPerIP[srcIP][dstIP] = make(map[uint16]bool)
 	}
 

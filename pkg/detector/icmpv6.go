@@ -96,7 +96,7 @@ func (i *ICMPv6Analyzer) handleRouterSolicitation(packet gopacket.Packet, ipv6In
 		Protocol:      "ICMPv6",
 		Detail:        "Host requesting router advertisement",
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleRouterAdvertisement processes Router Advertisement messages
@@ -143,7 +143,7 @@ func (i *ICMPv6Analyzer) handleRouterAdvertisement(packet gopacket.Packet, ipv6I
 		Protocol:      "ICMPv6",
 		Detail:        detail,
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleNeighborSolicitation processes Neighbor Solicitation messages
@@ -163,7 +163,7 @@ func (i *ICMPv6Analyzer) handleNeighborSolicitation(packet gopacket.Packet, ipv6
 		Protocol:      "ICMPv6",
 		Detail:        fmt.Sprintf("Resolving neighbor: %s", NormalizeIPv6Address(targetAddr)),
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleNeighborAdvertisement processes Neighbor Advertisement messages
@@ -209,7 +209,7 @@ func (i *ICMPv6Analyzer) handleNeighborAdvertisement(packet gopacket.Packet, ipv
 		Protocol:      "ICMPv6",
 		Detail:        detail,
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleRedirect processes ICMPv6 Redirect messages
@@ -222,7 +222,7 @@ func (i *ICMPv6Analyzer) handleRedirect(packet gopacket.Packet, ipv6Info *IPv6Pa
 		Protocol:      "ICMPv6",
 		Detail:        "Router redirect message",
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleEcho processes ICMPv6 Echo Request/Reply messages
@@ -245,7 +245,7 @@ func (i *ICMPv6Analyzer) handleEcho(packet gopacket.Packet, ipv6Info *IPv6Packet
 		Protocol:      "ICMPv6",
 		Detail:        fmt.Sprintf("Sequence: %d", seq),
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleDestinationUnreachable processes ICMPv6 Destination Unreachable messages
@@ -279,7 +279,7 @@ func (i *ICMPv6Analyzer) handleDestinationUnreachable(packet gopacket.Packet, ip
 		Protocol:      "ICMPv6",
 		Detail:        reason,
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handlePacketTooBig processes ICMPv6 Packet Too Big messages
@@ -297,7 +297,7 @@ func (i *ICMPv6Analyzer) handlePacketTooBig(packet gopacket.Packet, ipv6Info *IP
 		Protocol:      "ICMPv6",
 		Detail:        fmt.Sprintf("MTU: %d bytes", mtu),
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // handleTimeExceeded processes ICMPv6 Time Exceeded messages
@@ -321,7 +321,7 @@ func (i *ICMPv6Analyzer) handleTimeExceeded(packet gopacket.Packet, ipv6Info *IP
 		Protocol:      "ICMPv6",
 		Detail:        reason,
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // GetNeighborCache returns the neighbor discovery cache

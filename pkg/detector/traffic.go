@@ -134,5 +134,5 @@ func (t *TrafficAnalyzer) addSuspiciousFlow(srcIP, dstIP string, srcPort, dstPor
 	dstPortPtr := dstPort
 	event.SourcePort = &srcPortPtr
 	event.DestinationPort = &dstPortPtr
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }

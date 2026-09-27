@@ -270,7 +270,7 @@ func (l *LANProtocolAnalyzer) analyzeVRRP(packet gopacket.Packet, ipInfo *Packet
 				Protocol:  "VRRP",
 				Detail:    fmt.Sprintf("VRID %d: Priority changed from %d to %d (Virtual IPs: %v)", virtualRouterID, session.Priority, priority, virtualIPs),
 			}
-			report.Timeline = append(report.Timeline, event)
+			report.AddTimelineEvent(event)
 		}
 
 		session.Priority = priority
@@ -303,7 +303,7 @@ func (l *LANProtocolAnalyzer) analyzeVRRP(packet gopacket.Packet, ipInfo *Packet
 			Protocol:  "VRRP",
 			Detail:    fmt.Sprintf("VRID %d detected (v%d): Priority %d, Virtual IPs: %v, Interval: %ds", virtualRouterID, version, priority, virtualIPs, advertInterval),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 	}
 }
 
@@ -395,7 +395,7 @@ func (l *LANProtocolAnalyzer) analyzeCDP(packet gopacket.Packet, eth *layers.Eth
 			Protocol:  "CDP",
 			Detail:    fmt.Sprintf("Device: %s, Platform: %s, Port: %s, Capabilities: %s (v%d, TTL: %ds)", device.DeviceID, device.Platform, device.PortID, device.Capabilities, version, ttl),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 	}
 }
 
@@ -473,7 +473,7 @@ func (l *LANProtocolAnalyzer) analyzeLLDP(packet gopacket.Packet, eth *layers.Et
 			Protocol:  "LLDP",
 			Detail:    fmt.Sprintf("System: %s, Chassis: %s, Port: %s, Capabilities: %s", device.SystemName, device.ChassisID, device.PortID, device.Capabilities),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 	}
 }
 
@@ -582,7 +582,7 @@ func (l *LANProtocolAnalyzer) analyzeHSRP(packet gopacket.Packet, udp *layers.UD
 				Protocol:  "HSRP",
 				Detail:    fmt.Sprintf("Group %d: %s → %s, Priority=%d, Virtual IP=%s (v%d, Op=%d)", groupNumber, group.State, stateStr, priority, virtualIP, version, opCode),
 			}
-			report.Timeline = append(report.Timeline, event)
+			report.AddTimelineEvent(event)
 		}
 
 		group.State = stateStr
@@ -615,7 +615,7 @@ func (l *LANProtocolAnalyzer) analyzeHSRP(packet gopacket.Packet, udp *layers.UD
 			Protocol:  "HSRP",
 			Detail:    fmt.Sprintf("Group %d: State=%s, Priority=%d, Virtual IP=%s", groupNumber, stateStr, priority, virtualIP),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 	}
 }
 
@@ -654,7 +654,7 @@ func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Eth
 			Protocol:  "STP",
 			Detail:    fmt.Sprintf("Topology Change Notification from %s", eth.SrcMAC),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 		return
 	}
 
@@ -696,7 +696,7 @@ func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Eth
 				Protocol:  "STP",
 				Detail:    fmt.Sprintf("Root bridge changed from %s to %s (Bridge: %s)", bridge.RootBridgeID, rootBridgeID, bridgeID),
 			}
-			report.Timeline = append(report.Timeline, event)
+			report.AddTimelineEvent(event)
 		}
 
 		bridge.RootBridgeID = rootBridgeID
@@ -718,7 +718,7 @@ func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Eth
 			Protocol:  "STP",
 			Detail:    fmt.Sprintf("Bridge: %s, Root: %s, Cost: %d, Port: %d", bridgeID, rootBridgeID, rootCost, portID),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 	}
 }
 

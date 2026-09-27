@@ -91,7 +91,7 @@ func (h *HTTPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisSta
 			dstPortPtr := dstPort
 			event.SourcePort = &srcPortPtr
 			event.DestinationPort = &dstPortPtr
-			report.Timeline = append(report.Timeline, event)
+			report.AddTimelineEvent(event)
 		}
 	}
 

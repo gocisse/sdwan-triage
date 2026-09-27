@@ -130,16 +130,19 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 
 		if !found {
 			certInfo := models.TLSCertInfo{
-				Timestamp:    timestamp,
-				ServerIP:     srcIP,
-				ServerPort:   srcPort,
-				ServerName:   getTLSSNI(state, flowKey),
-				Issuer:       cert.Issuer.String(),
-				Subject:      cert.Subject.String(),
-				NotBefore:    cert.NotBefore.Format(time.RFC3339),
-				NotAfter:     cert.NotAfter.Format(time.RFC3339),
-				Fingerprint:  fingerprintStr,
-				IsExpired:    time.Now().After(cert.NotAfter),
+				Timestamp:   timestamp,
+				ServerIP:    srcIP,
+				ServerPort:  srcPort,
+				ServerName:  getTLSSNI(state, flowKey),
+				Issuer:      cert.Issuer.String(),
+				Subject:     cert.Subject.String(),
+				NotBefore:   cert.NotBefore.Format(time.RFC3339),
+				NotAfter:    cert.NotAfter.Format(time.RFC3339),
+				Fingerprint: fingerprintStr,
+				// Expiry is judged at the time the certificate was observed on the
+				// wire, not at analysis time: a capture analysed a year later must
+				// not report every certificate as expired.
+				IsExpired:    packet.Metadata().Timestamp.After(cert.NotAfter),
 				IsSelfSigned: cert.Issuer.String() == cert.Subject.String(),
 				DNSNames:     cert.DNSNames,
 				JA3Hash:      t.ja3PerFlow[flowKey],
@@ -170,7 +173,7 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				dstPortPtr := dstPort
 				event.SourcePort = &srcPortPtr
 				event.DestinationPort = &dstPortPtr
-				report.Timeline = append(report.Timeline, event)
+				report.AddTimelineEvent(event)
 			}
 		}
 	}

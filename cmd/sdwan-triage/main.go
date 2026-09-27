@@ -20,7 +20,7 @@ import (
 
 // Build-time variables — stamped via -ldflags "-X main.version=... -X main.buildCommit=... -X main.buildDate=..."
 var (
-	version     = "6.1.0.0"
+	version     = "6.3.0.0"
 	buildCommit = "unknown"
 	buildDate   = "unknown"
 )
@@ -291,6 +291,9 @@ For more information and documentation:
 	webPort := flag.Int("port", 8080, "HTTP server port for web mode (auto-retries if busy)")
 	noBrowser := flag.Bool("no-browser", false, "Do not auto-open browser in web mode")
 
+	// Threat Intelligence
+	threatIntelDir := flag.String("threat-intel", "", "Directory containing STIX 2.1 JSON feed files for IOC matching")
+
 	// Enterprise integration flags
 	serviceNowURL := flag.String("servicenow-url", "", "ServiceNow instance URL (e.g. https://instance.service-now.com)")
 	serviceNowUser := flag.String("servicenow-user", "", "ServiceNow username for ticket creation")
@@ -298,12 +301,19 @@ For more information and documentation:
 
 	flag.Parse()
 
+	// In -json mode stdout must contain ONLY the JSON document. Route every
+	// colored status/banner line to stderr instead.
+	if *jsonOutput {
+		color.Output = color.Error
+	}
+
 	// Web application mode — start server and return
 	if *webMode {
 		intOpts := &IntegrationOptions{
 			ServiceNowURL:      *serviceNowURL,
 			ServiceNowUser:     *serviceNowUser,
 			ServiceNowPassword: *serviceNowPassword,
+			ThreatIntelDir:     *threatIntelDir,
 		}
 		runWebServer(*webPort, *noBrowser, intOpts)
 		return
@@ -435,8 +445,20 @@ For more information and documentation:
 		processor.SetHandshakeTimeout(time.Duration(*handshakeTimeout) * time.Second)
 	}
 
-	color.Cyan("SD-WAN Network Triage v%s", version)
-	color.Cyan("Analyzing: %s\n", filepath.Base(absPath))
+	// Load threat intelligence feeds if specified
+	if *threatIntelDir != "" {
+		feeds, iocs, err := processor.LoadThreatIntelFeeds(*threatIntelDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: error loading threat intel feeds: %v\n", err)
+		} else if feeds > 0 {
+			color.Green("🛡️  Loaded %d threat intel feed(s) with %d indicators", feeds, iocs)
+		}
+	}
+
+	// Banner goes to stderr so that `-json` leaves stdout as pure JSON.
+	banner := color.New(color.FgCyan)
+	banner.Fprintf(os.Stderr, "SD-WAN Network Triage v%s\n", version)
+	banner.Fprintf(os.Stderr, "Analyzing: %s\n\n", filepath.Base(absPath))
 
 	if err := processor.Process(reader, state, report, filter); err != nil {
 		fmt.Fprintf(os.Stderr, "Error processing PCAP: %v\n", err)

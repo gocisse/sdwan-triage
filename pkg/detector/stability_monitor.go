@@ -30,6 +30,12 @@ const (
 	// IKE ports
 	ikePort    = 500
 	ikeNATPort = 4500
+
+	// maxTrackedTransitions bounds per-session timestamp histories (BFD
+	// transitions, IKE SA_INIT bursts, STP TCNs). The flapping thresholds are
+	// all < 10 events per window, so 1024 retained events is far more than the
+	// detectors need while keeping a pathological flap storm at ~24 KB.
+	maxTrackedTransitions = 1024
 )
 
 // ── BFD constants ───────────────────────────────────────────────────────────
@@ -64,7 +70,8 @@ type bfdSession struct {
 	srcIP       string
 	peerIP      string
 	lastState   uint8
-	transitions []time.Time // timestamps of Up→Down or Down→Up transitions
+	transitions []time.Time // timestamps of Up→Down or Down→Up transitions (bounded)
+	downEvents  []time.Time // timestamps of Up→Down transitions only (bounded)
 	firstSeen   time.Time
 	lastSeen    time.Time
 	packetCount int
@@ -188,7 +195,7 @@ func (sm *StabilityMonitor) analyzeBFD(packet gopacket.Packet, udp *layers.UDP, 
 			Protocol:      "BFD",
 			Detail:        fmt.Sprintf("BFD session %s → %s, state: %s", ipInfo.SrcIP, ipInfo.DstIP, bfdStateName(currentState)),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 		return
 	}
 
@@ -197,7 +204,12 @@ func (sm *StabilityMonitor) analyzeBFD(packet gopacket.Packet, udp *layers.UDP, 
 
 	// Detect state transition
 	if currentState != session.lastState {
-		session.transitions = append(session.transitions, ts)
+		if len(session.transitions) < maxTrackedTransitions {
+			session.transitions = append(session.transitions, ts)
+		}
+		if session.lastState == bfdStateUp && currentState != bfdStateUp && len(session.downEvents) < maxTrackedTransitions {
+			session.downEvents = append(session.downEvents, ts)
+		}
 
 		event := models.TimelineEvent{
 			Timestamp:     float64(ts.UnixNano()) / 1e9,
@@ -207,7 +219,7 @@ func (sm *StabilityMonitor) analyzeBFD(packet gopacket.Packet, udp *layers.UDP, 
 			Protocol:      "BFD",
 			Detail:        fmt.Sprintf("BFD %s → %s: %s → %s", ipInfo.SrcIP, ipInfo.DstIP, bfdStateName(session.lastState), bfdStateName(currentState)),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 
 		session.lastState = currentState
 	}
@@ -290,12 +302,14 @@ func (sm *StabilityMonitor) analyzeIKE(packet gopacket.Packet, udp *layers.UDP, 
 			Protocol:      "IKE",
 			Detail:        fmt.Sprintf("IKEv%d SA_INIT from %s → %s", majorVersion, ipInfo.SrcIP, ipInfo.DstIP),
 		}
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 		return
 	}
 
 	session.lastSeen = ts
-	session.initTimes = append(session.initTimes, ts)
+	if len(session.initTimes) < maxTrackedTransitions {
+		session.initTimes = append(session.initTimes, ts)
+	}
 
 	event := models.TimelineEvent{
 		Timestamp:     float64(ts.UnixNano()) / 1e9,
@@ -305,7 +319,7 @@ func (sm *StabilityMonitor) analyzeIKE(packet gopacket.Packet, udp *layers.UDP, 
 		Protocol:      "IKE",
 		Detail:        fmt.Sprintf("IKEv%d SA_INIT #%d from %s → %s", majorVersion, len(session.initTimes), ipInfo.SrcIP, ipInfo.DstIP),
 	}
-	report.Timeline = append(report.Timeline, event)
+	report.AddTimelineEvent(event)
 }
 
 // ── STP TCN Analysis ────────────────────────────────────────────────────────
@@ -328,7 +342,9 @@ func (sm *StabilityMonitor) analyzeSTPTCN(eth *layers.Ethernet, ts time.Time, re
 
 		if protocolID == 0x0000 && bpduType == 0x80 {
 			// This is a TCN BPDU
-			sm.stpTCN.tcnTimes = append(sm.stpTCN.tcnTimes, ts)
+			if len(sm.stpTCN.tcnTimes) < maxTrackedTransitions {
+				sm.stpTCN.tcnTimes = append(sm.stpTCN.tcnTimes, ts)
+			}
 			if sm.stpTCN.firstSeen.IsZero() {
 				sm.stpTCN.firstSeen = ts
 			}
@@ -340,7 +356,7 @@ func (sm *StabilityMonitor) analyzeSTPTCN(eth *layers.Ethernet, ts time.Time, re
 				Protocol:  "STP",
 				Detail:    fmt.Sprintf("STP Topology Change Notification BPDU #%d", len(sm.stpTCN.tcnTimes)),
 			}
-			report.Timeline = append(report.Timeline, event)
+			report.AddTimelineEvent(event)
 			return
 		}
 	}
@@ -354,7 +370,9 @@ func (sm *StabilityMonitor) analyzeSTPTCN(eth *layers.Ethernet, ts time.Time, re
 
 		if protocolID == 0x0000 && bpduType == 0x00 && (flags&0x01) != 0 {
 			// TC flag is set in config BPDU
-			sm.stpTCN.tcnTimes = append(sm.stpTCN.tcnTimes, ts)
+			if len(sm.stpTCN.tcnTimes) < maxTrackedTransitions {
+				sm.stpTCN.tcnTimes = append(sm.stpTCN.tcnTimes, ts)
+			}
 			if sm.stpTCN.firstSeen.IsZero() {
 				sm.stpTCN.firstSeen = ts
 			}
@@ -366,7 +384,7 @@ func (sm *StabilityMonitor) analyzeSTPTCN(eth *layers.Ethernet, ts time.Time, re
 				Protocol:  "STP",
 				Detail:    fmt.Sprintf("STP Config BPDU with Topology Change flag set (#%d)", len(sm.stpTCN.tcnTimes)),
 			}
-			report.Timeline = append(report.Timeline, event)
+			report.AddTimelineEvent(event)
 		}
 	}
 }
@@ -389,6 +407,29 @@ func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
 
 		// Count transitions that fall within any sliding 60-second window
 		maxInWindow := countInSlidingWindow(session.transitions, bfdWindowSeconds)
+
+		if maxInWindow <= bfdFlappingThreshold && len(session.downEvents) > 0 {
+			// Not flapping, but the session did go down: a single Up→Down is
+			// first-class SD-WAN evidence (tunnel/path loss) and must be visible.
+			first := session.downEvents[0]
+			last := session.downEvents[len(session.downEvents)-1]
+			finding := models.StabilityFinding{
+				Type:          "BFD Session Down",
+				Severity:      "High",
+				Identifier:    fmt.Sprintf("%s ↔ %s", session.srcIP, session.peerIP),
+				Description:   fmt.Sprintf("BFD session between %s and %s transitioned Up → Down at %s (%d down event(s), %d state transitions in capture)", session.srcIP, session.peerIP, first.Format(time.RFC3339), len(session.downEvents), len(session.transitions)),
+				StateChanges:  len(session.downEvents),
+				WindowSeconds: last.Sub(first).Seconds(),
+				FirstSeen:     first.Format(time.RFC3339),
+				LastSeen:      session.lastSeen.Format(time.RFC3339),
+				SourceIP:      session.srcIP,
+				PeerIP:        session.peerIP,
+				Protocol:      "BFD",
+				RootCauseHint: "Peer stopped responding within the detect interval: underlay path loss, WAN circuit failure, or peer reload. Correlate with TCP retransmissions/gaps at the same time and check 'show bfd neighbors detail' on both endpoints.",
+			}
+			report.StabilityFindings = append(report.StabilityFindings, finding)
+			continue
+		}
 
 		if maxInWindow > bfdFlappingThreshold {
 			window := session.lastSeen.Sub(session.firstSeen).Seconds()

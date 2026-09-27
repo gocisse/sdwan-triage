@@ -71,10 +71,7 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	// Initialize flow state if needed (using bounded cache)
 	flowState := state.GetTCPFlow(flowKey)
 	if flowState == nil {
-		flowState = &models.TCPFlowState{
-			SeqSeen:   make(map[uint32]bool),
-			SentTimes: make(map[uint32]time.Time),
-		}
+		flowState = models.NewTCPFlowState()
 		state.SetTCPFlow(flowKey, flowState)
 	}
 
@@ -82,7 +79,7 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	t.analyzeHandshake(tcp, srcIP, dstIP, srcPort, dstPort, flowKey, reverseFlowKey, timestamp, state, report)
 
 	// Detect retransmissions
-	t.detectRetransmissions(tcp, srcIP, dstIP, srcPort, dstPort, flowKey, flowState, report)
+	t.detectRetransmissions(tcp, srcIP, dstIP, srcPort, dstPort, flowKey, timestamp, flowState, report)
 
 	// Calculate RTT from ACKs
 	t.calculateRTT(tcp, reverseFlowKey, timestamp, state, report)
@@ -95,8 +92,13 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	// Update flow state
 	flowState.LastSeq = tcp.Seq
 	flowState.LastAck = tcp.Ack
-	flowState.SeqSeen[tcp.Seq] = true
-	flowState.SentTimes[tcp.Seq] = timestamp
+
+	// Only segments that consume sequence space (data, SYN, FIN) are remembered.
+	// A pure ACK shares its sequence number with the next data segment; recording
+	// it made every connection's first data segment look like a retransmission.
+	if len(tcp.Payload) > 0 || tcp.SYN || tcp.FIN {
+		flowState.Seq.Record(tcp.Seq, timestamp)
+	}
 
 	// Track bytes
 	payloadLen := uint64(len(tcp.Payload))
@@ -136,7 +138,7 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 		dstPortPtr := dstPort
 		event.SourcePort = &srcPortPtr
 		event.DestinationPort = &dstPortPtr
-		report.Timeline = append(report.Timeline, event)
+		report.AddTimelineEvent(event)
 	}
 
 	// SYN-ACK packet (connection response)
@@ -200,9 +202,9 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 }
 
 // detectRetransmissions identifies TCP retransmissions
-func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string, srcPort, dstPort uint16, flowKey string, flowState *models.TCPFlowState, report *models.TriageReport) {
+func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string, srcPort, dstPort uint16, flowKey string, timestamp time.Time, flowState *models.TCPFlowState, report *models.TriageReport) {
 	// Check if we've seen this sequence number before (retransmission)
-	if flowState.SeqSeen[tcp.Seq] && len(tcp.Payload) > 0 {
+	if len(tcp.Payload) > 0 && flowState.Seq.Seen(tcp.Seq) {
 		flow := models.TCPFlow{
 			SrcIP:   srcIP,
 			SrcPort: srcPort,
@@ -210,11 +212,12 @@ func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string
 			DstPort: dstPort,
 		}
 
-		// Notify correlator of retransmission event
+		// Notify correlator of retransmission event using capture time only:
+		// the original send time if still remembered, else this packet's time.
 		if t.OnRetransmission != nil {
-			ts := flowState.SentTimes[tcp.Seq]
-			if ts.IsZero() {
-				ts = time.Now()
+			ts, ok := flowState.Seq.Lookup(tcp.Seq)
+			if !ok || ts.IsZero() {
+				ts = timestamp
 			}
 			t.OnRetransmission(ts, flowKey, srcIP, dstIP)
 		}
@@ -244,10 +247,10 @@ func (t *TCPAnalyzer) calculateRTT(tcp *layers.TCP, reverseFlowKey string, times
 	// Look for the original packet this ACK is responding to (using bounded cache)
 	reverseState := state.GetTCPFlow(reverseFlowKey)
 	if reverseState != nil {
-		if sentTime, ok := reverseState.SentTimes[tcp.Ack-1]; ok {
+		if sentTime, ok := reverseState.Seq.Lookup(tcp.Ack - 1); ok {
 			rtt := timestamp.Sub(sentTime).Seconds() * 1000 // Convert to milliseconds
 			if rtt > 0 && rtt < 10000 {                     // Sanity check: RTT should be < 10 seconds
-				reverseState.RTTSamples = append(reverseState.RTTSamples, rtt)
+				reverseState.AddRTTSample(rtt)
 
 				// Notify correlator of RTT spike
 				if t.OnRTTSpike != nil && rtt >= t.rttSpikeThreshMs {

@@ -174,6 +174,11 @@ func (d *DDoSAnalyzer) trackICMPPacket(srcIP, dstIP string, timestamp time.Time,
 }
 
 func (d *DDoSAnalyzer) maybeResetCounters(timestamp time.Time, secState *models.SecurityState) {
+	// The first packet establishes the capture-time window origin.
+	if secState.LastResetTime.IsZero() {
+		secState.LastResetTime = timestamp
+		return
+	}
 	elapsed := timestamp.Sub(secState.LastResetTime).Seconds()
 	if elapsed >= secState.ResetIntervalSecs {
 		// Reset all counters

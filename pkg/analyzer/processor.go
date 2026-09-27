@@ -59,6 +59,7 @@ type Processor struct {
 	c2BeaconingAnalyzer  *detector.C2BeaconingAnalyzer
 	tcpAdvancedAnalyzer  *detector.TCPAdvancedAnalyzer
 	stabilityMonitor     *detector.StabilityMonitor
+	threatIntelMatcher   *detector.ThreatIntelMatcher
 	arubaDetector        *ArubaIssueDetector
 	viptelaDetector      *ViptelaIssueDetector
 	veloCloudDetector    *VeloCloudIssueDetector
@@ -71,6 +72,7 @@ type Processor struct {
 	verbose              bool
 	skippedPackets       int
 	errorCount           int
+	lastPacketTime       time.Time // capture timestamp of the most recent packet analysed
 }
 
 func (p *Processor) maxHeap() uint64 {
@@ -120,6 +122,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		c2BeaconingAnalyzer:  detector.NewC2BeaconingAnalyzer(),
 		tcpAdvancedAnalyzer:  detector.NewTCPAdvancedAnalyzer(),
 		stabilityMonitor:     detector.NewStabilityMonitor(),
+		threatIntelMatcher:   detector.NewThreatIntelMatcher(),
 		arubaDetector:        NewArubaIssueDetector(),
 		viptelaDetector:      NewViptelaIssueDetector(),
 		veloCloudDetector:    NewVeloCloudIssueDetector(),
@@ -147,6 +150,22 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 // SetHandshakeTimeout sets the timeout for TCP handshake completion
 func (p *Processor) SetHandshakeTimeout(timeout time.Duration) {
 	p.handshakeTimeout = timeout
+}
+
+// LoadThreatIntelFeeds loads STIX 2.1 JSON bundles from a directory.
+// Returns the number of feeds loaded and total IOC count.
+func (p *Processor) LoadThreatIntelFeeds(dirPath string) (int, int, error) {
+	loaded, err := p.threatIntelMatcher.LoadFeedsDirectory(dirPath)
+	if err != nil {
+		return 0, 0, err
+	}
+	_, totalIOCs := p.threatIntelMatcher.Stats()
+	return loaded, totalIOCs, nil
+}
+
+// LoadThreatIntelFile loads a single STIX 2.1 JSON bundle file.
+func (p *Processor) LoadThreatIntelFile(filePath string) error {
+	return p.threatIntelMatcher.LoadSTIXBundle(filePath)
 }
 
 // ApplyThresholds applies custom detection thresholds from configuration
@@ -250,11 +269,12 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		// Run all analyzers with panic recovery
 		p.safeAnalyzePacket(packet, state, report, packetCount)
 		packetCount++
+		p.lastPacketTime = ci.Timestamp
 
-		// Progress indicator every 10000 packets
+		// Progress indicator every 10000 packets (stderr: stdout is reserved for -json)
 		if packetCount%10000 == 0 {
 			elapsed := time.Since(startTime)
-			fmt.Printf("\rProcessed %d packets (%.0f pps)...", packetCount, float64(packetCount)/elapsed.Seconds())
+			fmt.Fprintf(os.Stderr, "\rProcessed %d packets (%.0f pps)...", packetCount, float64(packetCount)/elapsed.Seconds())
 
 			// OOM guard: abort if heap usage exceeds MaxHeapBytes (default 1 GB)
 			var memStats runtime.MemStats
@@ -264,10 +284,10 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 					ErrOOM, memStats.HeapAlloc/(1024*1024), p.maxHeap()/(1024*1024), packetCount)
 			}
 
-			// Periodic cleanup of stale stream data to prevent memory bloat
-			// Evict streams that haven't been seen for 30+ seconds
+			// Periodic cleanup of stale stream data to prevent memory bloat.
+			// Evict streams idle for 30+ seconds of CAPTURE time (never wall clock).
 			if p.streamReassembler != nil {
-				evicted := p.streamReassembler.CleanupStaleFlows(30 * time.Second)
+				evicted := p.streamReassembler.CleanupStaleFlows(30*time.Second, ci.Timestamp)
 				if evicted > 0 && p.verbose {
 					p.logDebug("Evicted %d stale streams", evicted)
 				}
@@ -275,8 +295,8 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		}
 	}
 
-	// Print summary
-	fmt.Printf("\rProcessed %d packets in %v\n", packetCount, time.Since(startTime).Round(time.Millisecond))
+	// Print summary (stderr: stdout is reserved for -json)
+	fmt.Fprintf(os.Stderr, "\rProcessed %d packets in %v\n", packetCount, time.Since(startTime).Round(time.Millisecond))
 
 	// Report any issues encountered
 	if p.skippedPackets > 0 || p.errorCount > 0 {
@@ -343,6 +363,9 @@ func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
 		// IOC matching
 		NewAnalyzerFunc("IOC-IP", p.iocAnalyzer.AnalyzeIP),
 		NewAnalyzerFunc("IOC-DNS", p.iocAnalyzer.AnalyzeDNS),
+
+		// Threat Intelligence (STIX 2.1 feeds)
+		NewAnalyzerFunc("ThreatIntel", p.threatIntelMatcher.AnalyzePacket),
 
 		// TCP advanced (window issues, out-of-order)
 		NewAnalyzerFunc("TCP-Advanced", p.tcpAdvancedAnalyzer.Analyze),
@@ -456,11 +479,19 @@ func (p *Processor) matchesFilter(packet gopacket.Packet, filter *models.Filter)
 
 // finalizeReport processes collected state into final report data
 func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.TriageReport) {
-	// Check for handshake timeouts
-	p.handshakeTracker.CheckTimeouts(time.Now(), p.handshakeTimeout, report)
+	// Check for handshake timeouts against the END OF CAPTURE (last packet
+	// timestamp), never the wall clock. A SYN that is still pending but was sent
+	// less than handshakeTimeout before the capture ended is simply incomplete.
+	// An empty capture has no reference time, so no timeout can be asserted.
+	if !p.lastPacketTime.IsZero() {
+		p.handshakeTracker.CheckTimeouts(p.lastPacketTime, p.handshakeTimeout, report)
+	}
 
 	// Export all remaining handshake flows to report (including incomplete ones)
 	p.handshakeTracker.ExportAllFlows(report)
+
+	// DNS queries that never received a response (judged in capture time)
+	p.dnsAnalyzer.Finalize(p.lastPacketTime, report)
 
 	// Build RTT histogram from collected samples
 	p.buildRTTHistogram(state, report)
@@ -470,23 +501,7 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 
 	// Calculate RTT statistics from TCP flows (using bounded cache iterator)
 	state.ForEachTCPFlow(func(flowKey string, flowState *models.TCPFlowState) bool {
-		if len(flowState.RTTSamples) > 0 {
-			var minRTT, maxRTT, sumRTT float64
-			minRTT = flowState.RTTSamples[0]
-			maxRTT = flowState.RTTSamples[0]
-
-			for _, rtt := range flowState.RTTSamples {
-				sumRTT += rtt
-				if rtt < minRTT {
-					minRTT = rtt
-				}
-				if rtt > maxRTT {
-					maxRTT = rtt
-				}
-			}
-
-			avgRTT := sumRTT / float64(len(flowState.RTTSamples))
-
+		if sampleCount, minRTT, maxRTT, avgRTT := flowState.RTTStats(); sampleCount > 0 {
 			// Only report high RTT flows (>100ms average)
 			if avgRTT > 100 {
 				// Parse flow key to get IPs and ports
@@ -514,7 +529,7 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 					MinRTT:     minRTT,
 					MaxRTT:     maxRTT,
 					AvgRTT:     avgRTT,
-					SampleSize: len(flowState.RTTSamples),
+					SampleSize: sampleCount,
 				}
 				report.RTTAnalysis = append(report.RTTAnalysis, rttFlow)
 			}
@@ -720,6 +735,13 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 			}
 		}
 		issues["Interface Flapping"] = len(report.StabilityFindings)
+	}
+
+	// P0 guard: the additive model is unbounded (len(slice)*weight). Cap the
+	// reported score at 100 so it stays a 0–100 figure; the level thresholds
+	// below are unchanged. The scoring model itself is redesigned later.
+	if score > 100 {
+		score = 100
 	}
 
 	// Set risk level based on score

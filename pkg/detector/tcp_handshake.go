@@ -8,9 +8,17 @@ import (
 	"github.com/google/gopacket"
 )
 
+// maxPendingHandshakes bounds the number of in-progress handshakes tracked.
+// Completed and failed handshakes are removed as soon as they are reported, so
+// this only limits SYNs still awaiting a SYN-ACK/ACK (e.g. a SYN flood). Each
+// entry is ~120 bytes, so the cap costs at most ~12 MB.
+const maxPendingHandshakes = 100000
+
 // TCPHandshakeTracker tracks TCP handshake state per flow
 type TCPHandshakeTracker struct {
 	flows map[string]*HandshakeFlow
+	// droppedPending counts SYNs not tracked because maxPendingHandshakes was hit.
+	droppedPending int
 }
 
 // HandshakeFlow represents the state of a TCP handshake
@@ -88,6 +96,10 @@ func (t *TCPHandshakeTracker) TrackHandshake(packet gopacket.Packet, state *mode
 	if tcp.SYN && !tcp.ACK {
 		flowKey := fmt.Sprintf("%s:%d->%s:%d", srcIP, srcPort, dstIP, dstPort)
 
+		if _, exists := t.flows[flowKey]; !exists && len(t.flows) >= maxPendingHandshakes {
+			t.droppedPending++
+			return
+		}
 		flow := &HandshakeFlow{
 			SrcIP:   srcIP,
 			SrcPort: srcPort,
@@ -151,8 +163,11 @@ func (t *TCPHandshakeTracker) TrackHandshake(packet gopacket.Packet, state *mode
 				flow.AckTime = timestamp
 				flow.CompleteTime = timestamp
 
-				// Add to report's handshake tracking
+				// Add to report's handshake tracking, then stop tracking: keeping
+				// established flows made the map grow for the whole capture and
+				// caused ExportAllFlows to report every completed handshake twice.
 				t.addToReport(flow, report)
+				delete(t.flows, flowKey)
 			}
 		}
 		return
@@ -216,10 +231,13 @@ func (t *TCPHandshakeTracker) addToReport(flow *HandshakeFlow, report *models.Tr
 	report.TCPHandshakeFlows = append(report.TCPHandshakeFlows, handshake)
 }
 
-// GetFlows returns all tracked flows
+// GetFlows returns all tracked (still pending) flows
 func (t *TCPHandshakeTracker) GetFlows() map[string]*HandshakeFlow {
 	return t.flows
 }
+
+// DroppedPending reports SYNs that were not tracked because the pending cap was hit.
+func (t *TCPHandshakeTracker) DroppedPending() int { return t.droppedPending }
 
 // ExportAllFlows exports all remaining flows to the report (including incomplete ones)
 func (t *TCPHandshakeTracker) ExportAllFlows(report *models.TriageReport) {

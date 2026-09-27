@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
-	"sync"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
@@ -48,49 +47,30 @@ func (r *DetectorRegistry) RegisterStateful(analyzers ...PacketAnalyzer) {
 	r.StatefulAnalyzers = append(r.StatefulAnalyzers, analyzers...)
 }
 
-// AnalyzePacket runs all registered detectors on a packet.
-// Independent detectors run concurrently via a WaitGroup; stateful detectors run sequentially afterward.
+// AnalyzePacket runs all registered detectors on a packet, in registration
+// order: the Independent group first, then the Stateful group.
 //
-// Thread-safety strategy:
-//   - AnalysisState: LRU caches are internally thread-safe; remaining maps use state.mu
-//   - TriageReport: Each detector acquires report.Mu before writing (append to slices)
-//   - SecurityState: Protected by its own mutex; only accessed by stateful (sequential) detectors
+// Execution is deliberately sequential on the calling goroutine. The previous
+// implementation spawned one goroutine per Independent detector per packet but
+// wrapped each Analyze call in report.Mu, so the detectors were fully serialised
+// anyway and the only effects were goroutine/lock overhead and a re-entrancy
+// deadlock when a detector itself took report.Mu. With a single goroutine no
+// report lock is needed; detectors may write to report and state directly.
+//
+// Each detector is still isolated with panic recovery so one crash does not
+// abort the pipeline.
 func (r *DetectorRegistry) AnalyzePacket(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
-	// Phase 1: Run independent (parallel-safe) detectors concurrently.
-	// Each goroutine acquires report.Mu around the Analyze call to serialize report writes.
-	// Parallelism benefit comes from concurrent packet layer parsing and filtering
-	// that each detector performs before deciding whether to write.
-	if len(r.IndependentAnalyzers) > 0 {
-		var wg sync.WaitGroup
-		wg.Add(len(r.IndependentAnalyzers))
-
-		for _, analyzer := range r.IndependentAnalyzers {
-			go func(a PacketAnalyzer) {
-				defer wg.Done()
-				// Lock report for the write phase — AnalysisState LRU caches
-				// are already thread-safe from Step 1 refactor.
-				// Use a nested func so defer Unlock runs before recoverDetector,
-				// preventing deadlock if the analyzer panics while holding the lock.
-				report.Mu.Lock()
-				func() {
-					defer report.Mu.Unlock()
-					defer r.recoverDetector(a.Name())
-					a.Analyze(packet, state, report)
-				}()
-			}(analyzer)
-		}
-
-		wg.Wait()
+	for _, analyzer := range r.IndependentAnalyzers {
+		r.runDetector(analyzer, packet, state, report)
 	}
-
-	// Phase 2: Run stateful detectors sequentially (they share SecurityState maps).
-	// These detectors write to SecurityState which is protected by its own mutex.
 	for _, analyzer := range r.StatefulAnalyzers {
-		func() {
-			defer r.recoverDetector(analyzer.Name())
-			analyzer.Analyze(packet, state, report)
-		}()
+		r.runDetector(analyzer, packet, state, report)
 	}
+}
+
+func (r *DetectorRegistry) runDetector(a PacketAnalyzer, packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
+	defer r.recoverDetector(a.Name())
+	a.Analyze(packet, state, report)
 }
 
 // recoverDetector catches panics from individual detectors so one crash doesn't kill the pipeline.
