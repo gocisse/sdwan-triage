@@ -127,21 +127,30 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		}
 
 		// Find and update the corresponding DNS query record. Prefer the O(1)
-		// transaction-ID index; fall back to the legacy name scan only when the
-		// response does not match any outstanding (id, name) pair.
+		// transaction-ID index, and only accept an indexed entry whose client is
+		// the response's destination. Fall back to a name scan only when no
+		// (id, name) entry matches, and even then require the same client: a
+		// response must never be credited to an unrelated client's query merely
+		// because the queried name is identical.
 		responseCode := uint16(dns.ResponseCode)
 		matchIdx := -1
 		pk := dnsPendingKey{id: dns.ID, name: queryName}
 		if idxs := d.pending[pk]; len(idxs) > 0 {
-			matchIdx = idxs[0]
-			if len(idxs) == 1 {
-				delete(d.pending, pk)
-			} else {
-				d.pending[pk] = idxs[1:]
+			for j, idx := range idxs {
+				if report.DNSDetails[idx].SourceIP == dstIP {
+					matchIdx = idx
+					d.pending[pk] = append(idxs[:j:j], idxs[j+1:]...)
+					if len(d.pending[pk]) == 0 {
+						delete(d.pending, pk)
+					}
+					break
+				}
 			}
-		} else {
+		}
+		if matchIdx < 0 {
 			for i := range report.DNSDetails {
-				if report.DNSDetails[i].QueryName == queryName && report.DNSDetails[i].ResponseTimestamp == nil {
+				rec := &report.DNSDetails[i]
+				if rec.QueryName == queryName && rec.ResponseTimestamp == nil && rec.SourceIP == dstIP {
 					matchIdx = i
 					break
 				}
@@ -204,20 +213,11 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				}
 			}
 
-			// Failure response codes (NXDOMAIN, SERVFAIL, REFUSED, ...) are
-			// anomalies in their own right, independent of the answer section.
+			// Failure response codes mark the matched record as anomalous
+			// (the anomaly itself is emitted below, matched or not).
 			if responseCode != uint16(layers.DNSResponseCodeNoErr) {
 				isAnomalous = true
 				reason = fmt.Sprintf("DNS %s for %s", dnsResponseCodeName(responseCode), queryName)
-				anomaly := models.DNSAnomaly{
-					Timestamp: timestamp,
-					Query:     queryName,
-					ServerIP:  srcIP,
-					ServerMAC: srcMAC,
-					Reason:    reason,
-				}
-				report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
-				emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
 			}
 
 			// Update anomaly status on the record
@@ -225,6 +225,23 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				report.DNSDetails[i].IsAnomalous = true
 				report.DNSDetails[i].Detail = reason
 			}
+		}
+
+		// Failure response codes (NXDOMAIN, SERVFAIL, REFUSED, ...) are
+		// anomalies in their own right: they are evidence about the response
+		// and its addressee even when the originating query is not in the
+		// capture (asymmetric capture points), so they are recorded whether or
+		// not a pending query record was matched above.
+		if responseCode != uint16(layers.DNSResponseCodeNoErr) && queryName != "" {
+			anomaly := models.DNSAnomaly{
+				Timestamp: timestamp,
+				Query:     queryName,
+				ServerIP:  srcIP,
+				ServerMAC: srcMAC,
+				Reason:    fmt.Sprintf("DNS %s for %s", dnsResponseCodeName(responseCode), queryName),
+			}
+			report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
+			emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
 		}
 
 		// Add timeline event for response
@@ -311,7 +328,7 @@ func (d *DNSAnalyzer) Finalize(endOfCapture time.Time, report *models.TriageRepo
 		report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
 		// Finalize runs after the last packet: stamp with the first unanswered
 		// query's own capture time, not the "current" (last) packet.
-		emitDNSAnomaly(report, time.Unix(0, int64(first.QueryTimestamp*1e9)), anomaly)
+		emitDNSAnomaly(report, time.Unix(0, int64(first.QueryTimestamp*1e9)).UTC(), anomaly)
 		for _, i := range g.idxs {
 			report.DNSDetails[i].IsAnomalous = true
 			report.DNSDetails[i].Detail = reason
@@ -325,9 +342,11 @@ func emitDNSAnomaly(report *models.TriageReport, ts time.Time, a models.DNSAnoma
 	if a.AnswerIP != "" {
 		attrs["answer_ip"] = a.AnswerIP
 	}
+	// Event timestamps are normalised to UTC at this boundary so packet-time and
+	// finalize-time DNS events serialise identically (same instant either way).
 	report.Emit(events.Event{
 		Kind:      events.DNSAnomaly,
-		Timestamp: ts,
+		Timestamp: ts.UTC(),
 		Attrs:     attrs,
 		Source:    "DNS",
 	})

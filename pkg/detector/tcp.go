@@ -99,6 +99,14 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	// it made every connection's first data segment look like a retransmission.
 	if len(tcp.Payload) > 0 || tcp.SYN || tcp.FIN {
 		flowState.Seq.Record(tcp.Seq, timestamp)
+		consumed := uint32(len(tcp.Payload))
+		if tcp.SYN {
+			consumed++
+		}
+		if tcp.FIN {
+			consumed++
+		}
+		flowState.ObserveSegment(tcp.Seq, consumed)
 	}
 
 	// Track bytes
@@ -204,6 +212,14 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 
 // detectRetransmissions identifies TCP retransmissions
 func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string, srcPort, dstPort uint16, flowKey string, timestamp time.Time, flowState *models.TCPFlowState, report *models.TriageReport) {
+	// A TCP keep-alive probe (<=1 byte at highest_next_seq-1) legitimately
+	// repeats its sequence number every interval; it is not a retransmission.
+	// Only this exact pattern is excluded — a 1-byte segment elsewhere in the
+	// stream is still eligible for retransmission detection.
+	if flowState.IsKeepAlive(tcp.Seq, len(tcp.Payload)) {
+		return
+	}
+
 	// Check if we've seen this sequence number before (retransmission)
 	if len(tcp.Payload) > 0 && flowState.Seq.Seen(tcp.Seq) {
 		flow := models.TCPFlow{

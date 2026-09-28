@@ -30,6 +30,8 @@ type tcpFlowState struct {
 	srcPort         uint16
 	dstPort         uint16
 	seq             *models.SeqHistory // bounded recent sequence-number history
+	highestNext     uint32             // highest seq+len seen (keep-alive recognition)
+	highestValid    bool
 	packetsSent     uint64
 	retransmissions uint64
 	outOfOrder      uint64
@@ -102,12 +104,20 @@ func (d *PacketLossDetector) ProcessPacket(packet gopacket.Packet) {
 	}
 
 	seqNum := tcp.Seq
+	// TCP keep-alive probe: 1 byte at highest_next-1, repeats by design.
+	if len(tcp.Payload) == 1 && flow.highestValid && seqNum == flow.highestNext-1 {
+		return
+	}
 	if flow.seq.Seen(seqNum) {
 		// Duplicate or retransmission
 		flow.retransmissions++
 		d.retransmissions++
 	} else {
 		flow.seq.Record(seqNum, packet.Metadata().Timestamp)
+	}
+	next := seqNum + uint32(len(tcp.Payload))
+	if !flow.highestValid || models.SeqAfterOrEqual(next, flow.highestNext) {
+		flow.highestNext, flow.highestValid = next, true
 	}
 }
 

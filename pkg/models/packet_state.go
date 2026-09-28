@@ -28,6 +28,12 @@ type TCPFlowState struct {
 	// Seq remembers recently sent sequence-consuming segments (bounded FIFO).
 	Seq *SeqHistory
 
+	// HighestNextSeq is the highest (seq + consumed length) observed in this
+	// direction; valid when HighestNextValid. Used to recognise TCP keep-alives
+	// (1-byte segment at HighestNextSeq-1), which are not retransmissions.
+	HighestNextSeq   uint32
+	HighestNextValid bool
+
 	// RTTSamples keeps the first MaxRTTSamplesPerFlow samples (for histograms);
 	// the aggregate fields below cover every sample observed on the flow.
 	RTTSamples []float64
@@ -43,6 +49,31 @@ type TCPFlowState struct {
 func NewTCPFlowState() *TCPFlowState {
 	return &TCPFlowState{Seq: NewSeqHistory(DefaultSeqHistorySize)}
 }
+
+// ObserveSegment advances HighestNextSeq for a segment that consumes
+// consumed bytes of sequence space starting at seq (payload + SYN + FIN).
+// Handles 32-bit sequence wrap-around.
+func (s *TCPFlowState) ObserveSegment(seq uint32, consumed uint32) {
+	if consumed == 0 {
+		return
+	}
+	next := seq + consumed
+	if !s.HighestNextValid || SeqAfterOrEqual(next, s.HighestNextSeq) {
+		s.HighestNextSeq = next
+		s.HighestNextValid = true
+	}
+}
+
+// IsKeepAlive reports whether a segment is a TCP keep-alive probe: a
+// zero/one-byte segment sitting exactly one byte before the highest sequence
+// number sent so far in this direction (RFC 1122 §4.2.3.6; matches Wireshark's
+// tcp.analysis.keep_alive rule).
+func (s *TCPFlowState) IsKeepAlive(seq uint32, payloadLen int) bool {
+	return payloadLen <= 1 && s.HighestNextValid && seq == s.HighestNextSeq-1
+}
+
+// SeqAfterOrEqual reports a >= b in TCP modular (wrap-around) arithmetic.
+func SeqAfterOrEqual(a, b uint32) bool { return int32(a-b) >= 0 }
 
 // AddRTTSample records an RTT measurement (milliseconds) for the flow.
 func (s *TCPFlowState) AddRTTSample(ms float64) {
