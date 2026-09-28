@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -198,6 +199,7 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 							Reason:    reason,
 						}
 						report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
+						emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
 					}
 				}
 			}
@@ -207,13 +209,15 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 			if responseCode != uint16(layers.DNSResponseCodeNoErr) {
 				isAnomalous = true
 				reason = fmt.Sprintf("DNS %s for %s", dnsResponseCodeName(responseCode), queryName)
-				report.DNSAnomalies = append(report.DNSAnomalies, models.DNSAnomaly{
+				anomaly := models.DNSAnomaly{
 					Timestamp: timestamp,
 					Query:     queryName,
 					ServerIP:  srcIP,
 					ServerMAC: srcMAC,
 					Reason:    reason,
-				})
+				}
+				report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
+				emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
 			}
 
 			// Update anomaly status on the record
@@ -298,17 +302,35 @@ func (d *DNSAnalyzer) Finalize(endOfCapture time.Time, report *models.TriageRepo
 			continue // may simply be cut off by the end of the capture
 		}
 
-		report.DNSAnomalies = append(report.DNSAnomalies, models.DNSAnomaly{
+		anomaly := models.DNSAnomaly{
 			Timestamp: first.QueryTimestamp,
 			Query:     k.name,
 			ServerIP:  first.DestinationIP,
 			Reason:    reason,
-		})
+		}
+		report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
+		// Finalize runs after the last packet: stamp with the first unanswered
+		// query's own capture time, not the "current" (last) packet.
+		emitDNSAnomaly(report, time.Unix(0, int64(first.QueryTimestamp*1e9)), anomaly)
 		for _, i := range g.idxs {
 			report.DNSDetails[i].IsAnomalous = true
 			report.DNSDetails[i].Detail = reason
 		}
 	}
+}
+
+// emitDNSAnomaly mirrors a DNSAnomaly into the typed event store.
+func emitDNSAnomaly(report *models.TriageReport, ts time.Time, a models.DNSAnomaly) {
+	attrs := map[string]string{"query": a.Query, "reason": a.Reason, "server_ip": a.ServerIP}
+	if a.AnswerIP != "" {
+		attrs["answer_ip"] = a.AnswerIP
+	}
+	report.Emit(events.Event{
+		Kind:      events.DNSAnomaly,
+		Timestamp: ts,
+		Attrs:     attrs,
+		Source:    "DNS",
+	})
 }
 
 // isKnownDNSServer checks if an IP is a known public DNS server

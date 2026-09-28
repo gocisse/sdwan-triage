@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -207,8 +208,20 @@ func (sm *StabilityMonitor) analyzeBFD(packet gopacket.Packet, udp *layers.UDP, 
 		if len(session.transitions) < maxTrackedTransitions {
 			session.transitions = append(session.transitions, ts)
 		}
-		if session.lastState == bfdStateUp && currentState != bfdStateUp && len(session.downEvents) < maxTrackedTransitions {
-			session.downEvents = append(session.downEvents, ts)
+		if session.lastState == bfdStateUp && currentState != bfdStateUp {
+			if len(session.downEvents) < maxTrackedTransitions {
+				session.downEvents = append(session.downEvents, ts)
+			}
+			report.Emit(events.Event{
+				Kind:      events.BFDDown,
+				Timestamp: ts,
+				Values: map[string]float64{
+					"prev_state": float64(session.lastState),
+					"new_state":  float64(currentState),
+				},
+				Attrs:  map[string]string{"src_ip": ipInfo.SrcIP, "peer_ip": ipInfo.DstIP, "new_state_name": bfdStateName(currentState)},
+				Source: "Stability",
+			})
 		}
 
 		event := models.TimelineEvent{

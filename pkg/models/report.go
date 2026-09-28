@@ -3,6 +3,8 @@ package models
 import (
 	"sync"
 	"time"
+
+	"github.com/gocisse/sdwan-triage/pkg/events"
 )
 
 // TriageReport contains all detected network anomalies and analysis results
@@ -114,6 +116,17 @@ type TriageReport struct {
 	// PCAP Export Info
 	SourcePCAPPath string `json:"source_pcap_path,omitempty"`
 
+	// ── Typed observation events (Phase 3 seam) ─────────────────────────
+	// Events is the chronologically indexed store of typed observations that
+	// detectors emit in ADDITION to their existing report fields. It is not
+	// serialised into the report JSON (events reference packets; the drill-down
+	// API re-reads the capture). EventCounts/EventsDropped are the only
+	// JSON-visible trace, so the schema change is small and intentional.
+	Events        *events.Index  `json:"-"`
+	Emitter       events.Emitter `json:"-"`
+	EventCounts   map[string]int `json:"event_counts,omitempty"`
+	EventsDropped int            `json:"events_dropped,omitempty"`
+
 	// TimelineTruncated is the number of timeline events that were NOT retained
 	// because MaxTimelineEvents was reached. Retained events are a uniform,
 	// deterministic sample across the whole capture (see AddTimelineEvent).
@@ -121,6 +134,15 @@ type TriageReport struct {
 
 	timelineSeen int    // total events offered to AddTimelineEvent
 	timelineRNG  uint64 // deterministic xorshift state for reservoir sampling
+}
+
+// Emit forwards a typed observation to the report's Emitter. It is a no-op when
+// no emitter is configured (e.g. detector unit tests using a bare report), so
+// detectors can always call it unconditionally.
+func (r *TriageReport) Emit(e events.Event) {
+	if r.Emitter != nil {
+		r.Emitter.Emit(e)
+	}
 }
 
 // MaxTimelineEvents bounds report.Timeline. The timeline feeds the UI's

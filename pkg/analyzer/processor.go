@@ -13,6 +13,7 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/config"
 	"github.com/gocisse/sdwan-triage/pkg/detector"
 	"github.com/gocisse/sdwan-triage/pkg/detectors"
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -73,6 +74,8 @@ type Processor struct {
 	skippedPackets       int
 	errorCount           int
 	lastPacketTime       time.Time // capture timestamp of the most recent packet analysed
+	MaxEvents            int       // capacity of the typed event index; 0 = events.DefaultMaxEvents
+	recorder             *events.Recorder
 }
 
 func (p *Processor) maxHeap() uint64 {
@@ -221,11 +224,25 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 	packetCount := 0
 	startTime := time.Now()
 
+	// Typed event store (additive to the existing report fields). A caller may
+	// pre-attach its own Index/Emitter; otherwise create the default bounded one.
+	if report.Events == nil {
+		report.Events = events.NewIndex(p.MaxEvents)
+	}
+	if report.Emitter == nil {
+		p.recorder = events.NewRecorder(report.Events, "")
+		report.Emitter = p.recorder
+	} else if rec, ok := report.Emitter.(*events.Recorder); ok {
+		p.recorder = rec
+	}
+	var packetIndex uint64 // ordinal of the packet in the capture file, including filtered/skipped ones
+
 	for {
 		data, ci, err := reader.ReadPacketData()
 		if err == io.EOF {
 			break
 		}
+		packetIndex++
 		if err != nil {
 			// Don't fail on individual packet read errors, log and continue
 			p.errorCount++
@@ -264,6 +281,11 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		// Final filter check with full packet (if quick check passed)
 		if filter != nil && !filter.IsEmpty() && !p.matchesFilter(packet, filter) {
 			continue
+		}
+
+		// Tell the event recorder which packet detectors are about to observe
+		if p.recorder != nil {
+			p.recorder.SetCurrentPacket(packetIndex-1, ci.Timestamp)
 		}
 
 		// Run all analyzers with panic recovery
@@ -628,6 +650,15 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 
 	// Generate plain English summary (after risk score is calculated)
 	report.PlainEnglishSummary = p.bandwidthAnalyzer.GetPlainEnglishSummary(report, gaps)
+
+	// Summarise the typed event store for the JSON report
+	if report.Events != nil && report.Events.Len() > 0 {
+		report.EventCounts = make(map[string]int)
+		for kind, n := range report.Events.Counts() {
+			report.EventCounts[string(kind)] = n
+		}
+		report.EventsDropped = report.Events.Dropped()
+	}
 }
 
 // calculateRiskScore calculates the overall risk score and generates recommendations

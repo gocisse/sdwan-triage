@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -214,13 +215,28 @@ func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string
 
 		// Notify correlator of retransmission event using capture time only:
 		// the original send time if still remembered, else this packet's time.
-		if t.OnRetransmission != nil {
-			ts, ok := flowState.Seq.Lookup(tcp.Seq)
-			if !ok || ts.IsZero() {
-				ts = timestamp
-			}
-			t.OnRetransmission(ts, flowKey, srcIP, dstIP)
+		origTS, ok := flowState.Seq.Lookup(tcp.Seq)
+		if !ok || origTS.IsZero() {
+			origTS = timestamp
 		}
+		if t.OnRetransmission != nil {
+			t.OnRetransmission(origTS, flowKey, srcIP, dstIP)
+		}
+
+		// Typed observation: one event per retransmitted segment, stamped with
+		// the retransmission's own capture time (the packet being analysed).
+		report.Emit(events.Event{
+			Kind:      events.TCPRetransmission,
+			Timestamp: timestamp,
+			FlowKey:   flowKey,
+			Values: map[string]float64{
+				"seq":               float64(tcp.Seq),
+				"payload_len":       float64(len(tcp.Payload)),
+				"since_original_ms": timestamp.Sub(origTS).Seconds() * 1000,
+			},
+			Attrs:  map[string]string{"src_ip": srcIP, "dst_ip": dstIP},
+			Source: "TCP",
+		})
 
 		// Check if this flow is already in retransmissions
 		found := false
