@@ -6,19 +6,15 @@ import (
 	"net"
 	"time"
 
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
-// BGPEventCallback is called when a BGP event is detected, allowing external
-// components (e.g., the underlay/overlay correlator) to record the event.
-type BGPEventCallback func(timestamp time.Time, peerIP, prefix, eventType, detail string)
-
 // BGPAnalyzer handles BGP protocol analysis and hijack detection
 type BGPAnalyzer struct {
 	bgpSessions map[string]*BGPSession
-	OnBGPEvent  BGPEventCallback // Optional callback for correlation
 }
 
 // BGPSession tracks BGP session state
@@ -195,12 +191,9 @@ func (b *BGPAnalyzer) handleBGPUpdate(msg *BGPMessage, session *BGPSession, ipIn
 		eventType = "Withdrawal"
 	}
 
-	// Notify correlator of BGP event
-	if b.OnBGPEvent != nil {
-		ts := time.Unix(0, int64(timestamp*1e9))
-		detail := fmt.Sprintf("Peer %s: BGP %s (withdrawn_len=%d)", ipInfo.SrcIP, eventType, withdrawnLen)
-		b.OnBGPEvent(ts, ipInfo.SrcIP, ipInfo.DstIP, eventType, detail)
-	}
+	// Publish the BGP event for underlay/overlay correlation
+	b.emitBGPEvent(report, timestamp, ipInfo, eventType,
+		fmt.Sprintf("Peer %s: BGP %s (withdrawn_len=%d)", ipInfo.SrcIP, eventType, withdrawnLen))
 
 	// Skip withdrawn routes
 	pos := 2 + withdrawnLen
@@ -345,11 +338,24 @@ func (b *BGPAnalyzer) handleBGPNotification(msg *BGPMessage, session *BGPSession
 	detail := fmt.Sprintf("BGP NOTIFICATION: Error %d/%d from %s", errorCode, errorSubcode, ipInfo.SrcIP)
 	b.reportBGPAnomaly(report, "BGP Session Error", ipInfo, timestamp, detail)
 
-	// Notify correlator of BGP session reset
-	if b.OnBGPEvent != nil {
-		ts := time.Unix(0, int64(timestamp*1e9))
-		b.OnBGPEvent(ts, ipInfo.SrcIP, ipInfo.DstIP, "Notification", detail)
-	}
+	// Publish the session reset for underlay/overlay correlation
+	b.emitBGPEvent(report, timestamp, ipInfo, "Notification", detail)
+}
+
+// emitBGPEvent publishes a bgp.event observation. timestamp is the packet
+// capture time in float seconds (the analyzer's existing convention).
+func (b *BGPAnalyzer) emitBGPEvent(report *models.TriageReport, timestamp float64, ipInfo *PacketIPInfo, eventType, detail string) {
+	report.Emit(events.Event{
+		Kind:      events.BGPEvent,
+		Timestamp: time.Unix(0, int64(timestamp*1e9)).UTC(),
+		Attrs: map[string]string{
+			"peer_ip":    ipInfo.SrcIP,
+			"dst_ip":     ipInfo.DstIP,
+			"event_type": eventType,
+			"detail":     detail,
+		},
+		Source: "BGP",
+	})
 }
 
 // reportBGPAnomaly adds a BGP anomaly to the report

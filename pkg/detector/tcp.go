@@ -10,17 +10,11 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-// TCPRetransmitCallback is called when a retransmission is detected.
-type TCPRetransmitCallback func(timestamp time.Time, flowKey, srcIP, dstIP string)
-
-// TCPRTTSpikeCallback is called when an RTT spike is detected.
-type TCPRTTSpikeCallback func(timestamp time.Time, flowKey, srcIP, dstIP string, rttMs float64)
-
-// TCPAnalyzer handles TCP packet analysis
+// TCPAnalyzer handles TCP packet analysis.
+// Correlation inputs (retransmissions, RTT spikes) are published as typed
+// events on the report's event index rather than via private callbacks.
 type TCPAnalyzer struct {
-	OnRetransmission TCPRetransmitCallback // Optional callback for correlation
-	OnRTTSpike       TCPRTTSpikeCallback   // Optional callback for correlation
-	rttSpikeThreshMs float64               // RTT threshold to trigger spike callback
+	rttSpikeThreshMs float64 // RTT threshold to emit a tcp.rtt_spike event
 }
 
 // NewTCPAnalyzer creates a new TCP analyzer
@@ -229,18 +223,16 @@ func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string
 			DstPort: dstPort,
 		}
 
-		// Notify correlator of retransmission event using capture time only:
-		// the original send time if still remembered, else this packet's time.
+		// Original send time (capture time only): the first transmission if
+		// still remembered, else this packet's time.
 		origTS, ok := flowState.Seq.Lookup(tcp.Seq)
 		if !ok || origTS.IsZero() {
 			origTS = timestamp
 		}
-		if t.OnRetransmission != nil {
-			t.OnRetransmission(origTS, flowKey, srcIP, dstIP)
-		}
 
 		// Typed observation: one event per retransmitted segment, stamped with
 		// the retransmission's own capture time (the packet being analysed).
+		// original_ts_us lets consumers recover the first-send instant exactly.
 		report.Emit(events.Event{
 			Kind:      events.TCPRetransmission,
 			Timestamp: timestamp,
@@ -249,6 +241,7 @@ func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string
 				"seq":               float64(tcp.Seq),
 				"payload_len":       float64(len(tcp.Payload)),
 				"since_original_ms": timestamp.Sub(origTS).Seconds() * 1000,
+				"original_ts_us":    float64(origTS.UnixMicro()),
 			},
 			Attrs:  map[string]string{"src_ip": srcIP, "dst_ip": dstIP},
 			Source: "TCP",
@@ -284,9 +277,15 @@ func (t *TCPAnalyzer) calculateRTT(tcp *layers.TCP, reverseFlowKey string, times
 			if rtt > 0 && rtt < 10000 {                     // Sanity check: RTT should be < 10 seconds
 				reverseState.AddRTTSample(rtt)
 
-				// Notify correlator of RTT spike
-				if t.OnRTTSpike != nil && rtt >= t.rttSpikeThreshMs {
-					t.OnRTTSpike(timestamp, reverseFlowKey, "", "", rtt)
+				// Publish RTT spikes for correlation
+				if rtt >= t.rttSpikeThreshMs {
+					report.Emit(events.Event{
+						Kind:      events.TCPRTTSpike,
+						Timestamp: timestamp,
+						FlowKey:   reverseFlowKey,
+						Values:    map[string]float64{"rtt_ms": rtt},
+						Source:    "TCP",
+					})
 				}
 			}
 		}

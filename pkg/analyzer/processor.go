@@ -139,11 +139,6 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		errorCount:           0,
 	}
 
-	// Wire correlator callbacks into BGP and TCP analyzers
-	p.bgpAnalyzer.OnBGPEvent = p.correlator.RecordBGPEvent
-	p.tcpAnalyzer.OnRetransmission = p.correlator.RecordRetransmission
-	p.tcpAnalyzer.OnRTTSpike = p.correlator.RecordRTTSpike
-
 	// Build the parallel detector registry
 	p.registry = p.buildDetectorRegistry()
 

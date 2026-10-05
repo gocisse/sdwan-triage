@@ -64,6 +64,7 @@ func Scenarios() []Scenario {
 		{"dns_failure", "dns_failure.pcap", DNSFailure},
 		{"bfd_tunnel_drop", "bfd_tunnel_drop.pcap", BFDTunnelDrop},
 		{"retransmission_storm", "retransmission_storm.pcap", RetransmissionStorm},
+		{"bgp_withdrawal_storm", "bgp_withdrawal_storm.pcap", BGPWithdrawalStorm},
 	}
 }
 
@@ -285,6 +286,62 @@ func BFDTunnelDrop() [][]byte {
 	}
 	// Session goes Down
 	packets = append(packets, UDPFrame(ClientMAC, ServerMAC, ClientIP, BFDPeer, 49152, 3784, BFDControl(bfdDown)))
+	return packets
+}
+
+// BGPPeer is the neighbour used by the BGP scenario.
+var BGPPeer = []byte{10, 0, 0, 2}
+
+// BGPUpdateWithdrawal returns a BGP UPDATE (type 2) withdrawing one /24.
+// Withdrawn Routes Length = 4 (prefix length byte + 3 prefix bytes),
+// Total Path Attribute Length = 0. Message length = 19 + 2 + 4 + 2 = 27.
+func BGPUpdateWithdrawal(prefix [3]byte) []byte {
+	msg := make([]byte, 0, 27)
+	for i := 0; i < 16; i++ {
+		msg = append(msg, 0xFF) // marker
+	}
+	msg = append(msg, 0x00, 27) // length
+	msg = append(msg, 0x02)     // type: UPDATE
+	msg = append(msg, 0x00, 0x04)
+	msg = append(msg, 24, prefix[0], prefix[1], prefix[2]) // withdrawn /24
+	msg = append(msg, 0x00, 0x00)                          // path attribute length
+	return msg
+}
+
+// BGPWithdrawalStorm is the underlay/overlay correlation scenario:
+//
+//	pkt 0      BGP UPDATE withdrawal from 10.0.0.2 -> 192.168.1.100 (underlay event, t=0)
+//	pkt 1-2    filler
+//	pkt 3,6    SYN / SYN-ACK 300 ms apart (RTT spike >= 200 ms) + ACK at pkt 7
+//	pkt 8..    five 1000-byte segments each retransmitted once (five retransmissions
+//	           within the 5 s correlation window after the BGP event)
+func BGPWithdrawalStorm() [][]byte {
+	var packets [][]byte
+	packets = append(packets, TCPFrame(ServerMAC, ClientMAC, BGPPeer, ClientIP, 179, 40179, 5000, 6000, PSH|ACK,
+		BGPUpdateWithdrawal([3]byte{192, 168, 50})))
+	filler := UDPFrame(ClientMAC, ServerMAC, ClientIP, ServerIP, 40000, 40001, []byte("x"))
+	packets = append(packets, filler, filler)
+
+	c2s := func(seq, ack uint32, flags uint8, payload []byte) []byte {
+		return TCPFrame(ClientMAC, ServerMAC, ClientIP, ServerIP, 50003, 443, seq, ack, flags, payload)
+	}
+	s2c := func(seq, ack uint32, flags uint8, payload []byte) []byte {
+		return TCPFrame(ServerMAC, ClientMAC, ServerIP, ClientIP, 443, 50003, seq, ack, flags, payload)
+	}
+	packets = append(packets, c2s(1000, 0, SYN, nil)) // pkt 3
+	packets = append(packets, filler, filler)         // 200 ms of nothing
+	packets = append(packets, s2c(2000, 1001, SYN|ACK, nil))
+	packets = append(packets, c2s(1001, 2001, ACK, nil))
+
+	data := make([]byte, 1000)
+	seq := uint32(1001)
+	for i := 0; i < 5; i++ {
+		packets = append(packets, c2s(seq, 2001, PSH|ACK, data))
+		packets = append(packets, s2c(2001, seq, ACK, nil))
+		packets = append(packets, c2s(seq, 2001, PSH|ACK, data)) // retransmission
+		seq += uint32(len(data))
+		packets = append(packets, s2c(2001, seq, ACK, nil))
+	}
 	return packets
 }
 

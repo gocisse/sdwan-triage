@@ -14,12 +14,25 @@ type Kind string
 
 const (
 	// TCPRetransmission: a data segment re-sent with a sequence number already
-	// seen on the same flow. Values: seq, payload_len. Attrs: src_ip, dst_ip.
+	// seen on the same flow. Values: seq, payload_len, since_original_ms,
+	// original_ts_us (unix microseconds of the first transmission, exact in
+	// float64). Attrs: src_ip, dst_ip.
 	TCPRetransmission Kind = "tcp.retransmission"
 
 	// BFDDown: a BFD session observed transitioning from Up to a non-Up state.
 	// Values: prev_state, new_state (RFC 5880 numeric). Attrs: src_ip, peer_ip.
 	BFDDown Kind = "bfd.down"
+
+	// TCPRTTSpike: a measured round-trip time at or above the TCP analyzer's
+	// spike threshold. Values: rtt_ms. FlowKey is the direction that sent the
+	// acknowledged segment.
+	TCPRTTSpike Kind = "tcp.rtt_spike"
+
+	// BGPEvent: a BGP UPDATE (with or without withdrawn routes) or NOTIFICATION
+	// observed on a peering session. Attrs: peer_ip (sender), dst_ip,
+	// event_type ("Update" | "Withdrawal" | "Notification"), detail.
+	// A finer BGP taxonomy is deliberately deferred.
+	BGPEvent Kind = "bgp.event"
 
 	// DNSAnomaly: a DNS observation the DNS detector classified as anomalous
 	// (failure RCODE, unanswered query, suspicious answer). Attrs: query,
