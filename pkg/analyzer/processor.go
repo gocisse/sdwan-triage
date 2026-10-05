@@ -627,6 +627,12 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Detect and add traffic gaps (gaps > 2 seconds)
 	gaps := p.bandwidthAnalyzer.DetectTrafficGaps(2.0)
 	for _, gap := range gaps {
+		report.Emit(events.Event{
+			Kind:      events.TrafficGap,
+			Timestamp: gap.StartTime,
+			Values:    map[string]float64{"duration_sec": gap.DurationSec, "end_ts_us": float64(gap.EndTime.UnixMicro())},
+			Source:    "Bandwidth",
+		})
 		report.TrafficGaps = append(report.TrafficGaps, models.TrafficGapInfo{
 			StartTime:   float64(gap.StartTime.UnixNano()) / 1e9,
 			EndTime:     float64(gap.EndTime.UnixNano()) / 1e9,
@@ -1030,6 +1036,33 @@ func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
 // finalizeTunnelAnalysis populates tunnel analysis results
 func (p *Processor) finalizeTunnelAnalysis(report *models.TriageReport) {
 	tunnels := p.tunnelAnalyzer.GetTunnels()
+
+	// Deterministic emission order for tunnel.observed events (map iteration
+	// order is random; the existing TunnelAnalysis slice order is unchanged).
+	keys := make([]string, 0, len(tunnels))
+	for k := range tunnels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		tunnel := tunnels[k]
+		report.Emit(events.Event{
+			Kind:      events.TunnelObserved,
+			Timestamp: tunnel.FirstSeen,
+			FlowKey:   fmt.Sprintf("%s:%d->%s:%d", tunnel.SrcIP, tunnel.SrcPort, tunnel.DstIP, tunnel.DstPort),
+			Values: map[string]float64{
+				"packet_count": float64(tunnel.PacketCount),
+				"byte_count":   float64(tunnel.ByteCount),
+				"last_seen_us": float64(tunnel.LastSeen.UnixMicro()),
+				"vni":          float64(tunnel.VNI),
+			},
+			Attrs: map[string]string{
+				"type": tunnel.Type, "src_ip": tunnel.SrcIP, "dst_ip": tunnel.DstIP,
+				"inner_proto": tunnel.InnerProto, "detection_method": tunnel.DetectionMethod,
+			},
+			Source: "Tunnel",
+		})
+	}
 
 	for _, tunnel := range tunnels {
 		report.TunnelAnalysis = append(report.TunnelAnalysis, models.TunnelFinding{

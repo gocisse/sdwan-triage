@@ -3,6 +3,7 @@ package detector
 import (
 	"fmt"
 
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -113,6 +114,15 @@ func (t *TCPAdvancedAnalyzer) analyzeWindow(tcp *layers.TCP, ipInfo *PacketIPInf
 	// Zero Window detection
 	if tcp.Window == 0 {
 		tracker.ZeroCount++
+		// Typed observation per zero-window segment (dual-write; the existing
+		// threshold-based TCPWindowFinding below is unchanged).
+		report.Emit(events.Event{
+			Kind:    events.TCPZeroWindow,
+			FlowKey: flowKey,
+			Values:  map[string]float64{"zero_count": float64(tracker.ZeroCount)},
+			Attrs:   map[string]string{"src_ip": ipInfo.SrcIP, "dst_ip": ipInfo.DstIP},
+			Source:  "TCP-Advanced",
+		})
 		if tracker.ZeroCount == ZeroWindowThreshold {
 			report.TCPWindowFindings = append(report.TCPWindowFindings, models.TCPWindowFinding{
 				Timestamp:   ts,

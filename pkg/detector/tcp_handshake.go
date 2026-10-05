@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 )
@@ -32,6 +33,8 @@ type HandshakeFlow struct {
 	SynAckTime    time.Time
 	AckTime       time.Time
 	CompleteTime  time.Time
+	FailedAt      time.Time     // capture time the failure was observed (RST) or the unanswered SYN/SYN-ACK time
+	ObservedWait  time.Duration // how long the attempt was observed waiting (RST-SYN, or end-of-wait-anchor)
 	FailureReason string
 	IsIPv6        bool
 }
@@ -137,6 +140,8 @@ func (t *TCPHandshakeTracker) TrackHandshake(packet gopacket.Packet, state *mode
 		if flow, exists := t.flows[flowKey]; exists {
 			flow.State = StateFailed
 			flow.FailureReason = "Connection reset (RST received)"
+			flow.FailedAt = timestamp
+			flow.ObservedWait = timestamp.Sub(flow.SynTime)
 			t.addToReport(flow, report)
 			delete(t.flows, flowKey)
 			return
@@ -145,6 +150,8 @@ func (t *TCPHandshakeTracker) TrackHandshake(packet gopacket.Packet, state *mode
 		if flow, exists := t.flows[reverseFlowKey]; exists {
 			flow.State = StateFailed
 			flow.FailureReason = "Connection reset (RST received)"
+			flow.FailedAt = timestamp
+			flow.ObservedWait = timestamp.Sub(flow.SynTime)
 			t.addToReport(flow, report)
 			delete(t.flows, reverseFlowKey)
 			return
@@ -184,22 +191,27 @@ func (t *TCPHandshakeTracker) CheckTimeouts(currentTime time.Time, timeout time.
 		var timeoutOccurred bool
 		var reason string
 
+		var anchor time.Time
 		switch flow.State {
 		case StateSynSent:
 			if currentTime.Sub(flow.SynTime) > timeout {
 				timeoutOccurred = true
 				reason = "SYN-ACK timeout (no server response)"
+				anchor = flow.SynTime
 			}
 		case StateSynAckReceived:
 			if currentTime.Sub(flow.SynAckTime) > timeout {
 				timeoutOccurred = true
 				reason = "ACK timeout (client did not complete handshake)"
+				anchor = flow.SynAckTime
 			}
 		}
 
 		if timeoutOccurred {
 			flow.State = StateFailed
 			flow.FailureReason = reason
+			flow.FailedAt = anchor
+			flow.ObservedWait = currentTime.Sub(anchor)
 			t.addToReport(flow, report)
 			delete(t.flows, flowKey)
 		}
@@ -229,6 +241,22 @@ func (t *TCPHandshakeTracker) addToReport(flow *HandshakeFlow, report *models.Tr
 	}
 
 	report.TCPHandshakeFlows = append(report.TCPHandshakeFlows, handshake)
+
+	// Typed observation for failed attempts (dual-write; the existing
+	// TCPHandshakeFlows entry above is unchanged).
+	if flow.State == StateFailed && !flow.FailedAt.IsZero() {
+		report.Emit(events.Event{
+			Kind:      events.TCPHandshakeFailed,
+			Timestamp: flow.FailedAt,
+			FlowKey:   fmt.Sprintf("%s:%d->%s:%d", flow.SrcIP, flow.SrcPort, flow.DstIP, flow.DstPort),
+			Values: map[string]float64{
+				"syn_ts_us": float64(flow.SynTime.UnixMicro()),
+				"wait_ms":   flow.ObservedWait.Seconds() * 1000,
+			},
+			Attrs:  map[string]string{"reason": flow.FailureReason, "src_ip": flow.SrcIP, "dst_ip": flow.DstIP},
+			Source: "TCP-Handshake",
+		})
+	}
 }
 
 // GetFlows returns all tracked (still pending) flows

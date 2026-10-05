@@ -34,6 +34,27 @@ const (
 	// A finer BGP taxonomy is deliberately deferred.
 	BGPEvent Kind = "bgp.event"
 
+	// TCPHandshakeFailed: a connection attempt that did not complete — reset
+	// by RST or SYN/SYN-ACK unanswered within the handshake timeout (judged in
+	// capture time). Timestamp: RST packet time, or the unanswered SYN's time.
+	// Values: syn_ts_us, wait_ms. Attrs: reason, state.
+	TCPHandshakeFailed Kind = "tcp.handshake_failed"
+
+	// TCPZeroWindow: a segment advertising a receive window of 0 (receiver
+	// buffer full). One event per such segment. Values: zero_count (running
+	// per-flow count). Attrs: src_ip, dst_ip.
+	TCPZeroWindow Kind = "tcp.zero_window"
+
+	// TunnelObserved: an encapsulation/VPN/SD-WAN tunnel was seen on the wire.
+	// One event per distinct tunnel, stamped with its first packet. Values:
+	// packet_count, byte_count, last_seen_us, vni. Attrs: type, src_ip, dst_ip,
+	// inner_proto, detection_method.
+	TunnelObserved Kind = "tunnel.observed"
+
+	// TrafficGap: no packets at all for longer than the gap threshold.
+	// Timestamp is the start of the silence. Values: duration_sec, end_ts_us.
+	TrafficGap Kind = "traffic.gap"
+
 	// DNSAnomaly: a DNS observation the DNS detector classified as anomalous
 	// (failure RCODE, unanswered query, suspicious answer). Attrs: query,
 	// reason, server_ip, and answer_ip when applicable.

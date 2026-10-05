@@ -345,6 +345,24 @@ func BGPWithdrawalStorm() [][]byte {
 	return packets
 }
 
+// GREFrame wraps an inner IPv4 packet in GRE (protocol 47, no flags/key).
+func GREFrame(srcMAC, dstMAC, outerSrc, outerDst []byte, inner []byte) []byte {
+	gre := append([]byte{0x00, 0x00, 0x08, 0x00}, inner...) // flags/version=0, proto=IPv4
+	ip := BuildIPv4(outerSrc, outerDst, 47, gre)
+	return BuildEthernet(srcMAC, dstMAC, 0x0800, ip)
+}
+
+// GRETunnel is three GRE-encapsulated UDP datagrams between two tunnel
+// endpoints (10.0.0.1 ↔ 10.0.0.2) carrying inner traffic 192.168.1.100 → 10.0.0.50.
+func GRETunnel() [][]byte {
+	var packets [][]byte
+	for i := 0; i < 3; i++ {
+		inner := BuildIPv4(ClientIP, ServerIP, 17, BuildUDP(40000, 40001, []byte("inner payload")))
+		packets = append(packets, GREFrame(ClientMAC, ServerMAC, BFDPeer, BGPPeer, inner))
+	}
+	return packets
+}
+
 // RetransmissionStorm is a handshake followed by five 1000-byte segments that
 // are each retransmitted once after three duplicate ACKs.
 func RetransmissionStorm() [][]byte {
