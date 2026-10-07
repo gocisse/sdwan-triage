@@ -20,10 +20,6 @@ func generateSecurityPage(data *ReportData, outputPath string) error {
                         </div>
                         <div class="card-body">
                             <div class="stats-grid">
-                                <div class="stat-card {{if gt .Stats.DDoSAttacks 0}}stat-danger{{end}}">
-                                    <span class="stat-value">{{.Stats.DDoSAttacks}}</span>
-                                    <span class="stat-label"><i class="fas fa-bomb"></i> DDoS Attacks</span>
-                                </div>
                                 <div class="stat-card {{if gt .Stats.PortScans 0}}stat-warning{{end}}">
                                     <span class="stat-value">{{.Stats.PortScans}}</span>
                                     <span class="stat-label"><i class="fas fa-crosshairs"></i> Port Scans</span>
@@ -114,40 +110,6 @@ func generateSecurityPage(data *ReportData, outputPath string) error {
                     </div>
                     {{end}}
                     </div>
-
-                    {{if .DDoSFindings}}
-                    <div class="card">
-                        <div class="card-header">
-                            <i class="fas fa-bomb"></i>
-                            <h2>DDoS Attacks Detected ({{len .DDoSFindings}})</h2>
-                        </div>
-                        <div class="card-body">
-                            <table class="data-table">
-                                <thead><tr><th>Time</th><th>Source IP</th><th>Target IP</th><th>Type</th><th>Packets</th><th>Severity</th><th>Action</th></tr></thead>
-                                <tbody>
-                                    {{range .DDoSFindings}}
-                                    <tr class="severity-row-{{if eq .Severity "Critical"}}critical{{else if eq .Severity "High"}}high{{else}}medium{{end}}">
-                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
-                                        <td><code>{{.SourceIP}}</code></td>
-                                        <td><code>{{.TargetIP}}</code></td>
-                                        <td><span class="badge badge-danger">{{.Type}}</span></td>
-                                        <td>{{.PacketCount}} (threshold: {{.Threshold}})</td>
-                                        <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="7">
-                                            <div class="action-content">
-                                                {{.Explanation}}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {{end}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {{end}}
 
                     {{if .PortScanFindings}}
                     <div class="card">
@@ -342,18 +304,6 @@ func generateSecurityPage(data *ReportData, outputPath string) error {
                                         <p><strong>Port scan detection (SYN packets from scanner):</strong></p>
                                         <code class="wireshark-filter">ip.src == 203.0.113.50 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
                                         <button class="copy-filter-btn" onclick="copyToClipboard('ip.src == 203.0.113.50 and tcp.flags.syn == 1 and tcp.flags.ack == 0')"><i class="fas fa-copy"></i> Copy</button>
-                                        
-                                        <p><strong>SYN flood (DDoS) to target:</strong></p>
-                                        <code class="wireshark-filter">ip.dst == 192.168.1.1 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
-                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 192.168.1.1 and tcp.flags.syn == 1 and tcp.flags.ack == 0')"><i class="fas fa-copy"></i> Copy</button>
-                                        
-                                        <p><strong>UDP flood to target:</strong></p>
-                                        <code class="wireshark-filter">ip.dst == 192.168.1.1 and udp</code>
-                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 192.168.1.1 and udp')"><i class="fas fa-copy"></i> Copy</button>
-                                        
-                                        <p><strong>ICMP flood:</strong></p>
-                                        <code class="wireshark-filter">ip.dst == 192.168.1.1 and icmp</code>
-                                        <button class="copy-filter-btn" onclick="copyToClipboard('ip.dst == 192.168.1.1 and icmp')"><i class="fas fa-copy"></i> Copy</button>
                                         
                                         <p><strong>ARP conflicts for specific IP:</strong></p>
                                         <code class="wireshark-filter">arp and arp.src.proto_ipv4 == 192.168.1.100</code>

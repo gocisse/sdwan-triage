@@ -91,9 +91,6 @@ func (g *PDFGenerator) GeneratePDFWithConfig(report *models.TriageReport, pdfPat
 	if len(report.FailedHandshakes) > 0 {
 		g.addFailedHandshakesTable(report)
 	}
-	if len(report.Security.DDoSFindings) > 0 {
-		g.addDDoSFindingsTable(report)
-	}
 	if len(report.Security.PortScanFindings) > 0 {
 		g.addPortScanFindingsTable(report)
 	}
@@ -369,28 +366,6 @@ func (g *PDFGenerator) addFailedHandshakesTable(report *models.TriageReport) {
 		g.pdf.CellFormat(55, 7, handshake.DstIP, "1", 0, "L", false, 0, "")
 		g.pdf.CellFormat(35, 7, fmt.Sprintf("%d", handshake.SrcPort), "1", 0, "C", false, 0, "")
 		g.pdf.CellFormat(35, 7, fmt.Sprintf("%d", handshake.DstPort), "1", 1, "C", false, 0, "")
-	}
-
-	g.pdf.Ln(5)
-}
-
-// addDDoSFindingsTable adds the DDoS findings table
-func (g *PDFGenerator) addDDoSFindingsTable(report *models.TriageReport) {
-	g.checkPageBreak(50)
-	g.addSectionHeader(fmt.Sprintf("DDoS Attack Indicators (%d total)", len(report.Security.DDoSFindings)))
-
-	// Table header
-	g.addTableHeader([]string{"Source IP", "Target IP", "Type", "Packets", "Severity"}, []float64{40, 40, 35, 30, 35})
-
-	// Table rows - all items
-	g.pdf.SetFont("Arial", "", 8)
-	for _, finding := range report.Security.DDoSFindings {
-		g.checkPageBreakWithHeader(7, []string{"Source IP", "Target IP", "Type", "Packets", "Severity"}, []float64{40, 40, 35, 30, 35})
-		g.pdf.CellFormat(40, 7, finding.SourceIP, "1", 0, "L", false, 0, "")
-		g.pdf.CellFormat(40, 7, finding.TargetIP, "1", 0, "L", false, 0, "")
-		g.pdf.CellFormat(35, 7, finding.Type, "1", 0, "L", false, 0, "")
-		g.pdf.CellFormat(30, 7, fmt.Sprintf("%d", finding.PacketCount), "1", 0, "C", false, 0, "")
-		g.pdf.CellFormat(35, 7, finding.Severity, "1", 1, "L", false, 0, "")
 	}
 
 	g.pdf.Ln(5)

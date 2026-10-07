@@ -101,33 +101,6 @@ func generateTopIssues(report *models.TriageReport) []PrioritizedIssue {
 	var issues []PrioritizedIssue
 
 	// Security Issues (Critical Priority)
-	if len(report.Security.DDoSFindings) > 0 {
-		var ips []string
-		for _, attack := range report.Security.DDoSFindings {
-			ips = append(ips, attack.SourceIP)
-		}
-		issues = append(issues, PrioritizedIssue{
-			Severity:        "critical",
-			Category:        "security",
-			Title:           "DDoS Attack Detected",
-			PlainEnglish:    "Someone is flooding your network with fake traffic to make your services unavailable.",
-			BusinessImpact:  "Users cannot access applications. Services may crash. Revenue loss possible.",
-			AffectedCount:   len(report.Security.DDoSFindings),
-			WiresharkFilter: generateDDoSFilter(report.Security.DDoSFindings),
-			QuickFix:        "Block attacking IP addresses at the firewall immediately.",
-			DetailedSteps: []string{
-				"1. Identify the source IP addresses from the table below",
-				"2. Add firewall rules to block these IPs: iptables -A INPUT -s [IP] -j DROP",
-				"3. Enable rate limiting on affected ports",
-				"4. Contact your ISP if attack persists (they can filter upstream)",
-				"5. Consider enabling DDoS protection service",
-			},
-			RelatedIPs: ips,
-			Icon:       "fa-bomb",
-			Color:      "#dc2626",
-		})
-	}
-
 	if len(report.Security.PortScanFindings) > 0 {
 		var ips []string
 		for _, scan := range report.Security.PortScanFindings {
@@ -317,18 +290,6 @@ func generateTopIssues(report *models.TriageReport) []PrioritizedIssue {
 // generateQuickWins creates list of immediately actionable fixes
 func generateQuickWins(report *models.TriageReport) []QuickWin {
 	var wins []QuickWin
-
-	if len(report.Security.DDoSFindings) > 0 {
-		for _, attack := range report.Security.DDoSFindings {
-			wins = append(wins, QuickWin{
-				Title:       fmt.Sprintf("Block DDoS Source: %s", attack.SourceIP),
-				Description: "Add firewall rule to block attacking IP",
-				Command:     fmt.Sprintf("iptables -A INPUT -s %s -j DROP", attack.SourceIP),
-				TimeToFix:   "1 minute",
-				Impact:      "Stops attack traffic immediately",
-			})
-		}
-	}
 
 	if len(report.ARPConflicts) > 0 {
 		wins = append(wins, QuickWin{
@@ -1005,14 +966,6 @@ func generateTroubleshootingFlow(issues []PrioritizedIssue) []TroubleshootingSte
 }
 
 // Helper functions
-func generateDDoSFilter(attacks []models.DDoSFinding) string {
-	var filters []string
-	for _, attack := range attacks {
-		filters = append(filters, fmt.Sprintf("ip.src == %s", attack.SourceIP))
-	}
-	return strings.Join(filters, " || ")
-}
-
 func uniqueStrings(input []string) []string {
 	seen := make(map[string]bool)
 	var result []string

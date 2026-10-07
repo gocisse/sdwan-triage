@@ -58,11 +58,6 @@
                     <div class="kpi-label">Failed Handshakes</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-header"><div class="kpi-icon {{if gt .Stats.DDoSAttacks 0}}danger{{else}}success{{end}}"><i class="fas fa-skull-crossbones"></i></div></div>
-                    <div class="kpi-value">{{.Stats.DDoSAttacks}}</div>
-                    <div class="kpi-label">DDoS Attacks</div>
-                </div>
-                <div class="kpi-card">
                     <div class="kpi-header"><div class="kpi-icon {{if gt .Stats.TCPRetransmissions 100}}warning{{else}}info{{end}}"><i class="fas fa-redo"></i></div></div>
                     <div class="kpi-value">{{.Stats.TCPRetransmissions}}</div>
                     <div class="kpi-label">Retransmissions</div>
@@ -113,11 +108,10 @@
                     <div class="card-header"><div class="card-title"><i class="fas fa-exclamation-triangle"></i> Critical Findings</div></div>
                     <div class="card-body">
                         <div class="findings-list">
-                            {{if gt .Stats.DDoSAttacks 0}}<div class="finding critical"><span class="severity critical">CRITICAL</span> {{.Stats.DDoSAttacks}} DDoS attacks</div>{{end}}
                             {{if gt .Stats.DNSAnomalies 0}}<div class="finding warning"><span class="severity high">HIGH</span> {{.Stats.DNSAnomalies}} DNS anomalies</div>{{end}}
                             {{if gt .Stats.FailedHandshakes 0}}<div class="finding warning"><span class="severity medium">MEDIUM</span> {{.Stats.FailedHandshakes}} failed handshakes</div>{{end}}
                             {{if gt .Stats.SuspiciousTraffic 0}}<div class="finding warning"><span class="severity high">HIGH</span> {{.Stats.SuspiciousTraffic}} suspicious flows</div>{{end}}
-                            {{if and (eq .Stats.DDoSAttacks 0) (eq .Stats.DNSAnomalies 0) (eq .Stats.FailedHandshakes 0)}}<div class="finding success"><span class="severity success">OK</span> No critical issues</div>{{end}}
+                            {{if and (eq .Stats.DNSAnomalies 0) (eq .Stats.FailedHandshakes 0)}}<div class="finding success"><span class="severity success">OK</span> No critical issues</div>{{end}}
                         </div>
                     </div>
                 </div>
@@ -140,21 +134,9 @@
         <section id="security" class="section">
             <div class="section-header">
                 <h1 class="section-title"><i class="fas fa-shield-alt"></i> Security Analysis</h1>
-                <span class="status-badge {{if or (gt .Stats.DDoSAttacks 0) (gt .Stats.SuspiciousTraffic 0)}}critical{{else}}success{{end}}">{{add .Stats.DDoSAttacks .Stats.PortScans .Stats.SuspiciousTraffic}} Threats</span>
+                <span class="status-badge {{if gt .Stats.SuspiciousTraffic 0}}critical{{else}}success{{end}}">{{add .Stats.PortScans .Stats.SuspiciousTraffic 0}} Threats</span>
             </div>
 
-            {{if gt .Stats.DDoSAttacks 0}}
-            <div class="card">
-                <div class="card-header"><div class="card-title"><i class="fas fa-skull-crossbones"></i> DDoS Attacks</div><span class="severity critical">{{.Stats.DDoSAttacks}}</span></div>
-                <div class="card-body">
-                    <div class="edu-banner"><div class="edu-banner-header"><i class="fas fa-info-circle"></i> What is DDoS?</div><p>A DDoS attack floods targets with traffic to overwhelm them. Types: SYN floods, UDP floods, ICMP floods.</p></div>
-                    <div class="table-container"><table class="data-table"><thead><tr><th>Type</th><th>Source</th><th>Target</th><th>Packets</th><th>Severity</th></tr></thead><tbody>
-                    {{range .DDoSFindings}}<tr><td><span class="severity critical">{{.Type}}</span></td><td class="mono">{{.SourceIP}}</td><td class="mono">{{.TargetIP}}</td><td>{{.PacketCount}}</td><td><span class="severity {{if gt .PacketCount 1000}}critical{{else}}high{{end}}">{{.Severity}}</span></td></tr>{{end}}
-                    </tbody></table></div>
-                    <div class="action-checklist"><div class="action-checklist-title"><i class="fas fa-user-shield"></i> Actions</div><ul><li><i class="fas fa-check-circle"></i> Check if multiple services affected → ESCALATE</li><li><i class="fas fa-check-circle"></i> Do NOT block IPs without approval</li></ul></div>
-                </div>
-            </div>
-            {{end}}
 
             {{if gt .Stats.DNSAnomalies 0}}
             <div class="card">
@@ -555,7 +537,7 @@
     }
     function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toastMessage').textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
     function exportReport(fmt) {
-        const data = { timestamp: new Date().toISOString(), file: '{{.FileName}}', riskScore: {{.RiskScore}}, findings: { ddos: {{.Stats.DDoSAttacks}}, dns: {{.Stats.DNSAnomalies}}, handshakes: {{.Stats.FailedHandshakes}}, retransmissions: {{.Stats.TCPRetransmissions}} }};
+        const data = { timestamp: new Date().toISOString(), file: '{{.FileName}}', riskScore: {{.RiskScore}}, findings: { dns: {{.Stats.DNSAnomalies}}, handshakes: {{.Stats.FailedHandshakes}}, retransmissions: {{.Stats.TCPRetransmissions}} }};
         if (fmt === 'json') { const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'sdwan-report.json'; a.click(); showToast('Exported JSON'); }
     }
     </script>

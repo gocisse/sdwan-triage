@@ -51,7 +51,7 @@ Every finding card is a **3-step guided troubleshooting workflow** (Verify → D
 Real-time filtering by Source IP, Destination IP, Port/Service, and Protocol directly in the Web UI. Partial matching (e.g., `10.0` matches all IPs in that subnet), service name resolution (e.g., `https` → port 443), and composable stacking with the timeline scrubber.
 
 ### 📡 35+ Protocol Analyzers
-DDoS detection, port scanning, DNS tunneling, C2 beaconing, TCP anomalies (retransmissions, zero window, out-of-order), DHCP rogue servers, NTP amplification, ARP spoofing, VRRP/HSRP/STP, ICMP anomalies, SIP/RTP voice quality, and more.
+Port scanning, DNS tunneling, C2 beaconing, TCP anomalies (retransmissions, zero window, out-of-order), DHCP rogue servers, NTP amplification, ARP spoofing, VRRP/HSRP/STP, ICMP anomalies, SIP/RTP voice quality, and more.
 
 ---
 

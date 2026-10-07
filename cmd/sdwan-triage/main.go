@@ -86,7 +86,6 @@ OPTIONS:
 
 FEATURES:
   Security Analysis:
-    • DDoS Detection (SYN flood, UDP flood, ICMP flood)
     • Port Scanning Detection (horizontal, vertical, block scans)
     • Malware Indicators (IOC checking with custom databases)
     • TLS Security Analysis (weak ciphers, outdated protocols)
@@ -168,7 +167,7 @@ EXAMPLES:
     sdwan-triage -src-ip 192.168.1.100 -service https -html report.html capture.pcap
 
   Security Analysis:
-    # Detect DDoS attacks and port scans
+    # Detect port scans
     sdwan-triage -config security -html security-report.html capture.pcap
 
     # Analyze suspicious traffic from specific IP
@@ -550,7 +549,6 @@ For more information and documentation:
 	// Config was loaded earlier for threshold customization
 	if *verbose && *configPath != "" {
 		fmt.Fprintf(os.Stderr, "[DEBUG] Loaded config from: %s\n", *configPath)
-		fmt.Fprintf(os.Stderr, "[DEBUG] DDoS SYN threshold: %d\n", thresholds.DDoS.SYNThreshold)
 		fmt.Fprintf(os.Stderr, "[DEBUG] High RTT threshold: %.1fms\n", thresholds.Performance.HighRTTMs)
 	}
 
@@ -945,10 +943,6 @@ func performTracePath(report *models.TriageReport, verbose bool) error {
 	for _, finding := range report.Security.TLSSecurityFindings {
 		destIPs[finding.ServerIP]++
 	}
-	// Count from DDoS findings
-	for _, finding := range report.Security.DDoSFindings {
-		destIPs[finding.TargetIP]++
-	}
 
 	if len(destIPs) == 0 {
 		color.Yellow("  No destinations with anomalies found for path tracing")
@@ -1052,13 +1046,6 @@ func performBGPCheck(report *models.TriageReport, verbose bool) error {
 		}
 		if !isPrivateIP(flow.DstIP) {
 			externalIPs[flow.DstIP] = true
-		}
-	}
-
-	// Also check IPs from security findings
-	for _, finding := range report.Security.DDoSFindings {
-		if finding.SourceIP != "" && !isPrivateIP(finding.SourceIP) {
-			externalIPs[finding.SourceIP] = true
 		}
 	}
 

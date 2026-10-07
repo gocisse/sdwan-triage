@@ -57,7 +57,7 @@ type ReportCounts struct {
 	TLSCerts           int    `json:"tls_certs"`
 	HTTPErrors         int    `json:"http_errors"`
 	BGPIndicators      int    `json:"bgp_indicators"`
-	DDoSAttacks        int    `json:"ddos_attacks"`
+	DDoSAttacks        int    `json:"ddos_attacks"` // Deprecated: DDoS detection removed; always 0 (kept for frozen consumers)
 	PortScans          int    `json:"port_scans"`
 	IOCMatches         int    `json:"ioc_matches"`
 	TLSWeaknesses      int    `json:"tls_weaknesses"`

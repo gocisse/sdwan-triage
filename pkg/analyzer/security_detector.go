@@ -415,11 +415,6 @@ func NewThreatDetector() *ThreatDetector {
 func (td *ThreatDetector) DetectThreats(stream *models.StreamData) []DetectedIssue {
 	issues := []DetectedIssue{}
 
-	// DDoS pattern detection
-	if ddosIssues := td.detectDDoSPatterns(stream); len(ddosIssues) > 0 {
-		issues = append(issues, ddosIssues...)
-	}
-
 	// C2 beaconing detection
 	if c2Issues := td.detectC2Beaconing(stream); len(c2Issues) > 0 {
 		issues = append(issues, c2Issues...)
@@ -433,72 +428,6 @@ func (td *ThreatDetector) DetectThreats(stream *models.StreamData) []DetectedIss
 	// DNS tunneling detection
 	if dnsIssues := td.detectDNSTunneling(stream); len(dnsIssues) > 0 {
 		issues = append(issues, dnsIssues...)
-	}
-
-	return issues
-}
-
-// detectDDoSPatterns detects potential DDoS attack patterns
-func (td *ThreatDetector) detectDDoSPatterns(stream *models.StreamData) []DetectedIssue {
-	issues := []DetectedIssue{}
-
-	// High packet rate with small packets suggests DDoS
-	if stream.PacketCount > 1000 && stream.Duration > 0 {
-		pps := float64(stream.PacketCount) / stream.Duration
-		avgPacketSize := float64(stream.TotalBytes) / float64(stream.PacketCount)
-
-		// Very high PPS with small packets
-		if pps > 1000 && avgPacketSize < 100 {
-			issue := DetectedIssue{
-				ID:              "THREAT-DDOS-001",
-				Title:           "Potential DDoS Attack Pattern",
-				TechnicalDesc:   "High packet rate with small packet sizes indicating possible volumetric attack",
-				BusinessImpact:  "Service degradation, bandwidth exhaustion, legitimate traffic affected",
-				Severity:        SeverityCritical,
-				Confidence:      0.70,
-				Category:        CategoryInfraIssues,
-				RootCause:       "Volumetric DDoS attack or misconfigured application",
-				AffectedService: "Network Infrastructure",
-
-				BaseFilter:      buildStreamFilter(stream),
-				ExpandedFilter:  buildExpandedFilter(stream),
-				OptimizedFilter: buildOptimizedFilter(stream),
-
-				ImmediateActions: []RemediationAction{
-					{
-						Description:    "Verify if traffic is legitimate",
-						Commands:       []string{"Check source IP reputation", "Verify application behavior"},
-						Verification:   "Determine if attack or legitimate traffic",
-						EstimatedTime:  "5 minutes",
-						RequiresChange: false,
-						SuccessRate:    0.80,
-					},
-					{
-						Description:    "Enable rate limiting if attack confirmed",
-						Commands:       []string{"Apply rate limit to source IP/subnet", "Monitor impact"},
-						Verification:   "Attack traffic reduced",
-						EstimatedTime:  "5 minutes",
-						RequiresChange: true,
-						SuccessRate:    0.85,
-					},
-				},
-
-				ShortTermFixes: []RemediationAction{
-					{
-						Description:     "Block attacking source at edge",
-						Commands:        []string{"Add ACL to block source IP/subnet", "Engage DDoS mitigation service"},
-						Verification:    "Attack traffic blocked",
-						EstimatedTime:   "15 minutes",
-						RequiresChange:  true,
-						SuccessRate:     0.90,
-						EscalationPoint: "Engage ISP or DDoS mitigation provider for large attacks",
-					},
-				},
-
-				KnowledgeBaseRef: "KB-THREAT-DDOS-001",
-			}
-			issues = append(issues, issue)
-		}
 	}
 
 	return issues

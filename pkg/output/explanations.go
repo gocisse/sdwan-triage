@@ -167,39 +167,6 @@ func GenerateHTTPErrorExplanation(statusCode int, method, url string) FindingExp
 	}
 }
 
-// DDoS Attack Explanation
-func GenerateDDoSExplanation(attackType, sourceIP string, packetCount int) FindingExplanation {
-	var filter, definition, impact string
-
-	switch attackType {
-	case "SYN Flood":
-		filter = fmt.Sprintf("tcp.flags.syn == 1 and tcp.flags.ack == 0 and ip.src == %s", sourceIP)
-		definition = fmt.Sprintf("A SYN flood attack involves sending a large number of TCP SYN packets (%d detected) from %s without completing the handshake, exhausting server resources.", packetCount, sourceIP)
-		impact = "SYN floods consume server memory and connection table entries, preventing legitimate users from establishing connections. The server becomes unresponsive or crashes."
-	case "UDP Flood":
-		filter = fmt.Sprintf("udp and ip.src == %s", sourceIP)
-		definition = fmt.Sprintf("A UDP flood attack sends a high volume of UDP packets (%d detected) from %s to overwhelm the target with traffic.", packetCount, sourceIP)
-		impact = "UDP floods consume bandwidth and processing resources, causing network congestion and service degradation. Legitimate traffic is crowded out."
-	case "ICMP Flood":
-		filter = fmt.Sprintf("icmp and ip.src == %s", sourceIP)
-		definition = fmt.Sprintf("An ICMP flood (ping flood) sends excessive ICMP Echo Request packets (%d detected) from %s to overwhelm the target.", packetCount, sourceIP)
-		impact = "ICMP floods consume bandwidth and CPU resources processing ping requests, degrading network performance and potentially causing outages."
-	default:
-		filter = fmt.Sprintf("ip.src == %s", sourceIP)
-		definition = fmt.Sprintf("A DDoS attack pattern was detected with %d packets from %s.", packetCount, sourceIP)
-		impact = "DDoS attacks aim to make services unavailable by overwhelming them with traffic."
-	}
-
-	return FindingExplanation{
-		Title:             fmt.Sprintf("%s DDoS Attack", attackType),
-		Definition:        definition,
-		Impact:            impact,
-		Detection:         fmt.Sprintf("The tool detected an abnormally high packet rate (%d packets) from source %s, exceeding normal traffic thresholds and matching %s attack patterns.", packetCount, sourceIP, attackType),
-		WiresharkFilter:   filter,
-		RecommendedAction: fmt.Sprintf("1. Apply the filter to examine the attack traffic. 2. Use 'Statistics → Conversations' to see traffic volume per IP. 3. Check if source IP %s is spoofed or part of a botnet. 4. Implement rate limiting and SYN cookies on affected servers. 5. Configure firewall rules to block or rate-limit traffic from %s. 6. Contact ISP for upstream filtering if attack is large-scale. 7. Consider DDoS mitigation services (Cloudflare, AWS Shield, etc.). 8. Use 'ip.src == %s and frame.time_relative < 1' to see attack intensity in first second.", sourceIP, sourceIP, sourceIP),
-	}
-}
-
 // Port Scan Explanation
 func GeneratePortScanExplanation(scanType, sourceIP string, portCount int) FindingExplanation {
 	var filter, definition string

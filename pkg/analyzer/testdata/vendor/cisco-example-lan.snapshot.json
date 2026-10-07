@@ -44,7 +44,6 @@
     "vendor_dpi_issues": 0
   },
   "security_counts": {
-    "ddos_findings": 1,
     "ioc_findings": 0,
     "port_scan_findings": 0,
     "tls_security_findings": 0

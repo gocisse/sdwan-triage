@@ -80,12 +80,6 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 		fmt.Println("🔒 SECURITY CONCERNS")
 		fmt.Println(strings.Repeat("─", 60))
 
-		if len(report.Security.DDoSFindings) > 0 {
-			red.Printf("• Possible attack detected (%d incidents)\n", len(report.Security.DDoSFindings))
-			fmt.Println("  This means: Someone may be trying to overwhelm your network")
-			fmt.Println("  Action needed: Contact your IT team or network administrator")
-		}
-
 		if len(report.Security.PortScanFindings) > 0 {
 			yellow.Printf("• Someone is probing your network (%d scans)\n", len(report.Security.PortScanFindings))
 			fmt.Println("  This means: An external system is checking for vulnerabilities")
@@ -171,9 +165,6 @@ func getHealthStatus(report *models.TriageReport) string {
 	warningIssues := 0
 
 	// Check for critical issues
-	if len(report.Security.DDoSFindings) > 0 {
-		criticalIssues++
-	}
 	if len(report.Security.IOCFindings) > 0 {
 		criticalIssues++
 	}
@@ -208,18 +199,13 @@ func getHealthStatus(report *models.TriageReport) string {
 }
 
 func hasSecurityIssues(report *models.TriageReport) bool {
-	return len(report.Security.DDoSFindings) > 0 ||
-		len(report.Security.PortScanFindings) > 0 ||
+	return len(report.Security.PortScanFindings) > 0 ||
 		len(report.Security.IOCFindings) > 0 ||
 		len(report.SuspiciousTraffic) > 0
 }
 
 func getRecommendedActions(report *models.TriageReport) []string {
 	actions := make([]string, 0)
-
-	if len(report.Security.DDoSFindings) > 0 {
-		actions = append(actions, "Contact your network administrator immediately about potential DDoS attack")
-	}
 
 	if len(report.Security.IOCFindings) > 0 {
 		actions = append(actions, "Run a full antivirus scan on all systems")

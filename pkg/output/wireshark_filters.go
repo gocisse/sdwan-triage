@@ -153,20 +153,6 @@ func (wfg *WiresharkFilterGenerator) GeneratePortScanFilter(scannerIP string) st
 	return fmt.Sprintf("ip.src == %s and tcp.flags.syn == 1 and tcp.flags.ack == 0", scannerIP)
 }
 
-// GenerateDDoSFilter creates a filter for DDoS traffic
-func (wfg *WiresharkFilterGenerator) GenerateDDoSFilter(targetIP string, attackType string) string {
-	switch strings.ToLower(attackType) {
-	case "syn flood":
-		return fmt.Sprintf("ip.dst == %s and tcp.flags.syn == 1 and tcp.flags.ack == 0", targetIP)
-	case "udp flood":
-		return fmt.Sprintf("ip.dst == %s and udp", targetIP)
-	case "icmp flood":
-		return fmt.Sprintf("ip.dst == %s and icmp", targetIP)
-	default:
-		return fmt.Sprintf("ip.dst == %s", targetIP)
-	}
-}
-
 // GenerateICMPFilter creates a filter for ICMP traffic
 func (wfg *WiresharkFilterGenerator) GenerateICMPFilter(srcIP, dstIP string, icmpType int) string {
 	filters := []string{"icmp"}
@@ -310,9 +296,6 @@ func (wfg *WiresharkFilterGenerator) GetFilterGuideHTML() string {
                 <div class="filter-examples">
                     <p><strong>Port scan detection:</strong></p>
                     <code>ip.src == 192.168.1.100 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
-                    
-                    <p><strong>SYN flood (DDoS):</strong></p>
-                    <code>ip.dst == 192.168.1.1 and tcp.flags.syn == 1 and tcp.flags.ack == 0</code>
                     
                     <p><strong>ARP conflicts:</strong></p>
                     <code>arp and arp.src.proto_ipv4 == 192.168.1.100</code>

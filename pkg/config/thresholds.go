@@ -9,9 +9,6 @@ import (
 
 // ThresholdsConfig holds user-configurable detection thresholds
 type ThresholdsConfig struct {
-	// DDoS detection thresholds
-	DDoS DDoSThresholds `yaml:"ddos"`
-
 	// Port scan detection thresholds
 	PortScan PortScanThresholds `yaml:"port_scan"`
 
@@ -20,13 +17,6 @@ type ThresholdsConfig struct {
 
 	// Analysis options
 	Analysis AnalysisThresholds `yaml:"analysis"`
-}
-
-// DDoSThresholds holds DDoS detection thresholds
-type DDoSThresholds struct {
-	SYNThreshold  int `yaml:"syn_threshold"`  // SYN packets per IP in detection window (default: 100)
-	UDPThreshold  int `yaml:"udp_threshold"`  // UDP packets per IP in detection window (default: 200)
-	ICMPThreshold int `yaml:"icmp_threshold"` // ICMP packets per IP in detection window (default: 100)
 }
 
 // PortScanThresholds holds port scan detection thresholds
@@ -56,11 +46,6 @@ type AnalysisThresholds struct {
 // DefaultThresholds returns the default threshold configuration
 func DefaultThresholds() *ThresholdsConfig {
 	return &ThresholdsConfig{
-		DDoS: DDoSThresholds{
-			SYNThreshold:  100,
-			UDPThreshold:  200,
-			ICMPThreshold: 100,
-		},
 		PortScan: PortScanThresholds{
 			HorizontalThreshold: 20,
 			VerticalThreshold:   10,
@@ -98,18 +83,14 @@ func LoadThresholds(path string) (*ThresholdsConfig, error) {
 	case "default", "":
 		return cfg, nil
 	case "performance":
-		// Performance-focused preset: lower thresholds for RTT, higher for security
+		// Performance-focused preset: lower thresholds for RTT, packet loss and retransmissions
 		cfg.Performance.HighRTTMs = 50.0
 		cfg.Performance.CriticalRTTMs = 100.0
 		cfg.Performance.PacketLossWarn = 0.5
 		cfg.Performance.RetransmitWarn = 5
-		cfg.DDoS.SYNThreshold = 200 // Higher threshold to reduce noise
 		return cfg, nil
 	case "security":
-		// Security-focused preset: lower thresholds for attack detection
-		cfg.DDoS.SYNThreshold = 50
-		cfg.DDoS.UDPThreshold = 100
-		cfg.DDoS.ICMPThreshold = 50
+		// Security-focused preset: lower port-scan thresholds
 		cfg.PortScan.HorizontalThreshold = 10
 		cfg.PortScan.VerticalThreshold = 5
 		return cfg, nil
@@ -141,8 +122,8 @@ func SaveThresholds(cfg *ThresholdsConfig, path string) error {
 # 
 # Presets available via -config flag:
 #   - default:     Balanced thresholds for general use
-#   - performance: Lower RTT/packet loss thresholds, higher security thresholds
-#   - security:    Lower attack detection thresholds for sensitive environments
+#   - performance: Lower RTT/packet loss thresholds
+#   - security:    Lower port-scan thresholds for sensitive environments
 #
 # Custom YAML files can be loaded via: -config /path/to/config.yaml
 

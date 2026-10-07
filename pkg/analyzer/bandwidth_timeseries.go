@@ -390,12 +390,6 @@ func (ba *BandwidthAnalyzer) GetPlainEnglishSummary(report *models.TriageReport,
 	}
 
 	// Security alerts
-	if len(report.Security.DDoSFindings) > 0 {
-		summary.SecurityAlerts = append(summary.SecurityAlerts,
-			fmt.Sprintf("🔴 Potential DDoS attack detected — %d flood patterns identified",
-				len(report.Security.DDoSFindings)))
-	}
-
 	if len(report.Security.PortScanFindings) > 0 {
 		summary.SecurityAlerts = append(summary.SecurityAlerts,
 			fmt.Sprintf("🟡 Port scanning activity from %d sources",

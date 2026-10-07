@@ -134,15 +134,6 @@ func GenerateCSVReports(r *models.TriageReport, baseFilename string) (*CSVExport
 		result.Files = append(result.Files, handshakeFile)
 	}
 
-	// Generate DDoS findings CSV if any exist
-	if len(r.Security.DDoSFindings) > 0 {
-		ddosFile := filepath.Join(dir, baseName+"_ddos_findings.csv")
-		if err := generateDDoSFindingsCSV(r.Security.DDoSFindings, ddosFile); err != nil {
-			return nil, fmt.Errorf("failed to generate DDoS findings CSV: %w", err)
-		}
-		result.Files = append(result.Files, ddosFile)
-	}
-
 	// Generate port scan findings CSV if any exist
 	if len(r.Security.PortScanFindings) > 0 {
 		portScanFile := filepath.Join(dir, baseName+"_port_scan_findings.csv")
@@ -262,7 +253,7 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 	}
 
 	// Calculate health status
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.DDoSFindings) + len(r.Security.IOCFindings)
+	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.IOCFindings)
 	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
 	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings)
 
@@ -305,7 +296,6 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		{"HTTP/2 Flows", fmt.Sprintf("%d", len(r.HTTP2Flows)), "HTTP/2 connections detected"},
 		{"QUIC Flows", fmt.Sprintf("%d", len(r.QUICFlows)), "QUIC connections detected"},
 		// Security Analysis metrics
-		{"DDoS Attacks Detected", fmt.Sprintf("%d", len(r.Security.DDoSFindings)), "DDoS attack patterns identified"},
 		{"Port Scans Detected", fmt.Sprintf("%d", len(r.Security.PortScanFindings)), "Port scanning activities detected"},
 		{"IOC Matches", fmt.Sprintf("%d", len(r.Security.IOCFindings)), "Indicators of Compromise matched"},
 		{"TLS Security Weaknesses", fmt.Sprintf("%d", len(r.Security.TLSSecurityFindings)), "Weak TLS configurations detected"},
@@ -968,59 +958,6 @@ func GenerateSingleCSV(r *models.TriageReport, filename string) error {
 			"",
 		}
 		writer.Write(row)
-	}
-
-	return nil
-}
-
-// generateDDoSFindingsCSV creates a CSV for DDoS attack findings
-func generateDDoSFindingsCSV(findings []models.DDoSFinding, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	header := []string{
-		"Timestamp (UTC)",
-		"Source IP",
-		"Target IP",
-		"Attack Type",
-		"Packet Count",
-		"Threshold",
-		"Duration (s)",
-		"Severity",
-		"Description",
-		"Recommended Action",
-	}
-	if err := writer.Write(header); err != nil {
-		return err
-	}
-
-	for _, f := range findings {
-		ts := formatTimestampForCSV(f.Timestamp)
-		description := fmt.Sprintf("%s attack detected from %s with %d packets (threshold: %d)",
-			f.Type, f.SourceIP, f.PacketCount, f.Threshold)
-		action := "Block source IP; enable rate limiting; configure DDoS protection"
-
-		row := []string{
-			ts,
-			f.SourceIP,
-			f.TargetIP,
-			f.Type,
-			fmt.Sprintf("%d", f.PacketCount),
-			fmt.Sprintf("%d", f.Threshold),
-			fmt.Sprintf("%.2f", f.Duration),
-			f.Severity,
-			description,
-			action,
-		}
-		if err := writer.Write(row); err != nil {
-			return err
-		}
 	}
 
 	return nil

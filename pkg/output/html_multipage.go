@@ -251,7 +251,7 @@ func generateDashboardPage(data *ReportData, outputPath string) error {
                                 <a href="security.html" class="quick-link-card">
                                     <i class="fas fa-shield-alt"></i>
                                     <h3>Security Analysis</h3>
-                                    <p>{{.Stats.DDoSAttacks}} DDoS • {{.Stats.PortScans}} Port Scans • {{.Stats.IOCMatches}} IOCs</p>
+                                    <p>{{.Stats.PortScans}} Port Scans • {{.Stats.IOCMatches}} IOCs</p>
                                 </a>
                                 <a href="performance.html" class="quick-link-card">
                                     <i class="fas fa-tachometer-alt"></i>
@@ -352,7 +352,7 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
                                 <div class="risk-breakdown">
                                     <div class="risk-category">
                                         <span class="risk-category-label">Security Threats:</span>
-                                        <span class="risk-category-value">{{.Stats.DDoSAttacks}} DDoS, {{.Stats.PortScans}} Scans, {{.Stats.IOCMatches}} IOCs</span>
+                                        <span class="risk-category-value">{{.Stats.PortScans}} Scans, {{.Stats.IOCMatches}} IOCs</span>
                                     </div>
                                     <div class="risk-category">
                                         <span class="risk-category-label">Performance Issues:</span>

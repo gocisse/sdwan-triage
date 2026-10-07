@@ -246,13 +246,6 @@ type AnalysisState struct {
 type SecurityState struct {
 	mu sync.RWMutex
 
-	// DDoS detection
-	SYNCountPerIP     map[string]*FloodCounter
-	UDPCountPerIP     map[string]*FloodCounter
-	ICMPCountPerIP    map[string]*FloodCounter
-	LastResetTime     time.Time
-	ResetIntervalSecs float64
-
 	// Port scan detection
 	ScannedPortsPerIP    map[string]map[string]map[uint16]bool // srcIP -> dstIP -> ports
 	ScanAttemptsPerIP    map[string]int
@@ -273,14 +266,6 @@ func (s *SecurityState) RLock() { s.mu.RLock() }
 
 // RUnlock releases the read lock on SecurityState.
 func (s *SecurityState) RUnlock() { s.mu.RUnlock() }
-
-// FloodCounter tracks packet counts for flood detection
-type FloodCounter struct {
-	Count     int
-	FirstSeen time.Time
-	LastSeen  time.Time
-	TargetIPs map[string]int
-}
 
 // ICMPStats tracks ICMP statistics per source IP
 type ICMPStats struct {
@@ -327,29 +312,10 @@ func NewBoundedAnalysisState(maxFlows, maxSYN int) *AnalysisState {
 // NewSecurityState creates a new initialized security state
 func NewSecurityState() *SecurityState {
 	return &SecurityState{
-		SYNCountPerIP:  make(map[string]*FloodCounter),
-		UDPCountPerIP:  make(map[string]*FloodCounter),
-		ICMPCountPerIP: make(map[string]*FloodCounter),
-		// LastResetTime is zero until the first packet establishes the capture
-		// time base (see DDoSAnalyzer.maybeResetCounters). Using wall-clock here
-		// made every window comparison against historical capture timestamps
-		// negative, so the window never reset.
-		LastResetTime:        time.Time{},
-		ResetIntervalSecs:    10.0,
 		ScannedPortsPerIP:    make(map[string]map[string]map[uint16]bool),
 		ScanAttemptsPerIP:    make(map[string]int),
 		ConnectionsPerIPPair: make(map[string]int),
 		ICMPStats:            make(map[string]*ICMPStats),
-	}
-}
-
-// NewFloodCounter creates a new flood counter
-func NewFloodCounter(t time.Time) *FloodCounter {
-	return &FloodCounter{
-		Count:     1,
-		FirstSeen: t,
-		LastSeen:  t,
-		TargetIPs: make(map[string]int),
 	}
 }
 

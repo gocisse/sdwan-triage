@@ -176,7 +176,6 @@ func project(name string, r *models.TriageReport) vendorProjection {
 		"vendor_dpi_issues":              len(r.VendorDPIIssues),
 	}
 	p.SecurityCounts = map[string]int{
-		"ddos_findings":         len(r.Security.DDoSFindings),
 		"ioc_findings":          len(r.Security.IOCFindings),
 		"port_scan_findings":    len(r.Security.PortScanFindings),
 		"tls_security_findings": len(r.Security.TLSSecurityFindings),

@@ -109,7 +109,6 @@ type ReportData struct {
 		DevicesDetected    int
 		DNSQueries         int
 		BGPIndicators      int
-		DDoSAttacks        int
 		PortScans          int
 		IOCMatches         int
 		TLSWeaknesses      int
@@ -134,7 +133,6 @@ type ReportData struct {
 	HTTPErrors          []HTTPErrorView
 	TLSCerts            []TLSCertView
 	BGPIndicators       []BGPIndicatorView
-	DDoSFindings        []DDoSFindingView
 	PortScanFindings    []PortScanFindingView
 	IOCFindings         []IOCFindingView
 	TLSSecurityFindings []TLSSecurityFindingView
@@ -452,18 +450,6 @@ type QoSMismatchView struct {
 	ExpectedClass string
 	ActualClass   string
 	Reason        string
-}
-
-type DDoSFindingView struct {
-	Timestamp   float64
-	SourceIP    string
-	TargetIP    string
-	Type        string
-	PacketCount int
-	Threshold   int
-	Duration    float64
-	Severity    string
-	Explanation template.HTML
 }
 
 type PortScanFindingView struct {
@@ -827,7 +813,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	}
 
 	// Calculate total findings for display
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.DDoSFindings) + len(r.Security.IOCFindings)
+	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.IOCFindings)
 	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
 	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings) + icmpAnomalies
 	data.TotalFindings = criticalIssues + performanceIssues + securityConcerns
@@ -859,7 +845,6 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.Stats.DevicesDetected = len(r.DeviceFingerprinting)
 	data.Stats.DNSQueries = len(r.DNSDetails)
 	data.Stats.BGPIndicators = len(r.BGPHijackIndicators)
-	data.Stats.DDoSAttacks = len(r.Security.DDoSFindings)
 	data.Stats.PortScans = len(r.Security.PortScanFindings)
 	data.Stats.IOCMatches = len(r.Security.IOCFindings)
 	data.Stats.TLSWeaknesses = len(r.Security.TLSSecurityFindings)
@@ -880,7 +865,6 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.HTTPErrors = convertHTTPErrors(r.HTTPErrors)
 	data.TLSCerts = convertTLSCerts(r.TLSCerts)
 	data.BGPIndicators = convertBGPIndicators(r.BGPHijackIndicators)
-	data.DDoSFindings = convertDDoSFindings(r.Security.DDoSFindings)
 	data.PortScanFindings = convertPortScanFindings(r.Security.PortScanFindings)
 	data.IOCFindings = convertIOCFindings(r.Security.IOCFindings)
 	data.TLSSecurityFindings = convertTLSSecurityFindings(r.Security.TLSSecurityFindings)
@@ -1255,11 +1239,6 @@ func generateNetworkJSON(r *models.TriageReport) string {
 		if anomaly.ServerIP != "" {
 			anomalyIPs[anomaly.ServerIP] = true
 		}
-	}
-
-	// DDoS sources
-	for _, ddos := range r.Security.DDoSFindings {
-		anomalyIPs[ddos.SourceIP] = true
 	}
 
 	// Port scan sources
@@ -1861,25 +1840,6 @@ func convertQoSMismatches(mismatches []models.QoSMismatch) []QoSMismatchView {
 			ExpectedClass: html.EscapeString(m.ExpectedClass),
 			ActualClass:   html.EscapeString(m.ActualClass),
 			Reason:        html.EscapeString(m.Reason),
-		}
-	}
-	return result
-}
-
-func convertDDoSFindings(findings []models.DDoSFinding) []DDoSFindingView {
-	result := make([]DDoSFindingView, len(findings))
-	for i, f := range findings {
-		explanation := GenerateDDoSExplanation(f.Type, f.SourceIP, f.PacketCount)
-		result[i] = DDoSFindingView{
-			Timestamp:   f.Timestamp,
-			SourceIP:    html.EscapeString(f.SourceIP),
-			TargetIP:    html.EscapeString(f.TargetIP),
-			Type:        html.EscapeString(f.Type),
-			PacketCount: f.PacketCount,
-			Threshold:   f.Threshold,
-			Duration:    f.Duration,
-			Severity:    html.EscapeString(f.Severity),
-			Explanation: explanation.ToHTML(),
 		}
 	}
 	return result
@@ -2502,10 +2462,6 @@ func getTemplateContent() string {
                             <span class="stat-value">{{.Stats.DNSQueries}}</span>
                             <span class="stat-label"><i class="fas fa-search"></i> DNS Queries</span>
                         </div>
-                        <div class="stat-card {{if gt .Stats.DDoSAttacks 0}}stat-danger{{end}}">
-                            <span class="stat-value">{{.Stats.DDoSAttacks}}</span>
-                            <span class="stat-label"><i class="fas fa-bomb"></i> DDoS Attacks</span>
-                        </div>
                         <div class="stat-card {{if gt .Stats.PortScans 0}}stat-warning{{end}}">
                             <span class="stat-value">{{.Stats.PortScans}}</span>
                             <span class="stat-label"><i class="fas fa-crosshairs"></i> Port Scans</span>
@@ -2705,37 +2661,6 @@ func getTemplateContent() string {
                                         <td>{{.NotBefore}}</td>
                                         <td>{{.NotAfter}}</td>
                                         <td><code>{{.ServerIP}}</code> ({{.ServerName}})</td>
-                                    </tr>
-                                    {{end}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                    {{end}}
-
-                    {{if .DDoSFindings}}
-                    <details open>
-                        <summary><i class="fas fa-bomb"></i> DDoS Attacks Detected ({{len .DDoSFindings}})</summary>
-                        <div>
-                            <table class="data-table">
-                                <thead><tr><th>Time</th><th>Source IP</th><th>Target IP</th><th>Type</th><th>Packets</th><th>Severity</th><th>Action</th></tr></thead>
-                                <tbody>
-                                    {{range .DDoSFindings}}
-                                    <tr class="severity-row-{{if eq .Severity "Critical"}}critical{{else if eq .Severity "High"}}high{{else}}medium{{end}}">
-                                        <td>{{formatUnixTimeShort .Timestamp}}</td>
-                                        <td><code>{{.SourceIP}}</code></td>
-                                        <td><code>{{.TargetIP}}</code></td>
-                                        <td><span class="badge badge-danger">{{.Type}}</span></td>
-                                        <td>{{.PacketCount}} (threshold: {{.Threshold}})</td>
-                                        <td><span class="badge badge-{{if eq .Severity "Critical"}}danger{{else if eq .Severity "High"}}warning{{else}}info{{end}}">{{.Severity}}</span></td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="toggleAction(this)">Show Details</button></td>
-                                    </tr>
-                                    <tr class="action-row">
-                                        <td colspan="7">
-                                            <div class="action-content">
-                                                {{.Explanation}}
-                                            </div>
-                                        </td>
                                     </tr>
                                     {{end}}
                                 </tbody>

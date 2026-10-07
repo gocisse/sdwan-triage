@@ -36,7 +36,6 @@ type Processor struct {
 	trafficAnalyzer      *detector.TrafficAnalyzer
 	quicAnalyzer         *detector.QUICAnalyzer
 	qosAnalyzer          *detector.QoSAnalyzer
-	ddosAnalyzer         *detector.DDoSAnalyzer
 	portScanAnalyzer     *detector.PortScanAnalyzer
 	iocAnalyzer          *detector.IOCAnalyzer
 	tlsSecurityAnalyzer  *detector.TLSSecurityAnalyzer
@@ -101,7 +100,6 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		trafficAnalyzer:      detector.NewTrafficAnalyzer(),
 		quicAnalyzer:         detector.NewQUICAnalyzer(),
 		qosAnalyzer:          detector.NewQoSAnalyzer(qosEnabled),
-		ddosAnalyzer:         detector.NewDDoSAnalyzer(),
 		portScanAnalyzer:     detector.NewPortScanAnalyzer(),
 		iocAnalyzer:          detector.NewIOCAnalyzer(),
 		tlsSecurityAnalyzer:  detector.NewTLSSecurityAnalyzer(),
@@ -176,17 +174,6 @@ func (p *Processor) LoadThreatIntelFile(filePath string) error {
 func (p *Processor) ApplyThresholds(cfg *config.ThresholdsConfig) {
 	if cfg == nil {
 		return
-	}
-
-	// Apply DDoS thresholds
-	if cfg.DDoS.SYNThreshold > 0 {
-		p.ddosAnalyzer.SetSYNThreshold(cfg.DDoS.SYNThreshold)
-	}
-	if cfg.DDoS.UDPThreshold > 0 {
-		p.ddosAnalyzer.SetUDPThreshold(cfg.DDoS.UDPThreshold)
-	}
-	if cfg.DDoS.ICMPThreshold > 0 {
-		p.ddosAnalyzer.SetICMPThreshold(cfg.DDoS.ICMPThreshold)
 	}
 
 	// Apply port scan thresholds
@@ -408,7 +395,7 @@ func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
 	)
 
 	// ── Stateful Analyzers (must run sequentially) ──
-	// These detectors write to shared SecurityState maps (DDoS counters, port scan tracking)
+	// These detectors write to shared SecurityState maps (port scan tracking)
 	// or maintain ordering-dependent state (TCP flow tracking, handshake correlation).
 	// SecurityState maps are protected by SecurityState.mu.
 	reg.RegisterStateful(
@@ -420,9 +407,6 @@ func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
 		NewAnalyzerFunc("Traffic", p.trafficAnalyzer.Analyze),
 
 		// Security detectors (write to SecurityState maps)
-		NewAnalyzerFunc("DDoS-TCP", p.ddosAnalyzer.AnalyzeTCP),
-		NewAnalyzerFunc("DDoS-UDP", p.ddosAnalyzer.AnalyzeUDP),
-		NewAnalyzerFunc("DDoS-ICMP", p.ddosAnalyzer.AnalyzeICMP),
 		NewAnalyzerFunc("PortScan", p.portScanAnalyzer.Analyze),
 
 		// C2 beaconing (maintains internal interval tracking state)
@@ -686,10 +670,6 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 		score += len(report.DNSAnomalies) * 10
 		issues["DNS Anomalies"] = len(report.DNSAnomalies)
 	}
-	if len(report.Security.DDoSFindings) > 0 {
-		score += len(report.Security.DDoSFindings) * 10
-		issues["DDoS Indicators"] = len(report.Security.DDoSFindings)
-	}
 	if len(report.Security.TLSSecurityFindings) > 0 {
 		score += len(report.Security.TLSSecurityFindings) * 10
 		issues["TLS Security Issues"] = len(report.Security.TLSSecurityFindings)
@@ -827,9 +807,6 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 	}
 	if issues["DNS Anomalies"] > 0 {
 		actions = append(actions, "CRITICAL: Review DNS anomalies for potential DNS hijacking or poisoning attacks.")
-	}
-	if issues["DDoS Indicators"] > 0 {
-		actions = append(actions, "CRITICAL: Potential DDoS attack detected. Enable rate limiting and contact your ISP if needed.")
 	}
 	if issues["IOC Matches"] > 0 {
 		actions = append(actions, "CRITICAL: Indicators of Compromise detected. Isolate affected systems and perform forensic analysis.")

@@ -26,12 +26,6 @@ func thrSYN(src, dst []byte, sport, dport uint16) []byte {
 	return testpcap.TCPFrame(testpcap.ClientMAC, testpcap.ServerMAC, src, dst, sport, dport, 1000, 0, testpcap.SYN, nil)
 }
 
-func thrICMPEcho(src, dst []byte) []byte {
-	icmp := []byte{8, 0, 0, 0, 0, 1, 0, 1}
-	ip := testpcap.BuildIPv4(src, dst, 1, icmp)
-	return testpcap.BuildEthernet(testpcap.ClientMAC, testpcap.ServerMAC, 0x0800, ip)
-}
-
 // runThr analyses packets spaced `interval` apart with a processor optionally
 // customised by configure (which must run before Process).
 func runThr(t *testing.T, packets [][]byte, interval time.Duration, configure func(*Processor)) *models.TriageReport {
@@ -114,66 +108,6 @@ func TestDefaultThresholds_PortScanVertical10(t *testing.T) {
 	}
 	if got := portScanTypes(runThr(t, scan(10), time.Millisecond, nil)); got["Vertical"] != 1 {
 		t.Errorf("10 targets: %v, want one Vertical finding (default is 10, pre-4.9b was 15)", got)
-	}
-}
-
-func ddosTypes(r *models.TriageReport) map[string]int {
-	out := map[string]int{}
-	for _, f := range r.Security.DDoSFindings {
-		out[f.Type]++
-	}
-	return out
-}
-
-// DDoS defaults were already equal (100/200/100) and must stay so.
-//
-// Boundary note: models.NewFloodCounter starts the counter at 1 and the first
-// packet increments it again, so a source trips a threshold of N after N-1
-// packets. That off-by-one is pre-existing and deliberately NOT changed here;
-// the test pins the effective boundary (N-1) so a change to either the default
-// or the counter behavior is noticed.
-func TestDefaultThresholds_DDoS100_200_100(t *testing.T) {
-	syn := func(n int) [][]byte {
-		var pk [][]byte
-		for i := 0; i < n; i++ {
-			pk = append(pk, thrSYN(thrSrc, thrDst, 50000, 443))
-		}
-		return pk
-	}
-	udp := func(n int) [][]byte {
-		var pk [][]byte
-		f := testpcap.UDPFrame(testpcap.ClientMAC, testpcap.ServerMAC, thrSrc, thrDst, 40000, 40001, []byte("x"))
-		for i := 0; i < n; i++ {
-			pk = append(pk, f)
-		}
-		return pk
-	}
-	icmp := func(n int) [][]byte {
-		var pk [][]byte
-		for i := 0; i < n; i++ {
-			pk = append(pk, thrICMPEcho(thrSrc, thrDst))
-		}
-		return pk
-	}
-	cases := []struct {
-		name     string
-		kind     string
-		pk       func(int) [][]byte
-		boundary int
-	}{
-		{"SYN", "SYN Flood", syn, 99},    // threshold 100
-		{"UDP", "UDP Flood", udp, 199},   // threshold 200
-		{"ICMP", "ICMP Flood", icmp, 99}, // threshold 100
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := ddosTypes(runThr(t, tc.pk(tc.boundary-1), time.Millisecond/4, nil)); got[tc.kind] != 0 {
-				t.Errorf("%d packets: %v, want no %s", tc.boundary-1, got, tc.kind)
-			}
-			if got := ddosTypes(runThr(t, tc.pk(tc.boundary), time.Millisecond/4, nil)); got[tc.kind] != 1 {
-				t.Errorf("%d packets: %v, want one %s", tc.boundary, got, tc.kind)
-			}
-		})
 	}
 }
 

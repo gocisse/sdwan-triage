@@ -53,7 +53,6 @@ func GenerateDebugHTML(report *models.TriageReport, filename string, pcapFile st
     <div class="section">
         <h2>🔒 Security Analysis</h2>
         <ul>
-            <li>DDoS Findings: <span class="count">{{.DDoSCount}}</span></li>
             <li>Port Scan Findings: <span class="count">{{.PortScanCount}}</span></li>
             <li>IOC Findings: <span class="count">{{.IOCCount}}</span></li>
             <li>TLS Security Issues: <span class="count">{{.TLSSecurityCount}}</span></li>
@@ -91,18 +90,6 @@ func GenerateDebugHTML(report *models.TriageReport, filename string, pcapFile st
     </div>
     {{end}}
 
-    {{if .DDoSFindings}}
-    <div class="section">
-        <h2>⚠️ DDoS Findings</h2>
-        <table>
-            <tr><th>Type</th><th>Source IP</th><th>Target IP</th><th>Packet Count</th></tr>
-            {{range .DDoSFindings}}
-            <tr><td>{{.Type}}</td><td>{{.SourceIP}}</td><td>{{.TargetIP}}</td><td>{{.PacketCount}}</td></tr>
-            {{end}}
-        </table>
-    </div>
-    {{end}}
-
     {{if .TLSSecurityFindings}}
     <div class="section">
         <h2>🔐 TLS Security Issues</h2>
@@ -135,7 +122,6 @@ func GenerateDebugHTML(report *models.TriageReport, filename string, pcapFile st
 		ARPConflictCount       int
 		HTTPErrorCount         int
 		TrafficFlowCount       int
-		DDoSCount              int
 		PortScanCount          int
 		IOCCount               int
 		TLSSecurityCount       int
@@ -147,7 +133,6 @@ func GenerateDebugHTML(report *models.TriageReport, filename string, pcapFile st
 		RiskLevel              string
 		TopIssue               string
 		DNSAnomalies           []models.DNSAnomaly
-		DDoSFindings           []models.DDoSFinding
 		TLSSecurityFindings    []models.TLSSecurityFinding
 	}
 
@@ -168,7 +153,6 @@ func GenerateDebugHTML(report *models.TriageReport, filename string, pcapFile st
 		ARPConflictCount:       len(report.ARPConflicts),
 		HTTPErrorCount:         len(report.HTTPErrors),
 		TrafficFlowCount:       len(report.TrafficAnalysis),
-		DDoSCount:              len(report.Security.DDoSFindings),
 		PortScanCount:          len(report.Security.PortScanFindings),
 		IOCCount:               len(report.Security.IOCFindings),
 		TLSSecurityCount:       len(report.Security.TLSSecurityFindings),
@@ -180,7 +164,6 @@ func GenerateDebugHTML(report *models.TriageReport, filename string, pcapFile st
 		RiskLevel:              report.RiskLevel,
 		TopIssue:               report.TopIssue,
 		DNSAnomalies:           dnsAnomalies,
-		DDoSFindings:           report.Security.DDoSFindings,
 		TLSSecurityFindings:    report.Security.TLSSecurityFindings,
 	}
 

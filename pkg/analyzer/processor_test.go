@@ -79,9 +79,6 @@ func TestProcessorInitialization(t *testing.T) {
 	if p.qosAnalyzer == nil {
 		t.Error("qosAnalyzer not initialized")
 	}
-	if p.ddosAnalyzer == nil {
-		t.Error("ddosAnalyzer not initialized")
-	}
 	if p.portScanAnalyzer == nil {
 		t.Error("portScanAnalyzer not initialized")
 	}

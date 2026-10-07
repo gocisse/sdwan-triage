@@ -43,7 +43,6 @@
     "vendor_dpi_issues": 6
   },
   "security_counts": {
-    "ddos_findings": 2,
     "ioc_findings": 0,
     "port_scan_findings": 0,
     "tls_security_findings": 0
@@ -59,5 +58,5 @@
   "risk_level": "Critical",
   "top_issue": "TCP Window Issues",
   "top_issue_count": 71,
-  "recommended_actions_count": 4
+  "recommended_actions_count": 3
 }

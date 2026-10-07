@@ -40,7 +40,6 @@
     "vendor_dpi_issues": 15
   },
   "security_counts": {
-    "ddos_findings": 4,
     "ioc_findings": 0,
     "port_scan_findings": 0,
     "tls_security_findings": 0
@@ -53,9 +52,9 @@
     "SD-WAN Data Plane/VIPTELA-AAR-002": 10
   },
   "total_bytes": 5030216,
-  "risk_score": 40,
-  "risk_level": "High",
-  "top_issue": "DDoS Indicators",
-  "top_issue_count": 4,
+  "risk_score": 0,
+  "risk_level": "Low",
+  "top_issue": "",
+  "top_issue_count": 0,
   "recommended_actions_count": 1
 }

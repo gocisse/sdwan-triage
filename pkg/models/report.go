@@ -521,7 +521,9 @@ type SecurityAnalysis struct {
 	TLSSecurityFindings []TLSSecurityFinding `json:"tls_security_findings,omitempty"`
 }
 
-// DDoSFinding represents a detected DDoS attack pattern
+// DDoSFinding is a retained compatibility type. DDoS detection was removed from the
+// analysis engine; nothing populates SecurityAnalysis.DDoSFindings any more. It is kept
+// only so frozen consumers (pkg/web) still compile; remove it with the web cleanup.
 type DDoSFinding struct {
 	Timestamp   float64 `json:"timestamp"`
 	SourceIP    string  `json:"source_ip"`

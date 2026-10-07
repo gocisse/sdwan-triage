@@ -72,7 +72,7 @@ func TestGenerateEnterpriseHTMLReport(t *testing.T) {
 		TotalBytes: 10000000,
 		RiskScore:  50,
 		RiskLevel:  "High",
-		TopIssue:   "DDoS Attack Detected",
+		TopIssue:   "TCP Retransmissions",
 		TrafficAnalysis: []models.TrafficFlow{
 			{SrcIP: "192.168.1.1", DstIP: "10.0.0.1", Protocol: "TCP", TotalBytes: 5000, SrcPort: 80, DstPort: 443},
 			{SrcIP: "192.168.1.2", DstIP: "10.0.0.2", Protocol: "UDP", TotalBytes: 3000, SrcPort: 53, DstPort: 53},
@@ -82,8 +82,8 @@ func TestGenerateEnterpriseHTMLReport(t *testing.T) {
 			{SrcIP: "192.168.1.2", DstIP: "10.0.0.2", SrcPort: 8080, DstPort: 80},
 		},
 		Security: models.SecurityAnalysis{
-			DDoSFindings: []models.DDoSFinding{
-				{SourceIP: "10.0.0.1", Type: "SYN Flood", PacketCount: 1000, Severity: "High"},
+			PortScanFindings: []models.PortScanFinding{
+				{SourceIP: "10.0.0.1", Type: "Horizontal", PortsScanned: 30, Severity: "Medium"},
 			},
 		},
 	}
