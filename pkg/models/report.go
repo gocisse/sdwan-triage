@@ -107,6 +107,10 @@ type TriageReport struct {
 	// Underlay/Overlay Correlation
 	RootCauseChains []RootCauseChain `json:"root_cause_chains,omitempty"`
 
+	// Findings are conclusions assembled from Events and correlation results
+	// (additive; the legacy slices above are unchanged).
+	Findings []Finding `json:"findings,omitempty"`
+
 	// Interface Stability / Flapping Detection
 	StabilityFindings []StabilityFinding `json:"stability_findings,omitempty"`
 

@@ -652,6 +652,10 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// Generate plain English summary (after risk score is calculated)
 	report.PlainEnglishSummary = p.bandwidthAnalyzer.GetPlainEnglishSummary(report, gaps)
 
+	// Assemble Findings from the event index and the correlator's chains
+	// (additive; legacy report fields are untouched).
+	report.Findings = BuildFindings(report)
+
 	// Summarise the typed event store for the JSON report
 	if report.Events != nil && report.Events.Len() > 0 {
 		report.EventCounts = make(map[string]int)

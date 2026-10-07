@@ -479,6 +479,7 @@ For more information and documentation:
 	} else {
 		// Print human-readable output
 		output.PrintExecutiveSummary(report)
+		output.PrintKeyFindings(report)
 		output.PrintDetailedReport(report)
 
 		// Print TCP handshake analysis if requested or if there are failures
