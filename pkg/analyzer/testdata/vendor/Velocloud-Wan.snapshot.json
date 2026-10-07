@@ -1,0 +1,63 @@
+{
+  "_note": "Snapshot of CURRENT engine behavior on a vendor capture. Not verified truth: green means unchanged, not correct. Regenerate only with SDWAN_UPDATE_SNAPSHOTS=1 and review the diff.",
+  "pcap": "Velocloud-Wan",
+  "event_counts": {
+    "dns.anomaly": 32,
+    "tcp.handshake_failed": 3,
+    "tcp.rtt_spike": 6,
+    "tunnel.observed": 16
+  },
+  "events_dropped": 0,
+  "root_cause_chains": [],
+  "findings": [],
+  "slice_lengths": {
+    "arp_conflicts": 0,
+    "bgp_hijack_indicators": 0,
+    "c2_beaconing_findings": 0,
+    "device_fingerprinting": 5,
+    "dhcp_findings": 0,
+    "dns_anomalies": 32,
+    "dns_details": 31,
+    "failed_handshakes": 0,
+    "http2_flows": 0,
+    "http_errors": 8,
+    "icmp_analysis": 803,
+    "kerberos_flows": 0,
+    "ldap_flows": 0,
+    "ntp_findings": 0,
+    "quic_flows": 0,
+    "rtt_analysis": 0,
+    "smb_flows": 0,
+    "stability_findings": 0,
+    "suspicious_traffic": 2,
+    "tcp_handshake_correlated_flows": 20,
+    "tcp_handshake_flows": 20,
+    "tcp_out_of_order_flows": 0,
+    "tcp_retransmissions": 0,
+    "tcp_window_findings": 71,
+    "threat_intel_matches": 0,
+    "tls_certs": 0,
+    "tls_flows": 16,
+    "traffic_gaps": 0,
+    "tunnel_analysis": 16,
+    "vendor_dpi_issues": 6
+  },
+  "security_counts": {
+    "ddos_findings": 2,
+    "ioc_findings": 0,
+    "port_scan_findings": 0,
+    "tls_security_findings": 0
+  },
+  "tunnel_types": {
+    "VMware Velocloud VCMP Tunnel": 16
+  },
+  "vendor_dpi_issues": {
+    "SD-WAN Control Plane/VELOCLOUD-VCMP-002": 6
+  },
+  "total_bytes": 1599568,
+  "risk_score": 100,
+  "risk_level": "Critical",
+  "top_issue": "TCP Window Issues",
+  "top_issue_count": 71,
+  "recommended_actions_count": 4
+}

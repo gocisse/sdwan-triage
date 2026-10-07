@@ -1,0 +1,63 @@
+{
+  "_note": "Snapshot of CURRENT engine behavior on a vendor capture. Not verified truth: green means unchanged, not correct. Regenerate only with SDWAN_UPDATE_SNAPSHOTS=1 and review the diff.",
+  "pcap": "cisco-example-lan",
+  "event_counts": {
+    "dns.anomaly": 466,
+    "tcp.handshake_failed": 101,
+    "tcp.retransmission": 9,
+    "tcp.rtt_spike": 6,
+    "tunnel.observed": 4
+  },
+  "events_dropped": 0,
+  "root_cause_chains": [],
+  "findings": [],
+  "slice_lengths": {
+    "arp_conflicts": 0,
+    "bgp_hijack_indicators": 0,
+    "c2_beaconing_findings": 0,
+    "device_fingerprinting": 106,
+    "dhcp_findings": 0,
+    "dns_anomalies": 466,
+    "dns_details": 375,
+    "failed_handshakes": 2,
+    "http2_flows": 5,
+    "http_errors": 0,
+    "icmp_analysis": 32,
+    "kerberos_flows": 0,
+    "ldap_flows": 10,
+    "ntp_findings": 0,
+    "quic_flows": 0,
+    "rtt_analysis": 3,
+    "smb_flows": 0,
+    "stability_findings": 0,
+    "suspicious_traffic": 1,
+    "tcp_handshake_correlated_flows": 187,
+    "tcp_handshake_flows": 187,
+    "tcp_out_of_order_flows": 0,
+    "tcp_retransmissions": 9,
+    "tcp_window_findings": 63,
+    "threat_intel_matches": 0,
+    "tls_certs": 1,
+    "tls_flows": 20,
+    "traffic_gaps": 0,
+    "tunnel_analysis": 4,
+    "vendor_dpi_issues": 0
+  },
+  "security_counts": {
+    "ddos_findings": 1,
+    "ioc_findings": 0,
+    "port_scan_findings": 0,
+    "tls_security_findings": 0
+  },
+  "tunnel_types": {
+    "Fortinet SD-WAN Control Plane (TCP)": 1,
+    "OpenVPN": 3
+  },
+  "vendor_dpi_issues": {},
+  "total_bytes": 4572167,
+  "risk_score": 100,
+  "risk_level": "Critical",
+  "top_issue": "DNS Anomalies",
+  "top_issue_count": 466,
+  "recommended_actions_count": 5
+}

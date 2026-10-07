@@ -381,6 +381,12 @@ Helper programs:
 
 PCAP files are generally not committed.
 
+Vendor-PCAP regression harness (`pkg/analyzer/vendor_regression_test.go`, snapshots in `pkg/analyzer/testdata/vendor/`):
+
+* Run: `SDWAN_VENDOR_PCAP_DIR=/path/to/VendorTestFile go test ./pkg/analyzer -run VendorRegression -count=1 -v`. Unset = loud skip; set but PCAPs missing = failure.
+* Snapshots are rewritten only with `SDWAN_UPDATE_SNAPSHOTS=1` (plus the directory variable); review the diff first.
+* Snapshots pin **current behavior, not verified truth**: green means "unchanged", never "correct". Nondeterministic fields are intentionally not protected (see the test header).
+
 Committed binaries and build artifacts are not authoritative source code.
 
 ---
