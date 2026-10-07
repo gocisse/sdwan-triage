@@ -92,6 +92,15 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	// A pure ACK shares its sequence number with the next data segment; recording
 	// it made every connection's first data segment look like a retransmission.
 	if len(tcp.Payload) > 0 || tcp.SYN || tcp.FIN {
+		// Any segment repeating an already-remembered sequence number is a
+		// re-send for RTT purposes: data retransmissions were flagged in
+		// detectRetransmissions, but payload-less SYN/FIN repeats and keep-alive
+		// probes (deliberately not counted as retransmissions) reach here too.
+		// Record keeps the ORIGINAL send time, so without this flag the ACK would
+		// yield an RTT inflated by the retransmission timeout / probe interval.
+		if flowState.Seq.Seen(tcp.Seq) {
+			flowState.Seq.MarkRetransmitted(tcp.Seq)
+		}
 		flowState.Seq.Record(tcp.Seq, timestamp)
 		consumed := uint32(len(tcp.Payload))
 		if tcp.SYN {
@@ -230,6 +239,10 @@ func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string
 			origTS = timestamp
 		}
 
+		// Karn: ACKs of this segment are ambiguous from now on; calculateRTT
+		// must not sample them against the first transmission time.
+		flowState.Seq.MarkRetransmitted(tcp.Seq)
+
 		// Typed observation: one event per retransmitted segment, stamped with
 		// the retransmission's own capture time (the packet being analysed).
 		// original_ts_us lets consumers recover the first-send instant exactly.
@@ -272,7 +285,7 @@ func (t *TCPAnalyzer) calculateRTT(tcp *layers.TCP, reverseFlowKey string, times
 	// Look for the original packet this ACK is responding to (using bounded cache)
 	reverseState := state.GetTCPFlow(reverseFlowKey)
 	if reverseState != nil {
-		if sentTime, ok := reverseState.Seq.Lookup(tcp.Ack - 1); ok {
+		if sentTime, ok := reverseState.Seq.Lookup(tcp.Ack - 1); ok && !reverseState.Seq.WasRetransmitted(tcp.Ack-1) {
 			rtt := timestamp.Sub(sentTime).Seconds() * 1000 // Convert to milliseconds
 			if rtt > 0 && rtt < 10000 {                     // Sanity check: RTT should be < 10 seconds
 				reverseState.AddRTTSample(rtt)

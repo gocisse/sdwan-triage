@@ -72,8 +72,9 @@ func TestCorrelator_BGPWithdrawalRetransmissionSpike(t *testing.T) {
 	if chain.UnderlayDetail != "Peer 10.0.0.1: BGP Withdrawal (withdrawn_len=4)" {
 		t.Errorf("UnderlayDetail = %q", chain.UnderlayDetail)
 	}
-	if chain.OverlayEffect != "TCP Retransmission Spike" {
-		t.Errorf("OverlayEffect = %q, want %q", chain.OverlayEffect, "TCP Retransmission Spike")
+	// Flow 10.1.1.1:443->10.2.2.2:50000 is not the BGP session: co-occurrence only.
+	if chain.OverlayEffect != "TCP Retransmission Burst (co-occurring)" || chain.EvidenceBasis != models.EvidenceTimeProximity || chain.Confidence != "Low" {
+		t.Errorf("chain = %q / %q / %q, want time_proximity burst with Low confidence", chain.OverlayEffect, chain.EvidenceBasis, chain.Confidence)
 	}
 	if chain.CorrelationGap < 0 || chain.CorrelationGap > 5.0 {
 		t.Errorf("CorrelationGap = %.2f, want between 0 and 5", chain.CorrelationGap)
@@ -83,22 +84,33 @@ func TestCorrelator_BGPWithdrawalRetransmissionSpike(t *testing.T) {
 	}
 }
 
-func TestCorrelator_BGPNotificationRTTSpike(t *testing.T) {
+// RTT spikes support only same_session chains. Here the BGP session is
+// 10.0.0.1 <-> 10.0.0.2:179 and the spiking flows are unrelated: no chain.
+func TestCorrelator_RTTSpikeOnUnrelatedFlowsDoesNotCorrelate(t *testing.T) {
 	h := newCorrHarness()
 	h.bgp(corrBase, "10.0.0.1", "10.0.0.2", "Notification", "BGP NOTIFICATION: Error 6/4 from 10.0.0.1")
 	h.rtt(corrBase.Add(1*time.Second), "10.1.1.1:80->10.2.2.2:50000", 350.0)
 	h.rtt(corrBase.Add(2*time.Second), "10.1.1.1:80->10.2.2.2:50001", 500.0)
-	chains := h.run()
+	if chains := h.run(); len(chains) != 0 {
+		t.Errorf("RTT spikes on unrelated flows must not create a chain, got %+v", chains)
+	}
+}
 
-	if len(chains) == 0 {
-		t.Fatal("expected at least one RootCauseChain entry for RTT spike")
+func TestCorrelator_RTTSpikeOnBGPSessionIsSameSession(t *testing.T) {
+	h := newCorrHarness()
+	h.bgp(corrBase, "10.0.0.1", "10.0.0.2", "Notification", "BGP NOTIFICATION: Error 6/4 from 10.0.0.1")
+	h.rtt(corrBase.Add(1*time.Second), "10.0.0.2:40000->10.0.0.1:179", 600.0)
+	h.rtt(corrBase.Add(2*time.Second), "10.1.1.1:80->10.2.2.2:50001", 900.0) // unrelated: ignored
+	chains := h.run()
+	if len(chains) != 1 {
+		t.Fatalf("expected 1 chain, got %+v", chains)
 	}
-	chain := chains[0]
-	if chain.OverlayEffect != "RTT Spike" {
-		t.Errorf("OverlayEffect = %q, want %q", chain.OverlayEffect, "RTT Spike")
+	c := chains[0]
+	if c.OverlayEffect != "RTT Spike" || c.EvidenceBasis != models.EvidenceSameSession || c.Severity != "High" {
+		t.Errorf("unexpected chain %+v", c)
 	}
-	if chain.Severity != "High" && chain.Severity != "Critical" {
-		t.Errorf("Severity = %q, want High or Critical for 500ms RTT", chain.Severity)
+	if len(c.AffectedFlows) != 1 || c.AffectedFlows[0] != "10.0.0.2:40000->10.0.0.1:179 (600ms)" {
+		t.Errorf("AffectedFlows = %v", c.AffectedFlows)
 	}
 }
 
@@ -156,7 +168,7 @@ func TestCorrelator_BFDDownWithRetransmissions(t *testing.T) {
 		t.Fatalf("expected exactly 1 chain, got %d: %+v", len(chains), chains)
 	}
 	c := chains[0]
-	if c.UnderlayEvent != "BFD Session Down" || c.OverlayEffect != "TCP Retransmission Spike" {
+	if c.UnderlayEvent != "BFD Session Down" || c.OverlayEffect != "TCP Retransmission Burst (co-occurring)" || c.EvidenceBasis != models.EvidenceTimeProximity {
 		t.Errorf("unexpected chain %q / %q", c.UnderlayEvent, c.OverlayEffect)
 	}
 	if c.UnderlayDetail != "BFD session 10.0.0.1 → 10.0.0.2 transitioned Up → Down" {
@@ -165,9 +177,9 @@ func TestCorrelator_BFDDownWithRetransmissions(t *testing.T) {
 	if c.CorrelationGap != 0.5 {
 		t.Errorf("CorrelationGap = %v, want 0.5", c.CorrelationGap)
 	}
-	// Same confidence/severity functions as BGP: 3 events, gap 0.5s → Medium / Low.
-	if c.Confidence != "Medium" || c.Severity != "Low" {
-		t.Errorf("confidence/severity = %s/%s, want Medium/Low", c.Confidence, c.Severity)
+	// BFD carries no flow identity: co-occurrence only, so confidence is capped at Low.
+	if c.Confidence != "Low" || c.Severity != "Low" {
+		t.Errorf("confidence/severity = %s/%s, want Low/Low", c.Confidence, c.Severity)
 	}
 	if len(c.AffectedFlows) != 1 || c.AffectedFlows[0] != "10.1.1.1:443->10.2.2.2:50000 (3 retrans)" {
 		t.Errorf("AffectedFlows = %v", c.AffectedFlows)
@@ -198,7 +210,8 @@ func TestCorrelator_RetransmissionsWithoutBFD(t *testing.T) {
 }
 
 // Window is [underlay, underlay+5s] inclusive, judged on the retransmission's
-// ORIGINAL transmission time (existing semantics).
+// ORIGINAL transmission time (existing semantics). The 3 retransmissions are on
+// one flow so the per-flow burst threshold is met.
 func TestCorrelator_BFDWindowBoundaries(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -239,8 +252,8 @@ func TestCorrelator_Deterministic(t *testing.T) {
 	if !reflect.DeepEqual(a, b) {
 		t.Errorf("correlation output differs between identical runs\n%+v\n%+v", a, b)
 	}
-	if len(a) != 4 { // BGP×(retrans,rtt) + BFD×(retrans,rtt)
-		t.Errorf("expected 4 chains (2 triggers × 2 effects), got %d", len(a))
+	if len(a) != 2 { // BGP + BFD retransmission co-occurrence; RTT needs a same-session flow
+		t.Errorf("expected 2 chains, got %d", len(a))
 	}
 }
 

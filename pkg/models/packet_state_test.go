@@ -276,3 +276,28 @@ func TestTCPFingerprint_Fields(t *testing.T) {
 		t.Error("DFFlag = false, want true")
 	}
 }
+
+func TestSeqHistory_MarkRetransmitted(t *testing.T) {
+	h := NewSeqHistory(2)
+	ts := time.Unix(100, 0)
+	h.MarkRetransmitted(1) // not remembered: no-op
+	if h.WasRetransmitted(1) {
+		t.Fatal("unremembered seq must not be flagged")
+	}
+	h.Record(1, ts)
+	h.MarkRetransmitted(1)
+	if !h.WasRetransmitted(1) {
+		t.Fatal("seq 1 should be flagged")
+	}
+	// Eviction drops the flag together with the entry (bounded memory), and a
+	// later reuse of the sequence number starts unflagged.
+	h.Record(2, ts)
+	h.Record(3, ts) // evicts 1
+	if h.WasRetransmitted(1) {
+		t.Fatal("flag must be dropped when the entry is evicted")
+	}
+	h.Record(1, ts)
+	if h.WasRetransmitted(1) {
+		t.Fatal("re-recorded seq must start unflagged")
+	}
+}

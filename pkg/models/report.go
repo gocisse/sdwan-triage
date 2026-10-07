@@ -315,8 +315,20 @@ type BandwidthReport struct {
 	TimeSeriesData            []TimeBucket         `json:"time_series_data"`
 }
 
+// RootCauseChain evidence bases.
+const (
+	// EvidenceSameSession: the overlay events occurred on the same TCP session
+	// that carried the underlay event (BGP peer pair on port 179).
+	EvidenceSameSession = "same_session"
+	// EvidenceTimeProximity: the events are close in capture time and nothing
+	// more is established. This is co-occurrence, not causation.
+	EvidenceTimeProximity = "time_proximity"
+)
+
 // RootCauseChain represents a correlated underlay/overlay event chain.
-// For example, a BGP route withdrawal (underlay) causing TCP retransmission spikes (overlay).
+// For example, a BGP route withdrawal (underlay) observed together with TCP retransmission
+// bursts (overlay). EvidenceBasis states whether the link is shared session identity or
+// time proximity only; neither is proof of causation.
 type RootCauseChain struct {
 	Timestamp      float64  `json:"timestamp"`
 	UnderlayEvent  string   `json:"underlay_event"`           // e.g., "BGP Route Withdrawal"
@@ -328,6 +340,7 @@ type RootCauseChain struct {
 	Confidence     string   `json:"confidence"`               // "High", "Medium", "Low"
 	Severity       string   `json:"severity"`                 // "Critical", "High", "Medium", "Low"
 	Recommendation string   `json:"recommendation"`
+	EvidenceBasis  string   `json:"evidence_basis"` // EvidenceSameSession | EvidenceTimeProximity (co-occurrence only)
 }
 
 // BGPIndicator represents a BGP hijack indicator

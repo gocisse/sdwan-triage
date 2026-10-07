@@ -106,6 +106,7 @@ type SeqHistory struct {
 	ring     []uint32
 	head     int
 	index    map[uint32]time.Time
+	retx     map[uint32]struct{} // sequence numbers observed retransmitted (bounded with index)
 }
 
 // NewSeqHistory creates a history remembering up to capacity sequence numbers.
@@ -117,6 +118,7 @@ func NewSeqHistory(capacity int) *SeqHistory {
 		capacity: capacity,
 		ring:     make([]uint32, 0, minInt(capacity, 16)),
 		index:    make(map[uint32]time.Time, minInt(capacity, 16)),
+		retx:     make(map[uint32]struct{}),
 	}
 }
 
@@ -131,10 +133,26 @@ func (h *SeqHistory) Record(seq uint32, ts time.Time) {
 		h.ring = append(h.ring, seq)
 	} else {
 		delete(h.index, h.ring[h.head])
+		delete(h.retx, h.ring[h.head])
 		h.ring[h.head] = seq
 		h.head = (h.head + 1) % h.capacity
 	}
 	h.index[seq] = ts
+}
+
+// MarkRetransmitted flags seq as having been retransmitted. An ACK for such a
+// segment is ambiguous (it may acknowledge either transmission), so it must not
+// be used as an RTT sample (Karn's algorithm). No-op for unremembered seqs.
+func (h *SeqHistory) MarkRetransmitted(seq uint32) {
+	if _, ok := h.index[seq]; ok {
+		h.retx[seq] = struct{}{}
+	}
+}
+
+// WasRetransmitted reports whether seq was flagged by MarkRetransmitted.
+func (h *SeqHistory) WasRetransmitted(seq uint32) bool {
+	_, ok := h.retx[seq]
+	return ok
 }
 
 // Seen reports whether seq is within the remembered window.
