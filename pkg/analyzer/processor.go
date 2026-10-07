@@ -142,6 +142,12 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 	// Build the parallel detector registry
 	p.registry = p.buildDetectorRegistry()
 
+	// config.DefaultThresholds() is the single source of default detection
+	// thresholds. Applying it here means every caller of the constructor (CLI,
+	// web handlers, tests) starts from the same values; the CLI then layers its
+	// explicit -config/preset on top with ApplyThresholds, which overrides these.
+	p.ApplyThresholds(config.DefaultThresholds())
+
 	return p
 }
 
