@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/fatih/color"
@@ -42,17 +43,7 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 	fmt.Println()
 
 	// Summary counts
-	fmt.Println("FINDINGS SUMMARY:")
-	fmt.Printf("  • DNS Anomalies:        %d\n", len(r.DNSAnomalies))
-	fmt.Printf("  • TCP Retransmissions:  %d\n", len(r.TCPRetransmissions))
-	fmt.Printf("  • Failed Handshakes:    %d\n", len(r.FailedHandshakes))
-	fmt.Printf("  • ARP Conflicts:        %d\n", len(r.ARPConflicts))
-	fmt.Printf("  • HTTP Errors:          %d\n", len(r.HTTPErrors))
-	fmt.Printf("  • TLS Certificates:     %d\n", len(r.TLSCerts))
-	fmt.Printf("  • Suspicious Traffic:   %d\n", len(r.SuspiciousTraffic))
-	fmt.Printf("  • High RTT Flows:       %d\n", len(r.RTTAnalysis))
-	fmt.Printf("  • Devices Detected:     %d\n", len(r.DeviceFingerprinting))
-
+	writeFindingsSummary(os.Stdout, r)
 	fmt.Println()
 
 	// Traffic summary
@@ -63,6 +54,37 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 	fmt.Printf("  • QUIC Flows:           %d\n", len(r.QUICFlows))
 
 	fmt.Println()
+}
+
+// writeFindingsSummary writes the FINDINGS SUMMARY block of the executive summary.
+//
+// Units matter here. r.TCPRetransmissions holds one entry per DISTINCT FLOW that
+// had a retransmission (not one per retransmitted segment), so it is labelled as
+// flows. The retransmission-event line comes from the typed event counts
+// (r.EventCounts["tcp.retransmission"], one per retransmitted segment) and is
+// printed only when such events exist. The event index is bounded: when it
+// dropped events the count is a lower bound and the line says so.
+func writeFindingsSummary(w io.Writer, r *models.TriageReport) {
+	fmt.Fprintln(w, "FINDINGS SUMMARY:")
+	fmt.Fprintf(w, "  • DNS Anomalies:        %d\n", len(r.DNSAnomalies))
+	fmt.Fprintf(w, "  • TCP Retransmission Flows: %d\n", len(r.TCPRetransmissions))
+	if events := r.EventCounts["tcp.retransmission"]; events > 0 {
+		if r.EventsDropped > 0 {
+			fmt.Fprintf(w, "  • TCP Retransmission Events: ≥%d\n", events)
+		} else {
+			fmt.Fprintf(w, "  • TCP Retransmission Events: %d\n", events)
+		}
+		if note := eventLossNote(r); note != "" {
+			fmt.Fprintf(w, "    %s\n", note)
+		}
+	}
+	fmt.Fprintf(w, "  • Failed Handshakes:    %d\n", len(r.FailedHandshakes))
+	fmt.Fprintf(w, "  • ARP Conflicts:        %d\n", len(r.ARPConflicts))
+	fmt.Fprintf(w, "  • HTTP Errors:          %d\n", len(r.HTTPErrors))
+	fmt.Fprintf(w, "  • TLS Certificates:     %d\n", len(r.TLSCerts))
+	fmt.Fprintf(w, "  • Suspicious Traffic:   %d\n", len(r.SuspiciousTraffic))
+	fmt.Fprintf(w, "  • High RTT Flows:       %d\n", len(r.RTTAnalysis))
+	fmt.Fprintf(w, "  • Devices Detected:     %d\n", len(r.DeviceFingerprinting))
 }
 
 // PrintDetailedReport prints detailed findings

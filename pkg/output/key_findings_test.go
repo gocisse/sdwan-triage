@@ -63,3 +63,25 @@ func TestKeyFindings_LimitsShown(t *testing.T) {
 		t.Errorf("missing truncation line:\n%s", buf.String())
 	}
 }
+
+func TestKeyFindings_OverflowNoteOnlyWhenDropped(t *testing.T) {
+	r := sampleFindingsReport()
+	var buf bytes.Buffer
+	WriteKeyFindings(&buf, r)
+	if bytes.Contains(buf.Bytes(), []byte("lower bounds")) {
+		t.Error("note printed without dropped events")
+	}
+	r.EventsDropped = 42
+	buf.Reset()
+	WriteKeyFindings(&buf, r)
+	want := "KEY FINDINGS:\n  Note: event-derived counts are lower bounds; the event index dropped 42 events.\n"
+	if !bytes.HasPrefix(buf.Bytes(), []byte(want)) {
+		t.Errorf("unexpected output:\n%s", buf.String())
+	}
+	// No findings: still nothing printed, even with dropped events.
+	buf.Reset()
+	WriteKeyFindings(&buf, &models.TriageReport{EventsDropped: 42})
+	if buf.Len() != 0 {
+		t.Errorf("expected no output, got %q", buf.String())
+	}
+}

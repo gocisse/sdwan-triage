@@ -14,6 +14,15 @@ const (
 	keyFindingTimeFmt     = "2006-01-02T15:04:05.000Z"
 )
 
+// eventLossNote returns the disclosure shown next to event-derived counts when the
+// bounded event index dropped events, or "" when nothing was dropped.
+func eventLossNote(r *models.TriageReport) string {
+	if r == nil || r.EventsDropped <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("Note: event-derived counts are lower bounds; the event index dropped %d events.", r.EventsDropped)
+}
+
 // PrintKeyFindings writes the KEY FINDINGS section to stdout.
 func PrintKeyFindings(r *models.TriageReport) { WriteKeyFindings(os.Stdout, r) }
 
@@ -25,6 +34,9 @@ func WriteKeyFindings(w io.Writer, r *models.TriageReport) {
 		return
 	}
 	fmt.Fprintln(w, "KEY FINDINGS:")
+	if note := eventLossNote(r); note != "" {
+		fmt.Fprintf(w, "  %s\n", note)
+	}
 	for i, f := range r.Findings {
 		if i >= maxKeyFindingsShown {
 			fmt.Fprintf(w, "  ... and %d more\n", len(r.Findings)-maxKeyFindingsShown)
