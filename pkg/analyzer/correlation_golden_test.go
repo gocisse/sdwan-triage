@@ -88,6 +88,11 @@ func assertChainsEquivalent(t *testing.T, got, want []models.RootCauseChain) {
 func TestCorrelation_BGPWithdrawalStorm_Phase43Semantics(t *testing.T) {
 	r := runGolden(t, testpcap.BGPWithdrawalStorm())
 	assertChainsEquivalent(t, r.RootCauseChains, expectedBGPStormChains)
+	// The chain records the exact events it used: the BGP trigger plus the five
+	// retransmissions counted on the affected flow.
+	if r.RootCauseChains[0].EvidenceCount != 6 || len(r.RootCauseChains[0].Evidence) != 6 {
+		t.Errorf("chain evidence = %d/%d, want 6/6", len(r.RootCauseChains[0].Evidence), r.RootCauseChains[0].EvidenceCount)
+	}
 
 	// The structured inputs the correlator consumed are themselves on the index.
 	if n := len(r.Events.ByKind(events.BGPEvent)); n != 1 {

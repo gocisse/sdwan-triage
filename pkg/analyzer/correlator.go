@@ -61,6 +61,8 @@ type underlayEvent struct {
 	// SessionA/SessionB are the two IPs of the BGP TCP session the event was
 	// observed on. Empty for BFD (UDP, no TCP session).
 	SessionA, SessionB string
+	// Ev is the source Event, kept so chains can cite their exact evidence.
+	Ev events.Event
 }
 
 // episode is a run of same-label triggers, each within the correlation window
@@ -72,14 +74,16 @@ type episode struct {
 	eventType   string
 	detail      string // detail of the first trigger
 	count       int
-	sessions    [][2]string // distinct BGP session IP pairs (normalised order)
+	sessions    [][2]string    // distinct BGP session IP pairs (normalised order)
+	triggers    []events.Event // every trigger in the episode (exact evidence)
 }
 
 // overlayEvent is a TCP overlay effect derived from the event index.
 type overlayEvent struct {
 	Timestamp time.Time
 	FlowKey   string
-	Value     float64 // Retransmission count (1) or RTT in ms
+	Value     float64      // Retransmission count (1) or RTT in ms
+	Ev        events.Event // source Event, kept so chains can cite their exact evidence
 }
 
 // NewUnderlayOverlayCorrelator creates a correlator with default settings.
@@ -145,6 +149,7 @@ func (c *UnderlayOverlayCorrelator) buildEpisodes(underlay []underlayEvent) []*e
 		}
 		ep.last = ue.Timestamp
 		ep.count++
+		ep.triggers = append(ep.triggers, ue.Ev)
 		if ue.SessionA != "" {
 			pair := [2]string{ue.SessionA, ue.SessionB}
 			known := false
@@ -216,6 +221,7 @@ type flowGroup struct {
 	flow     string
 	count    int
 	earliest time.Time
+	events   []events.Event // the exact retransmission events counted for this flow
 }
 
 // correlateRetransmissions emits at most one same_session chain and one
@@ -232,6 +238,7 @@ func (c *UnderlayOverlayCorrelator) correlateRetransmissions(report *models.Tria
 			order = append(order, e.FlowKey)
 		}
 		g.count++
+		g.events = append(g.events, e.Ev)
 		if e.Timestamp.Before(g.earliest) {
 			g.earliest = e.Timestamp
 		}
@@ -261,7 +268,11 @@ func (c *UnderlayOverlayCorrelator) appendRetransChain(report *models.TriageRepo
 	total := 0
 	earliest := groups[0].earliest
 	affected := make([]string, 0, len(groups))
+	// Evidence: every trigger of the episode plus exactly the retransmission
+	// events counted for the flows reported in this chain.
+	evidence := append([]events.Event(nil), ep.triggers...)
 	for _, g := range groups {
+		evidence = append(evidence, g.events...)
 		total += g.count
 		if g.earliest.Before(earliest) {
 			earliest = g.earliest
@@ -279,6 +290,7 @@ func (c *UnderlayOverlayCorrelator) appendRetransChain(report *models.TriageRepo
 		Severity:       c.calculateSeverity(total, len(groups)),
 		EvidenceBasis:  basis,
 	}
+	chain.Evidence, chain.EvidenceCount = boundedEvidence(evidence)
 	if basis == models.EvidenceSameSession {
 		chain.OverlayEffect = "TCP Retransmission Spike"
 		chain.OverlayDetail = fmt.Sprintf("%d retransmissions on the BGP session's own TCP connection within %.1fs of %s event",
@@ -304,11 +316,13 @@ func (c *UnderlayOverlayCorrelator) correlateRTT(report *models.TriageReport, ep
 	var earliest time.Time
 	var maxRTT float64
 	spikes := 0
+	evidence := append([]events.Event(nil), ep.triggers...)
 	for _, e := range evs {
 		if !ep.matchesSession(e.FlowKey) {
 			continue
 		}
 		spikes++
+		evidence = append(evidence, e.Ev)
 		if _, seen := peak[e.FlowKey]; !seen {
 			order = append(order, e.FlowKey)
 		}
@@ -337,10 +351,13 @@ func (c *UnderlayOverlayCorrelator) correlateRTT(report *models.TriageReport, ep
 	if maxRTT >= 1000 {
 		severity = "Critical"
 	}
+	refs, refCount := boundedEvidence(evidence)
 	report.RootCauseChains = append(report.RootCauseChains, models.RootCauseChain{
 		Timestamp:      float64(ep.first.UnixNano()) / 1e9,
 		UnderlayEvent:  ep.label,
 		UnderlayDetail: ep.underlayDetail(),
+		Evidence:       refs,
+		EvidenceCount:  refCount,
 		OverlayEffect:  "RTT Spike",
 		OverlayDetail: fmt.Sprintf("RTT peaked at %.0fms on the BGP session's own TCP connection within %.1fs of %s event",
 			maxRTT, gap, ep.protocol),
@@ -384,6 +401,7 @@ func (c *UnderlayOverlayCorrelator) loadUnderlayEvents(ix *events.Index) []under
 			Detail:    e.Attrs["detail"],
 			SessionA:  pair[0],
 			SessionB:  pair[1],
+			Ev:        e,
 		})
 	}
 	for _, e := range ix.ByKind(events.BFDDown) {
@@ -394,6 +412,7 @@ func (c *UnderlayOverlayCorrelator) loadUnderlayEvents(ix *events.Index) []under
 			Label:     "BFD Session Down",
 			Detail: fmt.Sprintf("BFD session %s → %s transitioned %s → %s",
 				e.Attrs["src_ip"], e.Attrs["peer_ip"], bfdStateLabel(e.Values["prev_state"]), e.Attrs["new_state_name"]),
+			Ev: e,
 		})
 	}
 	return out
@@ -410,7 +429,7 @@ func (c *UnderlayOverlayCorrelator) loadRetransmissions(ix *events.Index) []over
 		if us, ok := e.Values["original_ts_us"]; ok && us > 0 {
 			ts = time.UnixMicro(int64(us)).UTC()
 		}
-		out = append(out, overlayEvent{Timestamp: ts, FlowKey: e.FlowKey, Value: 1})
+		out = append(out, overlayEvent{Timestamp: ts, FlowKey: e.FlowKey, Value: 1, Ev: e})
 	}
 	return out
 }
@@ -424,7 +443,7 @@ func (c *UnderlayOverlayCorrelator) loadRTTSpikes(ix *events.Index) []overlayEve
 	evs := ix.ByKind(events.TCPRTTSpike)
 	out := make([]overlayEvent, 0, len(evs))
 	for _, e := range evs {
-		out = append(out, overlayEvent{Timestamp: e.Timestamp, FlowKey: e.FlowKey, Value: e.Values["rtt_ms"]})
+		out = append(out, overlayEvent{Timestamp: e.Timestamp, FlowKey: e.FlowKey, Value: e.Values["rtt_ms"], Ev: e})
 	}
 	return out
 }

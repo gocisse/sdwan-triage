@@ -345,6 +345,12 @@ type RootCauseChain struct {
 	Severity       string   `json:"severity"`                 // "Critical", "High", "Medium", "Low"
 	Recommendation string   `json:"recommendation"`
 	EvidenceBasis  string   `json:"evidence_basis"` // EvidenceSameSession | EvidenceTimeProximity (co-occurrence only)
+	// Evidence is the exact set of Events the correlator used (triggers of the
+	// episode plus the overlay events it counted), bounded to a chronological
+	// sample; EvidenceCount is the true total. Ref timestamps are observation
+	// times, while window membership was decided on original send time.
+	Evidence      []EvidenceRef `json:"evidence,omitempty"`
+	EvidenceCount int           `json:"evidence_count,omitempty"`
 }
 
 // BGPIndicator represents a BGP hijack indicator

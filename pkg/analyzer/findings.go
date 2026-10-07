@@ -27,13 +27,6 @@ const (
 	// whole capture. It is intentionally independent of the correlator's
 	// per-window constant; there is no windowing, rate or cause inference.
 	minRetransmissionEvents = 3
-
-	// chainEvidenceLookahead bounds the lookup of overlay events cited as
-	// evidence for a chain. It is NOT a detection window.
-	chainEvidenceLookahead = 10 * time.Second
-	// chainTriggerTolerance absorbs the float64-seconds round trip of
-	// RootCauseChain.Timestamp when re-resolving its trigger event.
-	chainTriggerTolerance = time.Millisecond
 )
 
 // Finding kinds.
@@ -49,7 +42,7 @@ func BuildFindings(report *models.TriageReport) []models.Finding {
 	var out []models.Finding
 	out = append(out, retransmissionFindings(report)...)
 	for _, chain := range report.RootCauseChains {
-		out = append(out, chainFinding(report, chain))
+		out = append(out, chainFinding(chain))
 	}
 
 	sort.SliceStable(out, func(i, j int) bool {
@@ -95,7 +88,18 @@ func evidenceRef(e events.Event) models.EvidenceRef {
 // boundedEvidence returns the first maxEvidenceRefs refs in chronological order
 // (ties broken by kind, flow, event ID) and the true total.
 func boundedEvidence(evs []events.Event) ([]models.EvidenceRef, int) {
-	sorted := append([]events.Event(nil), evs...)
+	// Drop repeats of the same event (by non-zero ID) so evidence is unique.
+	sorted := make([]events.Event, 0, len(evs))
+	seenIDs := make(map[uint64]bool, len(evs))
+	for _, e := range evs {
+		if e.ID != 0 {
+			if seenIDs[e.ID] {
+				continue
+			}
+			seenIDs[e.ID] = true
+		}
+		sorted = append(sorted, e)
+	}
 	sort.SliceStable(sorted, func(i, j int) bool {
 		a, b := sorted[i], sorted[j]
 		if !a.Timestamp.Equal(b.Timestamp) {
@@ -198,7 +202,7 @@ func retransmissionConfidence(n int) models.Confidence {
 
 // chainFinding produces exactly one Finding for a RootCauseChain. The chain
 // itself is not modified.
-func chainFinding(report *models.TriageReport, chain models.RootCauseChain) models.Finding {
+func chainFinding(chain models.RootCauseChain) models.Finding {
 	kind := findingKindCoOccurrence
 	basis := models.EvidenceTimeProximity
 	if chain.EvidenceBasis == models.EvidenceSameSession {
@@ -217,13 +221,19 @@ func chainFinding(report *models.TriageReport, chain models.RootCauseChain) mode
 			chain.UnderlayEvent, overlay, chain.CorrelationGap)
 	}
 
+	// Evidence is exactly what the correlator recorded on the chain; nothing is
+	// re-resolved or inferred. A chain without recorded evidence yields an empty
+	// (non-nil) list and a zero count.
 	ts := chainTime(chain)
-	evs := chainEvidenceEvents(report, chain, ts)
-	refs, total := boundedEvidence(evs)
+	refs := append([]models.EvidenceRef{}, chain.Evidence...)
+	total := chain.EvidenceCount
+	if total < len(refs) {
+		total = len(refs)
+	}
 	first, last := ts, ts
-	for _, e := range evs {
-		if e.Timestamp.After(last) {
-			last = e.Timestamp
+	for _, r := range refs {
+		if r.Timestamp.After(last) {
+			last = r.Timestamp
 		}
 	}
 
@@ -281,51 +291,4 @@ func chainConfidence(chain models.RootCauseChain, basis string) models.Confidenc
 	default:
 		return models.ConfidenceLow
 	}
-}
-
-// chainEvidenceEvents re-resolves, from the event index, the events a chain was
-// built from: the trigger event(s) at the chain's timestamp and the overlay
-// events on the chain's affected flows shortly after. The correlator does not
-// record event membership, so this is "events on those flows near the trigger",
-// not a guaranteed reproduction of the correlator's exact set.
-func chainEvidenceEvents(report *models.TriageReport, chain models.RootCauseChain, ts time.Time) []events.Event {
-	if report.Events == nil {
-		return nil
-	}
-	var evs []events.Event
-
-	switch {
-	case strings.HasPrefix(chain.UnderlayEvent, "BGP "):
-		want := strings.TrimPrefix(chain.UnderlayEvent, "BGP ")
-		for _, e := range report.Events.ByKindAndTime(events.BGPEvent, ts.Add(-chainTriggerTolerance), ts.Add(chainTriggerTolerance)) {
-			if e.Attrs["event_type"] == want {
-				evs = append(evs, e)
-			}
-		}
-	case strings.HasPrefix(chain.UnderlayEvent, "BFD "):
-		evs = append(evs, report.Events.ByKindAndTime(events.BFDDown, ts.Add(-chainTriggerTolerance), ts.Add(chainTriggerTolerance))...)
-	}
-
-	var overlayKind events.Kind
-	switch {
-	case strings.HasPrefix(chain.OverlayEffect, "TCP Retransmission"):
-		overlayKind = events.TCPRetransmission
-	case strings.HasPrefix(chain.OverlayEffect, "RTT Spike"):
-		overlayKind = events.TCPRTTSpike
-	}
-	if overlayKind != "" {
-		flows := make(map[string]bool, len(chain.AffectedFlows))
-		for _, f := range chain.AffectedFlows {
-			if i := strings.LastIndex(f, " ("); i > 0 {
-				f = f[:i]
-			}
-			flows[f] = true
-		}
-		for _, e := range report.Events.ByKindAndTime(overlayKind, ts, ts.Add(chainEvidenceLookahead)) {
-			if flows[e.FlowKey] {
-				evs = append(evs, e)
-			}
-		}
-	}
-	return evs
 }
