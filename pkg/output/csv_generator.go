@@ -312,6 +312,10 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		{"DNS Queries Recorded", fmt.Sprintf("%d", len(r.DNSDetails)), "Total DNS queries captured"},
 	}
 
+	if cov := evidenceCoverageLines(r); cov != nil {
+		rows = append(rows, []string{"Evidence Examined", evidenceCoverageCounts(r.EvidenceCoverage), evidenceCoverageReminder})
+	}
+
 	if r.IsNoData() {
 		rows = append(rows, []string{"Analysis Status", r.AnalysisStatus, noDataOneLine(r)}, []string{"No Data Reason", r.NoDataReason, "Why no health judgment was made"})
 	}

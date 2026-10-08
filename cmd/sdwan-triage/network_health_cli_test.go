@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -227,5 +228,42 @@ func TestCoverageCLI_NoDataHasNoCoverageOrHealth(t *testing.T) {
 	js, _, exit := runIn(t, t.TempDir(), bin, "-json", emptyPCAP(t))
 	if exit != 2 || strings.Contains(js, "evidence_coverage") || strings.Contains(js, "network_health") {
 		t.Errorf("exit=%d", exit)
+	}
+}
+
+// 4.26: the human evidence line matches the JSON evidence_coverage exactly.
+func TestEvidenceDisplayCLI_MatchesJSON(t *testing.T) {
+	bin := buildCLI(t)
+	noun := func(n int, s, p string) string {
+		if n == 1 {
+			return "1 " + s
+		}
+		return strconv.Itoa(n) + " " + p
+	}
+	for level, path := range healthFixtures(t) {
+		js, _, _ := runIn(t, t.TempDir(), bin, "-json", path)
+		var d struct {
+			Cov struct {
+				TCP, DNS, TLS, Stab, ARP int
+			} `json:"-"`
+			Raw map[string]int `json:"evidence_coverage"`
+		}
+		if err := json.Unmarshal([]byte(js), &d); err != nil {
+			t.Fatal(err)
+		}
+		want := "Evidence examined: " + strings.Join([]string{
+			noun(d.Raw["tcp_flows"], "TCP flow", "TCP flows"),
+			noun(d.Raw["dns_exchanges"], "DNS exchange", "DNS exchanges"),
+			noun(d.Raw["tls_certificates"], "TLS certificate", "TLS certificates"),
+			noun(d.Raw["stability_sessions"], "stability unit", "stability units"),
+			noun(d.Raw["arp_bindings"], "ARP binding", "ARP bindings"),
+		}, ", ") + "."
+		term, _, _ := runIn(t, t.TempDir(), bin, path)
+		sp, _, _ := runIn(t, t.TempDir(), bin, "-simple", path)
+		for name, out := range map[string]string{"terminal": term, "simple": sp} {
+			if !strings.Contains(out, want) || !strings.Contains(out, "they do not measure how much is enough.") {
+				t.Errorf("%s/%s: want %q in\n%s", level, name, want, out)
+			}
+		}
 	}
 }

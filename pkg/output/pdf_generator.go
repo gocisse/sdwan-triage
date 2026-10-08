@@ -185,6 +185,11 @@ func (g *PDFGenerator) addExecutiveSummary(report *models.TriageReport) {
 		}
 	}
 
+	// Evidence examined (descriptive counts; ASCII only).
+	for _, line := range evidenceCoverageLines(report) {
+		g.pdf.MultiCell(0, 5, line, "", "L", false)
+	}
+
 	// NO_DATA: nothing was analyzed; say so explicitly (no health verdict exists).
 	if note := noDataOneLine(report); note != "" {
 		g.pdf.Ln(2)

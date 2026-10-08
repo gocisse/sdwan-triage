@@ -138,3 +138,45 @@ func completenessOneLine(r *models.TriageReport) string {
 	}
 	return "PARTIAL ANALYSIS: " + strings.Join(parts, "; ") + ". " + completenessScopeLine
 }
+
+// ─── Evidence coverage display (4.26) ───────────────────────────────────────
+//
+// DISPLAY ONLY. The counts come straight from report.EvidenceCoverage (the same
+// values the JSON carries); nothing here judges them. They show how much
+// health-relevant traffic was seen, not how much is enough: there is no
+// sufficiency model, threshold or confidence level.
+
+// evidenceCoverageReminder follows the counts on every surface.
+const evidenceCoverageReminder = "Counts show how much health-relevant traffic was seen; they do not measure how much is enough."
+
+// countNoun renders "1 TCP flow" / "2 TCP flows".
+func countNoun(n int, singular, plural string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", singular)
+	}
+	return fmt.Sprintf("%d %s", n, plural)
+}
+
+// evidenceCoverageCounts is the comma-separated count list (no prefix, no period).
+func evidenceCoverageCounts(c *models.EvidenceCoverage) string {
+	return strings.Join([]string{
+		countNoun(c.TCPFlows, "TCP flow", "TCP flows"),
+		countNoun(c.DNSExchanges, "DNS exchange", "DNS exchanges"),
+		countNoun(c.TLSCertificates, "TLS certificate", "TLS certificates"),
+		countNoun(c.StabilitySessions, "stability unit", "stability units"),
+		countNoun(c.ARPBindings, "ARP binding", "ARP bindings"),
+	}, ", ")
+}
+
+// evidenceCoverageLines returns the evidence line and the reminder, or nil when
+// there is nothing truthful to show: NO_DATA, errors (no report) and reports whose
+// coverage was never computed.
+func evidenceCoverageLines(r *models.TriageReport) []string {
+	if r == nil || r.IsNoData() || r.EvidenceCoverage == nil {
+		return nil
+	}
+	return []string{
+		"Evidence examined: " + evidenceCoverageCounts(r.EvidenceCoverage) + ".",
+		evidenceCoverageReminder,
+	}
+}

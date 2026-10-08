@@ -51,6 +51,11 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 		color.Yellow("%s", line)
 	}
 
+	// What health-relevant traffic was examined (descriptive counts, not a verdict).
+	for _, line := range evidenceCoverageLines(r) {
+		fmt.Println(line)
+	}
+
 	fmt.Println()
 
 	// Summary counts

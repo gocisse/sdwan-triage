@@ -59,6 +59,9 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 	for _, line := range completenessLines(report) {
 		yellow.Printf("%s\n", line)
 	}
+	for _, line := range evidenceCoverageLines(report) {
+		fmt.Println(line)
+	}
 	fmt.Println()
 
 	// What's Happening

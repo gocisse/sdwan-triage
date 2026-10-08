@@ -96,6 +96,10 @@ type ReportData struct {
 	// had input (empty otherwise).
 	CoverageNote string
 
+	// EvidenceLines are the evidence-examined counts and the reminder (4.26);
+	// empty for NO_DATA and when coverage is unknown.
+	EvidenceLines []string
+
 	// Health status
 	HealthStatus  string // "good", "warning", "critical"
 	RiskScore     int
@@ -963,6 +967,7 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	if goodWithNoApplicableEvidence(r) {
 		data.CoverageNote = noApplicableEvidenceText(false)
 	}
+	data.EvidenceLines = evidenceCoverageLines(r)
 
 	// NO_DATA is an analysis status, not a health level: never show a health badge.
 	if r.IsNoData() {
