@@ -826,6 +826,13 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	return findings
 }
 
+// StabilityUnits returns how many stability-protocol units this analyzer saw:
+// HSRP groups, VRRP sessions and STP bridges. Read-only; it exposes existing
+// state and changes no detection behavior.
+func (l *LANProtocolAnalyzer) StabilityUnits() int {
+	return len(l.hsrpGroups) + len(l.vrrpSessions) + len(l.stpBridges)
+}
+
 // FinalizeStability evaluates HSRP and VRRP session data for flapping and
 // appends StabilityFinding entries to the report. Called by processor.go
 // alongside the StabilityMonitor's own Finalize.

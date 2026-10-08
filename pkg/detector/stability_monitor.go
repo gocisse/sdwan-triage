@@ -404,6 +404,13 @@ func (sm *StabilityMonitor) analyzeSTPTCN(eth *layers.Ethernet, ts time.Time, re
 	}
 }
 
+// ObservedUnits returns how many stability-protocol units this monitor saw:
+// BFD sessions, IKE SA_INIT sessions and STP TCN BPDUs. Read-only; it exposes
+// existing state and changes no detection behavior.
+func (sm *StabilityMonitor) ObservedUnits() int {
+	return len(sm.bfdSessions) + len(sm.ikeSessions) + len(sm.stpTCN.tcnTimes)
+}
+
 // ── Finalize ────────────────────────────────────────────────────────────────
 
 // Finalize evaluates all tracked sessions against thresholds and appends

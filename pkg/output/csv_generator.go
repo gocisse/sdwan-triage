@@ -275,10 +275,15 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		healthStatus = strings.ToUpper(level)
 	}
 
+	healthDescription := "Overall network health assessment"
+	if goodWithNoApplicableEvidence(r) {
+		healthDescription = noApplicableEvidenceText(false)
+	}
+
 	// Write summary rows
 	rows := [][]string{
 		{"Report Generated", time.Now().Format("2006-01-02 15:04:05"), "Timestamp of report generation"},
-		{"Network Health Status", healthStatus, "Overall network health assessment"},
+		{"Network Health Status", healthStatus, healthDescription},
 		{"Total Packets Analyzed", "N/A", "Number of packets processed"},
 		{"Total Traffic Volume", formatBytesForCSV(r.TotalBytes), "Total bytes transferred"},
 		// Original metrics

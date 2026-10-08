@@ -180,6 +180,9 @@ func (g *PDFGenerator) addExecutiveSummary(report *models.TriageReport) {
 		g.pdf.SetFont("Arial", "B", 10)
 		g.pdf.CellFormat(0, 6, "Network Health: "+strings.ToUpper(level), "", 1, "L", false, 0, "")
 		g.pdf.SetFont("Arial", "", 10)
+		if goodWithNoApplicableEvidence(report) {
+			g.pdf.MultiCell(0, 5, noApplicableEvidenceText(true), "", "L", false)
+		}
 	}
 
 	// NO_DATA: nothing was analyzed; say so explicitly (no health verdict exists).

@@ -355,6 +355,9 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		// The ONE authoritative health conclusion, computed once, after every
 		// input of the health algorithm exists (Findings, stability, handshakes…).
 		report.NetworkHealth = models.ComputeNetworkHealth(report)
+		// Which health-relevant classes had input (applicability metadata only; it
+		// is computed AFTER the health level and never feeds back into it).
+		report.EvidenceCoverage = p.buildEvidenceCoverage(state, report)
 		applyHealthToPlainEnglish(report)
 	}
 
@@ -1348,4 +1351,35 @@ func applyHealthToPlainEnglish(report *models.TriageReport) {
 	report.PlainEnglishSummary.OverallHealth = label
 	report.PlainEnglishSummary.HealthIcon = icon
 	report.PlainEnglishSummary.HealthColor = color
+
+	// A GOOD verdict with no health-relevant evidence class exercised says so in
+	// plain English (the label and network_health are unchanged).
+	if report.NetworkHealth == models.NetworkHealthGood && report.EvidenceCoverage.NoHealthRelevantEvidence() {
+		report.PlainEnglishSummary.KeyFindings = append(report.PlainEnglishSummary.KeyFindings, models.NoApplicableEvidenceNote)
+	}
+}
+
+// buildEvidenceCoverage derives, from state that already exists after the packet
+// loop, how many units of each health-relevant evidence class were seen. It adds
+// no per-packet counters and changes no detector behavior.
+func (p *Processor) buildEvidenceCoverage(state *models.AnalysisState, report *models.TriageReport) *models.EvidenceCoverage {
+	cov := &models.EvidenceCoverage{
+		TCPFlows:          state.TCPFlowCount(),
+		TLSCertificates:   len(report.TLSCerts),
+		StabilitySessions: p.stabilityMonitor.ObservedUnits() + p.lanProtocolAnalyzer.StabilityUnits(),
+		ARPBindings:       len(state.ARPIPToMAC),
+	}
+	// DNS: recorded exchanges (queries). A capture holding only failure responses
+	// has no query records but its failure responses are the evidence the health
+	// algorithm reads, so they count. (Successful responses whose query is not in
+	// the capture leave no trace and cannot be counted.)
+	cov.DNSExchanges = len(report.DNSDetails)
+	if cov.DNSExchanges == 0 {
+		for _, a := range report.DNSAnomalies {
+			if a.Kind == models.DNSKindNXDomain || a.Kind == models.DNSKindServerFailure {
+				cov.DNSExchanges++
+			}
+		}
+	}
+	return cov
 }

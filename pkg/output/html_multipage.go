@@ -174,7 +174,7 @@ func generateDashboardPage(data *ReportData, outputPath string) error {
 
 	contentTemplate := `{{define "content"}}
                 <!-- KPI Dashboard Section -->
-                <section id="dashboard">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}
+                <section id="dashboard">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .CoverageNote}}<div class="coverage-notice" role="note" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);">{{.CoverageNote}}</div>{{end}}
                     <div class="kpi-grid">
                         <div class="kpi-card">
                             <div class="kpi-icon {{if eq .HealthStatus "no_data"}}no-data{{else if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "fair"}}warning{{else if eq .HealthStatus "warning"}}warning{{else}}danger{{end}}">
@@ -291,7 +291,7 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
                             <i class="fas fa-chart-line"></i>
                             <h2>Executive Summary</h2>
                         </div>
-                        <div class="card-body">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}
+                        <div class="card-body">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .CoverageNote}}<div class="coverage-notice" role="note" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);">{{.CoverageNote}}</div>{{end}}
                             {{.ExecutiveSummaryExplanation}}
                             
                             {{if eq .HealthStatus "no_data"}}
@@ -300,7 +300,7 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
                             </div>
                             {{else if eq .HealthStatus "good"}}
                             <div class="health-badge health-good">
-                                <i class="fas fa-check-circle"></i> Network Health: GOOD{{if .CompletenessLines}} (analyzed packets only){{end}}
+                                <i class="fas fa-check-circle"></i> Network Health: GOOD{{if .CompletenessLines}} (analyzed packets only){{else if .CoverageNote}} (no applicable traffic){{end}}
                             </div>
                             {{else if eq .HealthStatus "fair"}}
                             <div class="health-badge health-warning">

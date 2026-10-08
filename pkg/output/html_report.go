@@ -92,6 +92,10 @@ type ReportData struct {
 	// HealthStatus is "no_data" in that case so no good/warning/critical badge is shown.
 	NoDataLines []string
 
+	// CoverageNote qualifies a GOOD verdict when no health-relevant evidence class
+	// had input (empty otherwise).
+	CoverageNote string
+
 	// Health status
 	HealthStatus  string // "good", "warning", "critical"
 	RiskScore     int
@@ -955,6 +959,10 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 
 	// Evidence scope (provable input limitations only)
 	data.CompletenessLines = completenessLines(r)
+
+	if goodWithNoApplicableEvidence(r) {
+		data.CoverageNote = noApplicableEvidenceText(false)
+	}
 
 	// NO_DATA is an analysis status, not a health level: never show a health badge.
 	if r.IsNoData() {

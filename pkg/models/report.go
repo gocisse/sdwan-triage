@@ -137,6 +137,13 @@ type TriageReport struct {
 	// metadata only: it never feeds RiskScore, Findings, Events or health severity.
 	Completeness *CaptureCompleteness `json:"capture_completeness,omitempty"`
 
+	// EvidenceCoverage says which health-relevant evidence classes had input in
+	// this capture (applicability, NOT sufficiency). Set once at the end of
+	// Process for analyzed reports; absent for NO_DATA and on errors. An all-zero
+	// value is meaningful: packets were analyzed, but none of them exercised a
+	// class that can move NetworkHealth. It never influences NetworkHealth.
+	EvidenceCoverage *EvidenceCoverage `json:"evidence_coverage,omitempty"`
+
 	// NetworkHealth is the ONE authoritative machine-readable health conclusion:
 	// "good" | "fair" | "warning" | "critical" (NetworkHealth* constants). It is
 	// set once at the end of Process for analyzed reports and is absent when the

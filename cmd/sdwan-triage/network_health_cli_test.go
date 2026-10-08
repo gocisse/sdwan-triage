@@ -72,7 +72,9 @@ func TestNetworkHealthCLI_SurfacesAgreeAndExit0(t *testing.T) {
 	bin := buildCLI(t)
 	banner := map[string]string{"good": "GOOD", "fair": "FAIR", "warning": "WARNING", "critical": "CRITICAL"}
 	simple := map[string]string{
-		"good": "healthy and performing well", "fair": "minor issues worth a look",
+		// The "good" fixture is one UDP packet: no health-relevant evidence class had input,
+		// so the (unchanged) GOOD level is worded with the 4.25 qualification.
+		"good": "No problems were found, but there was no TCP, DNS, TLS, ARP-reply or stability-protocol traffic to evaluate", "fair": "minor issues worth a look",
 		"warning": "some issues that need attention", "critical": "serious problems requiring immediate action"}
 	for level, path := range healthFixtures(t) {
 		term, _, exit := runIn(t, t.TempDir(), bin, path)
@@ -151,5 +153,79 @@ func TestNetworkHealthCLI_DeterministicAcrossRuns(t *testing.T) {
 		} else if d.Health != first {
 			t.Fatalf("run %d: %q != %q", i, d.Health, first)
 		}
+	}
+}
+
+// Evidence applicability (4.25): the level and exit code are unchanged; only the
+// wording is qualified, and only when no health-relevant class had input.
+func TestCoverageCLI_QualifiedGoodForUDPOnly(t *testing.T) {
+	bin := buildCLI(t)
+	udp := healthFixtures(t)["good"] // one UDP packet
+	stdout, _, exit := runIn(t, t.TempDir(), bin, udp)
+	if exit != 0 || !strings.Contains(stdout, "NETWORK HEALTH: GOOD - No significant issues observed — there was no TCP, DNS, TLS, ARP-reply or stability-protocol traffic to evaluate") {
+		t.Fatalf("exit=%d\n%s", exit, stdout)
+	}
+	js, _, _ := runIn(t, t.TempDir(), bin, "-json", udp)
+	var d struct {
+		Health string `json:"network_health"`
+		Cov    *struct {
+			TCP, DNS, TLS, Stab, ARP int
+		} `json:"-"`
+		Raw map[string]int `json:"evidence_coverage"`
+	}
+	if err := json.Unmarshal([]byte(js), &d); err != nil {
+		t.Fatal(err)
+	}
+	if d.Health != "good" || len(d.Raw) != 5 {
+		t.Errorf("health=%q coverage=%v", d.Health, d.Raw)
+	}
+	for k, v := range d.Raw {
+		if v != 0 {
+			t.Errorf("%s = %d, want 0", k, v)
+		}
+	}
+}
+
+func TestCoverageCLI_NotQualifiedWithRelevantEvidence(t *testing.T) {
+	bin := buildCLI(t)
+	fx := healthFixtures(t)
+	p := handshakePCAP(t, testpcap.Handshake())
+	stdout, _, exit := runIn(t, t.TempDir(), bin, p)
+	if exit != 0 || strings.Contains(stdout, "no TCP, DNS, TLS") {
+		t.Errorf("TCP capture must not be qualified (exit %d)", exit)
+	}
+	// FAIR / WARNING / CRITICAL fixtures keep their wording.
+	for _, level := range []string{"fair", "warning", "critical"} {
+		out, _, _ := runIn(t, t.TempDir(), bin, fx[level])
+		if strings.Contains(out, "no TCP, DNS, TLS") {
+			t.Errorf("%s must not be qualified", level)
+		}
+	}
+	// ARP requests only → qualified; ARP replies → not qualified.
+	mac, ip := []byte{0, 1, 2, 3, 4, 5}, []byte{192, 168, 1, 50}
+	req := handshakePCAP(t, [][]byte{arpFrameCLI(1, mac, ip)})
+	if out, _, _ := runIn(t, t.TempDir(), bin, req); !strings.Contains(out, "no TCP, DNS, TLS") {
+		t.Errorf("ARP requests only must be qualified:\n%s", out)
+	}
+	rep := handshakePCAP(t, [][]byte{arpFrameCLI(2, mac, ip)})
+	if out, _, _ := runIn(t, t.TempDir(), bin, rep); strings.Contains(out, "no TCP, DNS, TLS") {
+		t.Errorf("ARP replies must not be qualified:\n%s", out)
+	}
+}
+
+func arpFrameCLI(op byte, mac, ip []byte) []byte {
+	arp := []byte{0, 1, 8, 0, 6, 4, 0, op}
+	arp = append(arp, mac...)
+	arp = append(arp, ip...)
+	arp = append(arp, make([]byte, 6)...)
+	arp = append(arp, testpcap.ServerIP...)
+	return testpcap.BuildEthernet(mac, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, 0x0806, arp)
+}
+
+func TestCoverageCLI_NoDataHasNoCoverageOrHealth(t *testing.T) {
+	bin := buildCLI(t)
+	js, _, exit := runIn(t, t.TempDir(), bin, "-json", emptyPCAP(t))
+	if exit != 2 || strings.Contains(js, "evidence_coverage") || strings.Contains(js, "network_health") {
+		t.Errorf("exit=%d", exit)
 	}
 }

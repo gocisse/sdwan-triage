@@ -28,8 +28,28 @@ func isPartialAnalysis(r *models.TriageReport) bool {
 	return r != nil && r.Completeness.IsPartial()
 }
 
+// goodWithNoApplicableEvidence reports whether the verdict is GOOD although no
+// health-relevant evidence class had any input (evidence applicability, 4.25).
+// The health level itself is untouched; this only qualifies how GOOD is worded.
+func goodWithNoApplicableEvidence(r *models.TriageReport) bool {
+	level, ok := networkHealthOf(r)
+	return ok && level == models.NetworkHealthGood && r.EvidenceCoverage.NoHealthRelevantEvidence()
+}
+
+// noApplicableEvidenceText is the qualification sentence (ASCII dash for fixed-font
+// exports such as the PDF).
+func noApplicableEvidenceText(ascii bool) string {
+	if ascii {
+		return strings.ReplaceAll(models.NoApplicableEvidenceNote, "\u2014", "-")
+	}
+	return models.NoApplicableEvidenceNote
+}
+
 // goodSubline is the text after "NETWORK HEALTH: GOOD - ".
 func goodSubline(r *models.TriageReport) string {
+	if goodWithNoApplicableEvidence(r) {
+		return strings.TrimSuffix(models.NoApplicableEvidenceNote, ".")
+	}
 	if isPartialAnalysis(r) {
 		return goodSublinePartial
 	}

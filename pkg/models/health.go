@@ -157,3 +157,41 @@ func PlainEnglishHealthLabel(level string) (label, icon, color string) {
 		return "Critical", "🔴", "health-critical"
 	}
 }
+
+// EvidenceCoverage counts, per health-relevant evidence class, the units of
+// input the analysis actually saw. It answers one binary question — "did this
+// class have anything to evaluate?" — and deliberately NOT "was there enough to
+// be confident": there are no sufficiency thresholds, so a single SYN gives
+// tcp_flows = 1.
+//
+// Sources (all finalized state, no hot-path counters):
+//   - TCPFlows:           TCP flows tracked by the TCP analyzer (retransmission, RTT,
+//     handshake and window detectors all consume TCP segments)
+//   - DNSExchanges:       DNS exchanges recorded (queries, or — for a capture that has
+//     only failure responses — the failure responses); successful responses whose
+//     query is not in the capture leave no trace and are not counted
+//   - TLSCertificates:    server certificates parsed (expiry is the health input)
+//   - StabilitySessions:  observed units of the stability protocols: BFD sessions,
+//     IKE SA_INIT sessions, STP bridges / TCN BPDUs, HSRP groups, VRRP sessions
+//   - ARPBindings:        distinct IPs for which an ARP REPLY was seen (the ARP
+//     conflict detector reads replies only; requests do not count)
+type EvidenceCoverage struct {
+	TCPFlows          int `json:"tcp_flows"`
+	DNSExchanges      int `json:"dns_exchanges"`
+	TLSCertificates   int `json:"tls_certificates"`
+	StabilitySessions int `json:"stability_sessions"`
+	ARPBindings       int `json:"arp_bindings"`
+}
+
+// NoHealthRelevantEvidence reports whether coverage is known and every
+// health-relevant class had zero input. A nil coverage (not computed, e.g. a
+// hand-built report) is NOT treated as "no evidence". It inspects nothing else:
+// not the health level, RiskScore, Findings, packet counts or completeness.
+func (c *EvidenceCoverage) NoHealthRelevantEvidence() bool {
+	return c != nil && c.TCPFlows == 0 && c.DNSExchanges == 0 && c.TLSCertificates == 0 &&
+		c.StabilitySessions == 0 && c.ARPBindings == 0
+}
+
+// NoApplicableEvidenceNote is the single wording used wherever a GOOD verdict
+// must be qualified because no health-relevant evidence class had input.
+const NoApplicableEvidenceNote = "No significant issues observed \u2014 there was no TCP, DNS, TLS, ARP-reply or stability-protocol traffic to evaluate."

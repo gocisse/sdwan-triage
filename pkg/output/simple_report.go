@@ -40,7 +40,10 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 	health, _ := networkHealthOf(report)
 	switch health {
 	case models.NetworkHealthGood:
-		if isPartialAnalysis(report) {
+		if goodWithNoApplicableEvidence(report) {
+			// Nothing health-relevant existed to evaluate: not an affirmative statement.
+			green.Printf("✓ No problems were found, but there was no TCP, DNS, TLS, ARP-reply or stability-protocol traffic to evaluate\n")
+		} else if isPartialAnalysis(report) {
 			// Not an affirmative statement about the network: part of the input was not analyzed.
 			green.Printf("✓ No problems were found in the packets that could be analyzed\n")
 		} else {
