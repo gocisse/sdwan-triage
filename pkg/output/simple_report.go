@@ -28,11 +28,19 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 	healthStatus := getHealthStatus(report)
 	switch healthStatus {
 	case "Healthy":
-		green.Printf("✓ Your network is healthy and performing well\n")
+		if isPartialAnalysis(report) {
+			// Not an affirmative statement about the network: part of the input was not analyzed.
+			green.Printf("✓ No problems were found in the packets that could be analyzed\n")
+		} else {
+			green.Printf("✓ Your network is healthy and performing well\n")
+		}
 	case "Warning":
 		yellow.Printf("⚠ Your network has some issues that need attention\n")
 	case "Critical":
 		red.Printf("✗ Your network has serious problems requiring immediate action\n")
+	}
+	for _, line := range completenessLines(report) {
+		yellow.Printf("%s\n", line)
 	}
 	fmt.Println()
 

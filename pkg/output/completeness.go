@@ -1,0 +1,120 @@
+package output
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/gocisse/sdwan-triage/pkg/models"
+)
+
+// This file is the single source of truth for how the tool words the scope of
+// its evidence. It only formats models.CaptureCompleteness; it never influences
+// health severity (healthVerdict does not read it), RiskScore or Findings.
+//
+// Wording is observational. It states what was not analyzed and what may be
+// missing from the capture file; it never claims packet loss in the network.
+
+// Verdict sub-lines for GOOD. The complete-input text is the long-standing one.
+const (
+	goodSublineComplete = "No significant issues detected"
+	goodSublinePartial  = "No significant issues observed in the analyzed packets"
+)
+
+// completenessScopeLine closes every completeness notice.
+const completenessScopeLine = "Findings cover only the analyzed packets; counts may be incomplete or may reflect effects of missing counterpart packets."
+
+// isPartialAnalysis reports whether the report carries a provable limitation.
+func isPartialAnalysis(r *models.TriageReport) bool {
+	return r != nil && r.Completeness.IsPartial()
+}
+
+// goodSubline is the text after "NETWORK HEALTH: GOOD - ".
+func goodSubline(r *models.TriageReport) string {
+	if isPartialAnalysis(r) {
+		return goodSublinePartial
+	}
+	return goodSublineComplete
+}
+
+// withThousands formats n with comma separators (10667 -> "10,667").
+func withThousands(n int) string {
+	s := fmt.Sprintf("%d", n)
+	if n < 0 || len(s) <= 3 {
+		return s
+	}
+	var b strings.Builder
+	pre := len(s) % 3
+	if pre > 0 {
+		b.WriteString(s[:pre])
+	}
+	for i := pre; i < len(s); i += 3 {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
+}
+
+// completenessLines returns the notice as lines (nil when the analysis is
+// complete). The first line of each block starts with the "⚠" marker; detail
+// lines are indented. Order is fixed, so output is deterministic.
+func completenessLines(r *models.TriageReport) []string {
+	if !isPartialAnalysis(r) {
+		return nil
+	}
+	c := r.Completeness
+	var lines []string
+
+	if c.PacketsUnsupported > 0 || c.PacketsDecodeFailed > 0 || c.PacketsSkipped > 0 {
+		if c.PacketsUnsupported > 0 && c.PacketsRead > 0 {
+			pct := 100 * float64(c.PacketsUnsupported) / float64(c.PacketsRead)
+			lines = append(lines, fmt.Sprintf("⚠ PARTIAL ANALYSIS: %s of %s packets (%.1f%%) were not analyzed.",
+				withThousands(c.PacketsUnsupported), withThousands(c.PacketsRead), pct))
+		} else {
+			lines = append(lines, "⚠ PARTIAL ANALYSIS: some packets were not fully analyzed.")
+		}
+		for _, u := range c.UnsupportedLinkTypes {
+			lines = append(lines, fmt.Sprintf("   Unsupported link type %s: %s packets.", u.Label, withThousands(u.Packets)))
+		}
+		if c.PacketsDecodeFailed > 0 {
+			lines = append(lines, fmt.Sprintf("   %s packets could not be decoded (no link or network layer).", withThousands(c.PacketsDecodeFailed)))
+		}
+		if c.PacketsSkipped > 0 {
+			lines = append(lines, fmt.Sprintf("   %s packets were skipped after an internal analyzer error.", withThousands(c.PacketsSkipped)))
+		}
+	}
+	if c.ReadErrors > 0 {
+		lines = append(lines, fmt.Sprintf("⚠ INCOMPLETE CAPTURE FILE: the capture ended unexpectedly (%s read error(s)).", withThousands(c.ReadErrors)))
+		lines = append(lines, "   Trailing packets may be missing.")
+	}
+	lines = append(lines, "   "+completenessScopeLine)
+	return lines
+}
+
+// completenessText is the notice as one string (empty when complete).
+func completenessText(r *models.TriageReport) string {
+	return strings.Join(completenessLines(r), "\n")
+}
+
+// completenessOneLine is a compact single-line form for tabular exports.
+func completenessOneLine(r *models.TriageReport) string {
+	if !isPartialAnalysis(r) {
+		return ""
+	}
+	c := r.Completeness
+	var parts []string
+	if c.PacketsUnsupported > 0 {
+		parts = append(parts, fmt.Sprintf("%d of %d packets not analyzed (unsupported link type)", c.PacketsUnsupported, c.PacketsRead))
+	}
+	if c.PacketsDecodeFailed > 0 {
+		parts = append(parts, fmt.Sprintf("%d packets could not be decoded", c.PacketsDecodeFailed))
+	}
+	if c.PacketsSkipped > 0 {
+		parts = append(parts, fmt.Sprintf("%d packets skipped after an analyzer error", c.PacketsSkipped))
+	}
+	if c.ReadErrors > 0 {
+		parts = append(parts, fmt.Sprintf("capture file ended unexpectedly (%d read error(s)); trailing packets may be missing", c.ReadErrors))
+	}
+	return "PARTIAL ANALYSIS: " + strings.Join(parts, "; ") + ". " + completenessScopeLine
+}

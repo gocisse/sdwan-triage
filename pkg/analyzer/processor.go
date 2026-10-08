@@ -226,6 +226,8 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 	}
 	var packetIndex uint64 // ordinal of the packet in the capture file, including filtered/skipped ones
 	p.decode = decodeStats{}
+	p.skippedPackets = 0
+	p.errorCount = 0
 
 	for {
 		data, ci, err := reader.ReadPacketData()
@@ -333,6 +335,10 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 
 	// Finalize report
 	p.finalizeReport(state, report)
+
+	// Record provable input limitations (nil when the analysis was complete).
+	// Evidence-scope metadata only: set last so nothing above can read it.
+	report.Completeness = p.buildCompleteness()
 
 	return nil
 }

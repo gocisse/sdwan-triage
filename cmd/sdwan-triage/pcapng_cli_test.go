@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,5 +117,88 @@ func TestCLI_NormalPcapngMatchesPcapVerdict(t *testing.T) {
 	}
 	if banner(so1) == "" || banner(so1) != banner(so2) {
 		t.Fatalf("pcapng banner %q != pcap banner %q", banner(so1), banner(so2))
+	}
+}
+
+func partialFixture(t *testing.T) string {
+	t.Helper()
+	pkts := testpcap.EthernetNG(testpcap.Handshake())
+	pkts = append(pkts, testpcap.NGPacket{Interface: 1, Data: make([]byte, 40)})
+	return writeNGFile(t, []uint16{testpcap.LinkTypeEthernet, testpcap.LinkTypeEthernetMPkt}, pkts)
+}
+
+func TestCLI_PartialAnalysisQualifiesVerdictOnStdout(t *testing.T) {
+	bin := buildCLI(t)
+	stdout, _, exit := runCLI(t, bin, partialFixture(t))
+	if exit != 0 {
+		t.Fatalf("exit = %d", exit)
+	}
+	for _, want := range []string{"NETWORK HEALTH: ", "PARTIAL ANALYSIS: 1 of 6 packets", "Unsupported link type 18", "Findings cover only the analyzed packets"} {
+		if !bytes.Contains([]byte(stdout), []byte(want)) {
+			t.Errorf("stdout missing %q:\n%s", want, stdout)
+		}
+	}
+	if bytes.Contains([]byte(stdout), []byte("No significant issues detected")) {
+		t.Errorf("partial GOOD must not use the affirmative wording:\n%s", stdout)
+	}
+}
+
+func TestCLI_CompleteCaptureHasNoCompletenessOutput(t *testing.T) {
+	bin := buildCLI(t)
+	path := writeNGFile(t, []uint16{testpcap.LinkTypeEthernet}, testpcap.EthernetNG(testpcap.Handshake()))
+	stdout, stderr, exit := runCLI(t, bin, path)
+	if exit != 0 || bytes.Contains([]byte(stdout+stderr), []byte("PARTIAL ANALYSIS")) || bytes.Contains([]byte(stdout), []byte("INCOMPLETE CAPTURE FILE")) {
+		t.Fatalf("complete capture must carry no completeness notice (exit %d)\n%s\n%s", exit, stdout, stderr)
+	}
+	js, _, _ := runCLI(t, bin, "-json", path)
+	if !json.Valid([]byte(js)) || bytes.Contains([]byte(js), []byte("capture_completeness")) {
+		t.Fatalf("complete JSON must be valid and omit capture_completeness")
+	}
+}
+
+func TestCLI_JSONCarriesCompletenessWhenPartial(t *testing.T) {
+	bin := buildCLI(t)
+	js, _, exit := runCLI(t, bin, "-json", partialFixture(t))
+	if exit != 0 || !json.Valid([]byte(js)) {
+		t.Fatalf("exit=%d valid=%v", exit, json.Valid([]byte(js)))
+	}
+	var rep struct {
+		C struct {
+			PacketsRead        int `json:"packets_read"`
+			PacketsDecoded     int `json:"packets_decoded"`
+			PacketsUnsupported int `json:"packets_unsupported"`
+			ReadErrors         int `json:"read_errors"`
+		} `json:"capture_completeness"`
+	}
+	if err := json.Unmarshal([]byte(js), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if rep.C.PacketsRead != 6 || rep.C.PacketsDecoded != 5 || rep.C.PacketsUnsupported != 1 || rep.C.ReadErrors != 0 {
+		t.Fatalf("unexpected completeness: %+v", rep.C)
+	}
+	if bytes.Contains([]byte(js), []byte("PARTIAL ANALYSIS")) {
+		t.Error("human-readable text must never appear in JSON stdout")
+	}
+}
+
+func TestCLI_TruncatedCaptureIsQualified(t *testing.T) {
+	bin := buildCLI(t)
+	full := filepath.Join(t.TempDir(), "full.pcap")
+	if err := testpcap.WriteFile(full, testpcap.Handshake()); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(full)
+	cut := filepath.Join(t.TempDir(), "cut.pcap")
+	if err := os.WriteFile(cut, b[:len(b)-10], 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _, exit := runCLI(t, bin, cut)
+	if exit != 0 {
+		t.Fatalf("exit = %d", exit)
+	}
+	for _, want := range []string{"NETWORK HEALTH: ", "INCOMPLETE CAPTURE FILE: the capture ended unexpectedly", "Trailing packets may be missing."} {
+		if !bytes.Contains([]byte(stdout), []byte(want)) {
+			t.Errorf("stdout missing %q:\n%s", want, stdout)
+		}
 	}
 }

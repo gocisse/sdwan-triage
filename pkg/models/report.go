@@ -131,6 +131,12 @@ type TriageReport struct {
 	EventCounts   map[string]int `json:"event_counts,omitempty"`
 	EventsDropped int            `json:"events_dropped,omitempty"`
 
+	// Completeness records provable limitations of the INPUT analysis (packets
+	// not analyzed, truncated capture file). It is nil for a complete analysis,
+	// so complete captures serialise without the key. It is evidence-scope
+	// metadata only: it never feeds RiskScore, Findings, Events or health severity.
+	Completeness *CaptureCompleteness `json:"capture_completeness,omitempty"`
+
 	// TimelineTruncated is the number of timeline events that were NOT retained
 	// because MaxTimelineEvents was reached. Retained events are a uniform,
 	// deterministic sample across the whole capture (see AddTimelineEvent).
@@ -950,4 +956,37 @@ type VendorDPIIssue struct {
 	Category        string  `json:"category"`
 	RootCause       string  `json:"root_cause"`
 	WiresharkFilter string  `json:"wireshark_filter,omitempty"`
+}
+
+// UnsupportedLinkType counts packets skipped because their link type is not
+// decoded by the analyzer.
+type UnsupportedLinkType struct {
+	LinkType int    `json:"link_type"` // as seen by the decoder (pcapng types >= 256 are truncated, e.g. 274 -> 18)
+	Label    string `json:"label"`
+	Packets  int    `json:"packets"`
+}
+
+// CaptureCompleteness describes what the analyzer could and could not examine.
+// The causes are deliberately kept separate:
+//   - PacketsUnsupported: read, but the link type is not supported (not analyzed)
+//   - PacketsDecodeFailed: supported link type, but no link/network layer could be decoded
+//   - PacketsSkipped: dropped from analysis by the analyzer's own skip/recovery path
+//   - ReadErrors: the reader returned a non-EOF error (e.g. a truncated capture file)
+//
+// These are facts about the analysis input. They are not statements about packet
+// loss in the network, and no percentage threshold is applied anywhere.
+type CaptureCompleteness struct {
+	PacketsRead          int                   `json:"packets_read"`
+	PacketsDecoded       int                   `json:"packets_decoded"`
+	PacketsUnsupported   int                   `json:"packets_unsupported"`
+	PacketsDecodeFailed  int                   `json:"packets_decode_failed"`
+	PacketsSkipped       int                   `json:"packets_skipped"`
+	ReadErrors           int                   `json:"read_errors"`
+	UnsupportedLinkTypes []UnsupportedLinkType `json:"unsupported_link_types,omitempty"` // sorted by link type
+}
+
+// IsPartial reports whether any provable analysis limitation exists.
+func (c *CaptureCompleteness) IsPartial() bool {
+	return c != nil && (c.PacketsUnsupported > 0 || c.PacketsDecodeFailed > 0 ||
+		c.PacketsSkipped > 0 || c.ReadErrors > 0)
 }

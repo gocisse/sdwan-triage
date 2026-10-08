@@ -23,13 +23,18 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 	// Health Status (see healthVerdict for the evidence it considers)
 	switch healthVerdict(r) {
 	case healthGood:
-		color.Green("✓ NETWORK HEALTH: GOOD - No significant issues detected")
+		color.Green("✓ NETWORK HEALTH: GOOD - %s", goodSubline(r))
 	case healthCritical:
 		color.Red("✗ NETWORK HEALTH: CRITICAL - Immediate attention required")
 	case healthWarning:
 		color.Yellow("⚠ NETWORK HEALTH: WARNING - Issues detected that need review")
 	default:
 		color.Cyan("○ NETWORK HEALTH: FAIR - Minor issues detected")
+	}
+
+	// Evidence scope: only present when the analysis is provably incomplete.
+	for _, line := range completenessLines(r) {
+		color.Yellow("%s", line)
 	}
 
 	fmt.Println()

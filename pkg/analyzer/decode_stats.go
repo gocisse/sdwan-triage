@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
@@ -114,4 +115,37 @@ func (s DecodeSummary) PartialDecodeNotice() string {
 	pct := 100 * float64(s.PacketsUnsupported) / float64(s.PacketsRead)
 	return fmt.Sprintf("%d of %d packets (%.1f%%) use an unsupported link type and were NOT analyzed (%s); results cover only the %d decoded packets",
 		s.PacketsUnsupported, s.PacketsRead, pct, s.UnsupportedDescribe, s.PacketsDecoded)
+}
+
+// buildCompleteness snapshots the analysis-input limitations of the last
+// Process call. It returns nil when nothing is provably incomplete, so complete
+// captures carry no completeness metadata. The result is deterministic
+// (counters plus a slice sorted by link type) and is never read by detectors,
+// risk, findings or health severity.
+func (p *Processor) buildCompleteness() *models.CaptureCompleteness {
+	c := &models.CaptureCompleteness{
+		PacketsRead:         p.decode.read,
+		PacketsDecoded:      p.decode.decoded,
+		PacketsUnsupported:  p.decode.unsupportedTotal(),
+		PacketsDecodeFailed: p.decode.failed,
+		PacketsSkipped:      p.skippedPackets,
+		ReadErrors:          p.errorCount,
+	}
+	if !c.IsPartial() {
+		return nil
+	}
+	keys := make([]int, 0, len(p.decode.unsupported))
+	for lt := range p.decode.unsupported {
+		keys = append(keys, int(lt))
+	}
+	sort.Ints(keys)
+	for _, k := range keys {
+		lt := layers.LinkType(k)
+		c.UnsupportedLinkTypes = append(c.UnsupportedLinkTypes, models.UnsupportedLinkType{
+			LinkType: k,
+			Label:    LinkTypeLabel(lt),
+			Packets:  p.decode.unsupported[lt],
+		})
+	}
+	return c
 }

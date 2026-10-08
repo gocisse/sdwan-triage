@@ -310,6 +310,11 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		{"DNS Queries Recorded", fmt.Sprintf("%d", len(r.DNSDetails)), "Total DNS queries captured"},
 	}
 
+	// Evidence scope: additive row, only for provably incomplete analyses.
+	if note := completenessOneLine(r); note != "" {
+		rows = append(rows, []string{"Capture Completeness", "PARTIAL", note})
+	}
+
 	for _, row := range rows {
 		if err := writer.Write(row); err != nil {
 			return err

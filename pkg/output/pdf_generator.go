@@ -172,6 +172,14 @@ func (g *PDFGenerator) addExecutiveSummary(report *models.TriageReport) {
 	g.pdf.SetFont("Arial", "", 10)
 	g.pdf.CellFormat(0, 8, fmt.Sprintf("%d", len(report.QUICFlows)), "", 1, "L", false, 0, "")
 
+	// Evidence scope: only present when the analysis is provably incomplete.
+	if note := completenessOneLine(report); note != "" {
+		g.pdf.Ln(2)
+		g.pdf.SetFont("Arial", "B", 9)
+		g.pdf.MultiCell(0, 5, note, "", "L", false)
+		g.pdf.SetFont("Arial", "", 10)
+	}
+
 	g.pdf.Ln(5)
 }
 

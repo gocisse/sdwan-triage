@@ -174,7 +174,7 @@ func generateDashboardPage(data *ReportData, outputPath string) error {
 
 	contentTemplate := `{{define "content"}}
                 <!-- KPI Dashboard Section -->
-                <section id="dashboard">
+                <section id="dashboard">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}
                     <div class="kpi-grid">
                         <div class="kpi-card">
                             <div class="kpi-icon {{if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}danger{{end}}">
@@ -291,12 +291,12 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
                             <i class="fas fa-chart-line"></i>
                             <h2>Executive Summary</h2>
                         </div>
-                        <div class="card-body">
+                        <div class="card-body">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}
                             {{.ExecutiveSummaryExplanation}}
                             
                             {{if eq .HealthStatus "good"}}
                             <div class="health-badge health-good">
-                                <i class="fas fa-check-circle"></i> Network Health: GOOD
+                                <i class="fas fa-check-circle"></i> Network Health: GOOD{{if .CompletenessLines}} (analyzed packets only){{end}}
                             </div>
                             {{else if eq .HealthStatus "warning"}}
                             <div class="health-badge health-warning">

@@ -82,6 +82,10 @@ type ReportData struct {
 	Version     string
 	Year        int
 
+	// CompletenessLines is the evidence-scope notice (empty when the analysis
+	// was complete); see completenessLines.
+	CompletenessLines []string
+
 	// Health status
 	HealthStatus  string // "good", "warning", "critical"
 	RiskScore     int
@@ -948,6 +952,9 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.ProtocolStatsJSON = template.JS(generateProtocolStatsJSON(data.ProtocolStats))
 	data.TopTalkersJSON = template.JS(generateTopTalkersJSON(data.TopTalkers))
 	data.RTTHistogramJSON = template.JS(generateRTTHistogramJSON(r.RTTHistogram))
+
+	// Evidence scope (provable input limitations only)
+	data.CompletenessLines = completenessLines(r)
 
 	// Add educational content
 	data.ExecutiveSummaryExplanation = template.HTML(GetExecutiveSummaryExplanation())
