@@ -18,26 +18,17 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 	color.New(color.Bold, color.FgCyan).Println("              SD-WAN NETWORK TRIAGE - EXECUTIVE SUMMARY")
 	color.New(color.Bold, color.FgCyan).Println("═══════════════════════════════════════════════════════════════")
 
-	// Calculate totals
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts)
-	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes) + len(r.RTTAnalysis)
-	securityConcerns := len(r.SuspiciousTraffic)
-	for _, cert := range r.TLSCerts {
-		if cert.IsExpired || cert.IsSelfSigned {
-			securityConcerns++
-		}
-	}
-
 	fmt.Println()
 
-	// Health Status
-	if criticalIssues == 0 && performanceIssues == 0 && securityConcerns == 0 {
+	// Health Status (see healthVerdict for the evidence it considers)
+	switch healthVerdict(r) {
+	case healthGood:
 		color.Green("✓ NETWORK HEALTH: GOOD - No significant issues detected")
-	} else if criticalIssues > 0 {
+	case healthCritical:
 		color.Red("✗ NETWORK HEALTH: CRITICAL - Immediate attention required")
-	} else if performanceIssues > 5 || securityConcerns > 0 {
+	case healthWarning:
 		color.Yellow("⚠ NETWORK HEALTH: WARNING - Issues detected that need review")
-	} else {
+	default:
 		color.Cyan("○ NETWORK HEALTH: FAIR - Minor issues detected")
 	}
 
