@@ -62,8 +62,7 @@ func TestHealth_PerformanceBucketUnchanged(t *testing.T) {
 	hvLevel(t, "RTT flows 6", &models.TriageReport{RTTAnalysis: make([]models.RTTFlow, 6)}, healthWarning)
 	// Combined: 2 retransmission flows + 2 RTT flows + 2 failed handshakes = 6.
 	hvLevel(t, "combined 6", &models.TriageReport{TCPRetransmissions: flows(2), RTTAnalysis: make([]models.RTTFlow, 2), TCPHandshakeFlows: hvFailed(2)}, healthWarning)
-	hvLevel(t, "suspicious traffic", &models.TriageReport{SuspiciousTraffic: make([]models.SuspiciousFlow, 1)}, healthWarning)
-	hvLevel(t, "self-signed cert", &models.TriageReport{TLSCerts: []models.TLSCertInfo{{IsSelfSigned: true}}}, healthWarning)
+	hvLevel(t, "expired cert", &models.TriageReport{TLSCerts: []models.TLSCertInfo{{IsExpired: true}}}, healthWarning)
 	hvLevel(t, "valid cert only", &models.TriageReport{TLSCerts: []models.TLSCertInfo{{}}}, healthGood)
 }
 

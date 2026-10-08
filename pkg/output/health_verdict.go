@@ -30,7 +30,10 @@ const performanceWarnThreshold = 5
 //     the handshake tracker when it has data (failed flows only; incomplete
 //     flows are never failures); the legacy RST-only count is used only when the
 //     tracker has no flows, so nothing is counted twice.
-//   - security concerns (suspicious traffic, bad certificates) → at least WARNING.
+//   - expired TLS certificates → at least WARNING. Suspicious-port flows and
+//     self-signed certificates are OBSERVATIONS, not failures: a port number is
+//     not proof of an attack and a self-signed certificate is not proof of a
+//     network problem, so neither affects health (both stay in the report).
 //   - stability findings (BFD/IKE/HSRP/VRRP/STP): High/Critical → at least
 //     WARNING, any other severity → at least FAIR. A floor, never a sum: two
 //     directional findings for one BFD drop are not worse than one.
@@ -63,14 +66,13 @@ func healthVerdict(r *models.TriageReport) healthLevel {
 		raise(healthWarning)
 	}
 
-	security := len(r.SuspiciousTraffic)
+	// Only expired certificates escalate (judged against capture time by the TLS
+	// detector). SuspiciousTraffic and IsSelfSigned are informational.
 	for _, cert := range r.TLSCerts {
-		if cert.IsExpired || cert.IsSelfSigned {
-			security++
+		if cert.IsExpired {
+			raise(healthWarning)
+			break
 		}
-	}
-	if security > 0 {
-		raise(healthWarning)
 	}
 
 	for _, s := range r.StabilityFindings {

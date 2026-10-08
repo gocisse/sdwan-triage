@@ -202,3 +202,40 @@ func TestCLI_TruncatedCaptureIsQualified(t *testing.T) {
 		}
 	}
 }
+
+// Suspicious-port flows stay reported but do not drive the health verdict
+// (observation != failure).
+func TestCLI_SuspiciousPortIsReportedButNotHealth(t *testing.T) {
+	bin := buildCLI(t)
+	// Client uses SOURCE port 5555 (the Velocloud-Wan shape) for a full handshake + data exchange.
+	c2s := func(seq, ack uint32, flags uint8, payload []byte) []byte {
+		return testpcap.TCPFrame(testpcap.ClientMAC, testpcap.ServerMAC, testpcap.ClientIP, testpcap.ServerIP, 5555, 443, seq, ack, flags, payload)
+	}
+	s2c := func(seq, ack uint32, flags uint8, payload []byte) []byte {
+		return testpcap.TCPFrame(testpcap.ServerMAC, testpcap.ClientMAC, testpcap.ServerIP, testpcap.ClientIP, 443, 5555, seq, ack, flags, payload)
+	}
+	frames := [][]byte{c2s(1000, 0, testpcap.SYN, nil), s2c(2000, 1001, testpcap.SYN|testpcap.ACK, nil), c2s(1001, 2001, testpcap.ACK, nil)}
+	path := filepath.Join(t.TempDir(), "p5555.pcap")
+	if err := testpcap.WriteFile(path, frames); err != nil {
+		t.Fatal(err)
+	}
+	js, _, exit := runCLI(t, bin, "-json", path)
+	var rep struct {
+		Susp []struct {
+			SrcPort int    `json:"src_port"`
+			Reason  string `json:"reason"`
+		} `json:"suspicious_traffic"`
+	}
+	if exit != 0 || json.Unmarshal([]byte(js), &rep) != nil || len(rep.Susp) == 0 || rep.Susp[0].SrcPort != 5555 {
+		t.Fatalf("suspicious-port detection must stay intact (exit %d): %s", exit, js)
+	}
+	out, _, _ := runCLI(t, bin, path)
+	if !bytes.Contains([]byte(out), []byte("Suspicious Traffic:   ")) {
+		t.Errorf("observation must stay in the summary:\n%s", out)
+	}
+	for _, bad := range []string{"NETWORK HEALTH: WARNING", "NETWORK HEALTH: CRITICAL"} {
+		if bytes.Contains([]byte(out), []byte(bad)) {
+			t.Errorf("a port number alone must not produce %q:\n%s", bad, out)
+		}
+	}
+}
