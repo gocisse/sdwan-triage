@@ -34,7 +34,7 @@
     "tcp_handshake_flows": 20,
     "tcp_out_of_order_flows": 0,
     "tcp_retransmissions": 0,
-    "tcp_window_findings": 71,
+    "tcp_window_findings": 0,
     "threat_intel_matches": 0,
     "tls_certs": 0,
     "tls_flows": 16,
@@ -56,7 +56,7 @@
   "total_bytes": 1599568,
   "risk_score": 100,
   "risk_level": "Critical",
-  "top_issue": "TCP Window Issues",
-  "top_issue_count": 71,
-  "recommended_actions_count": 3
+  "top_issue": "DNS Anomalies",
+  "top_issue_count": 32,
+  "recommended_actions_count": 2
 }

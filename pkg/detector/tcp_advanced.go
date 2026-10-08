@@ -27,6 +27,52 @@ const (
 type TCPAdvancedAnalyzer struct {
 	windowIssues map[string]*tcpWindowTracker
 	oooFlows     map[string]*tcpOOOTracker
+	// conns holds the Window Scale evidence seen in each connection's handshake,
+	// keyed by the client->server (SYN) direction.
+	conns map[string]*tcpScaleState
+}
+
+// maxWindowScaleShift is the largest shift RFC 7323 allows (a larger value is
+// treated as 14).
+const maxWindowScaleShift = 14
+
+// tcpScaleState is the Window Scale evidence observed in one connection's
+// handshake. The option is per direction: the SYN sender's shift applies to the
+// windows it advertises, the SYN-ACK sender's shift to the windows the server
+// advertises. Scaling is in effect only if BOTH sides sent the option.
+type tcpScaleState struct {
+	synSeen, synHasOpt       bool
+	synAckSeen, synAckHasOpt bool
+	synShift, synAckShift    uint8
+}
+
+// resolve reports whether the scale of each direction is known and, if so,
+// the shift to apply to client->server (clientShift) and server->client
+// (serverShift) windows. Unknown means the capture does not contain enough of
+// the handshake to establish it; callers must not assume shift 0 in that case.
+func (c *tcpScaleState) resolve() (known bool, clientShift, serverShift uint8) {
+	switch {
+	case c.synSeen && !c.synHasOpt, c.synAckSeen && !c.synAckHasOpt:
+		// Either side omitting the option disables scaling in both directions.
+		return true, 0, 0
+	case c.synSeen && c.synAckSeen && c.synHasOpt && c.synAckHasOpt:
+		return true, c.synShift, c.synAckShift
+	}
+	return false, 0, 0
+}
+
+// windowScaleOption returns the Window Scale shift carried by a TCP segment.
+func windowScaleOption(tcp *layers.TCP) (shift uint8, ok bool) {
+	for _, opt := range tcp.Options {
+		if opt.OptionType == layers.TCPOptionKindWindowScale && len(opt.OptionData) >= 1 {
+			s := opt.OptionData[0]
+			if s > maxWindowScaleShift {
+				s = maxWindowScaleShift
+			}
+			return s, true
+		}
+	}
+	return 0, false
 }
 
 type tcpWindowTracker struct {
@@ -55,6 +101,7 @@ func NewTCPAdvancedAnalyzer() *TCPAdvancedAnalyzer {
 	return &TCPAdvancedAnalyzer{
 		windowIssues: make(map[string]*tcpWindowTracker),
 		oooFlows:     make(map[string]*tcpOOOTracker),
+		conns:        make(map[string]*tcpScaleState),
 	}
 }
 
@@ -80,6 +127,9 @@ func (t *TCPAdvancedAnalyzer) Analyze(packet gopacket.Packet, state *models.Anal
 	flowKey := fmt.Sprintf("%s:%d->%s:%d", ipInfo.SrcIP, srcPort, ipInfo.DstIP, dstPort)
 	ts := float64(packet.Metadata().Timestamp.UnixNano()) / 1e9
 
+	// Learn Window Scale from the handshake (must run before analyzeWindow skips SYNs).
+	t.learnWindowScale(tcp, ipInfo, srcPort, dstPort)
+
 	// --- Window Size Analysis ---
 	t.analyzeWindow(tcp, ipInfo, srcPort, dstPort, flowKey, ts, report)
 
@@ -87,6 +137,57 @@ func (t *TCPAdvancedAnalyzer) Analyze(packet gopacket.Packet, state *models.Anal
 	if len(tcp.Payload) > 0 {
 		t.analyzeOutOfOrder(tcp, ipInfo, srcPort, dstPort, flowKey, report)
 	}
+}
+
+// learnWindowScale records the Window Scale option of a SYN (client direction)
+// or SYN-ACK (server direction). A new SYN starts a fresh connection record.
+func (t *TCPAdvancedAnalyzer) learnWindowScale(tcp *layers.TCP, ipInfo *PacketIPInfo, srcPort, dstPort uint16) {
+	if !tcp.SYN {
+		return
+	}
+	shift, has := windowScaleOption(tcp)
+	if !tcp.ACK {
+		key := fmt.Sprintf("%s:%d->%s:%d", ipInfo.SrcIP, srcPort, ipInfo.DstIP, dstPort)
+		if _, exists := t.conns[key]; !exists && len(t.conns) >= maxAdvancedTrackedFlows {
+			return
+		}
+		t.conns[key] = &tcpScaleState{synSeen: true, synHasOpt: has, synShift: shift}
+		return
+	}
+	// SYN-ACK: the connection is keyed by the client->server direction.
+	key := fmt.Sprintf("%s:%d->%s:%d", ipInfo.DstIP, dstPort, ipInfo.SrcIP, srcPort)
+	c, exists := t.conns[key]
+	if !exists {
+		if len(t.conns) >= maxAdvancedTrackedFlows {
+			return
+		}
+		c = &tcpScaleState{}
+		t.conns[key] = c
+	}
+	c.synAckSeen, c.synAckHasOpt, c.synAckShift = true, has, shift
+}
+
+// effectiveWindow returns the advertised window in bytes for a packet sent from
+// ipInfo.Src to ipInfo.Dst, or ok=false when the Window Scale for that
+// direction is unknown (handshake not captured).
+func (t *TCPAdvancedAnalyzer) effectiveWindow(tcp *layers.TCP, ipInfo *PacketIPInfo, srcPort, dstPort uint16) (window uint64, ok bool) {
+	fwd := fmt.Sprintf("%s:%d->%s:%d", ipInfo.SrcIP, srcPort, ipInfo.DstIP, dstPort)
+	if c, exists := t.conns[fwd]; exists { // packet travels client->server
+		known, clientShift, _ := c.resolve()
+		if !known {
+			return 0, false
+		}
+		return uint64(tcp.Window) << clientShift, true
+	}
+	rev := fmt.Sprintf("%s:%d->%s:%d", ipInfo.DstIP, dstPort, ipInfo.SrcIP, srcPort)
+	if c, exists := t.conns[rev]; exists { // packet travels server->client
+		known, _, serverShift := c.resolve()
+		if !known {
+			return 0, false
+		}
+		return uint64(tcp.Window) << serverShift, true
+	}
+	return 0, false
 }
 
 func (t *TCPAdvancedAnalyzer) analyzeWindow(tcp *layers.TCP, ipInfo *PacketIPInfo, srcPort, dstPort uint16, flowKey string, ts float64, report *models.TriageReport) {
@@ -139,22 +240,26 @@ func (t *TCPAdvancedAnalyzer) analyzeWindow(tcp *layers.TCP, ipInfo *PacketIPInf
 		}
 	}
 
-	// Small Window detection
-	if tcp.Window > 0 && tcp.Window <= SmallWindowSize {
-		tracker.SmallCount++
-		if tracker.SmallCount == SmallWindowThreshold {
-			report.TCPWindowFindings = append(report.TCPWindowFindings, models.TCPWindowFinding{
-				Timestamp:   ts,
-				SrcIP:       ipInfo.SrcIP,
-				DstIP:       ipInfo.DstIP,
-				SrcPort:     srcPort,
-				DstPort:     dstPort,
-				Type:        "Small Window",
-				WindowSize:  tcp.Window,
-				Severity:    "Warning",
-				Description: fmt.Sprintf("TCP Small Window (%d bytes) from %s:%d — receiver is struggling to keep up, throughput will be limited.", tcp.Window, ipInfo.SrcIP, srcPort),
-				Count:       tracker.SmallCount,
-			})
+	// Small Window detection. The raw header field is meaningless without the
+	// negotiated Window Scale, so judge the EFFECTIVE window; if the scale for
+	// this direction is unknown, make no claim (never assume scale 0).
+	if tcp.Window > 0 {
+		if eff, ok := t.effectiveWindow(tcp, ipInfo, srcPort, dstPort); ok && eff <= SmallWindowSize {
+			tracker.SmallCount++
+			if tracker.SmallCount == SmallWindowThreshold {
+				report.TCPWindowFindings = append(report.TCPWindowFindings, models.TCPWindowFinding{
+					Timestamp:   ts,
+					SrcIP:       ipInfo.SrcIP,
+					DstIP:       ipInfo.DstIP,
+					SrcPort:     srcPort,
+					DstPort:     dstPort,
+					Type:        "Small Window",
+					WindowSize:  uint16(eff), // eff <= SmallWindowSize
+					Severity:    "Warning",
+					Description: fmt.Sprintf("TCP Small Window: %s:%d advertised an effective receive window of %d bytes (raw %d with negotiated scale) in %d segments. This shows the receiver offered little buffer space; it does not by itself show why.", ipInfo.SrcIP, srcPort, eff, tcp.Window, tracker.SmallCount),
+					Count:       tracker.SmallCount,
+				})
+			}
 		}
 	}
 }
