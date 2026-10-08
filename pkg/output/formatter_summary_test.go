@@ -113,7 +113,7 @@ func TestSummary_NoOverflowNoNote(t *testing.T) {
 // Other summary lines are untouched.
 func TestSummary_OtherLinesUnchanged(t *testing.T) {
 	out := summaryText(&models.TriageReport{DNSAnomalies: make([]models.DNSAnomaly, 2)})
-	for _, want := range []string{"  • DNS Anomalies:        2\n", "  • Failed Handshakes:    0\n", "  • ARP Conflicts:        0\n", "  • High RTT Flows:       0\n"} {
+	for _, want := range []string{"  • DNS Anomalies:        2\n", "  • TCP Handshake Failures: 0\n", "  • ARP Conflicts:        0\n", "  • High RTT Flows:       0\n"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q", want)
 		}

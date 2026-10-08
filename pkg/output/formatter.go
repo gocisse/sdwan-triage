@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -78,13 +79,87 @@ func writeFindingsSummary(w io.Writer, r *models.TriageReport) {
 			fmt.Fprintf(w, "    %s\n", note)
 		}
 	}
-	fmt.Fprintf(w, "  • Failed Handshakes:    %d\n", len(r.FailedHandshakes))
+	writeHandshakeSummary(w, r)
 	fmt.Fprintf(w, "  • ARP Conflicts:        %d\n", len(r.ARPConflicts))
 	fmt.Fprintf(w, "  • HTTP Errors:          %d\n", len(r.HTTPErrors))
 	fmt.Fprintf(w, "  • TLS Certificates:     %d\n", len(r.TLSCerts))
 	fmt.Fprintf(w, "  • Suspicious Traffic:   %d\n", len(r.SuspiciousTraffic))
 	fmt.Fprintf(w, "  • High RTT Flows:       %d\n", len(r.RTTAnalysis))
 	fmt.Fprintf(w, "  • Devices Detected:     %d\n", len(r.DeviceFingerprinting))
+}
+
+// handshakeCounts classifies the handshake tracker's flows
+// (r.TCPHandshakeFlows). Failed flows are split by the tracker's own failure
+// reason; flows still pending when the capture ended are "incomplete" and are
+// never counted as failures.
+type handshakeCounts struct {
+	synAckNotObserved int // "SYN-ACK timeout": no SYN-ACK seen in the capture after the last SYN
+	reset             int // RST observed on the attempt
+	finalAckMissing   int // "ACK timeout": SYN-ACK seen, final ACK not seen
+	otherFailed       int // failed with a reason this summary does not recognise
+	incomplete        int // SYN / SYN-ACK still pending at the end of the capture
+}
+
+func (c handshakeCounts) failed() int {
+	return c.synAckNotObserved + c.reset + c.finalAckMissing + c.otherFailed
+}
+
+func countHandshakes(flows []models.TCPHandshakeFlow) handshakeCounts {
+	var c handshakeCounts
+	for _, f := range flows {
+		switch f.State {
+		case "Handshake Failed":
+			// Order matters: "SYN-ACK timeout" also contains "ACK timeout".
+			switch {
+			case strings.HasPrefix(f.FailureReason, "SYN-ACK timeout"):
+				c.synAckNotObserved++
+			case strings.HasPrefix(f.FailureReason, "ACK timeout"):
+				c.finalAckMissing++
+			case strings.HasPrefix(f.FailureReason, "Connection reset"):
+				c.reset++
+			default:
+				c.otherFailed++
+			}
+		case "SYN", "SYN-ACK":
+			c.incomplete++
+		}
+	}
+	return c
+}
+
+// writeHandshakeSummary prints TCP connection-setup results from the handshake
+// tracker. These are OBSERVATIONS about this capture: "SYN-ACK not observed"
+// does not establish that the server was down or never answered (the capture
+// may be one-sided or the path asymmetric). Flows pending at the end of the
+// capture are reported separately as incomplete, never as failures.
+// If the report carries no tracker data, only the narrower RST-refusal count
+// (r.FailedHandshakes) is available and it is labelled as such.
+func writeHandshakeSummary(w io.Writer, r *models.TriageReport) {
+	if len(r.TCPHandshakeFlows) == 0 {
+		if n := len(r.FailedHandshakes); n > 0 {
+			fmt.Fprintf(w, "  • TCP Connections Reset During Setup: %d\n", n)
+			return
+		}
+		fmt.Fprintln(w, "  • TCP Handshake Failures: 0")
+		return
+	}
+	c := countHandshakes(r.TCPHandshakeFlows)
+	fmt.Fprintf(w, "  • TCP Handshake Failures: %d\n", c.failed())
+	if c.synAckNotObserved > 0 {
+		fmt.Fprintf(w, "      %d SYN-ACK not observed in capture\n", c.synAckNotObserved)
+	}
+	if c.reset > 0 {
+		fmt.Fprintf(w, "      %d reset observed\n", c.reset)
+	}
+	if c.finalAckMissing > 0 {
+		fmt.Fprintf(w, "      %d final ACK not observed\n", c.finalAckMissing)
+	}
+	if c.otherFailed > 0 {
+		fmt.Fprintf(w, "      %d other\n", c.otherFailed)
+	}
+	if c.incomplete > 0 {
+		fmt.Fprintf(w, "  • TCP Handshakes Incomplete at end of capture: %d\n", c.incomplete)
+	}
 }
 
 // PrintDetailedReport prints detailed findings
