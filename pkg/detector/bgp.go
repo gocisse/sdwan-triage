@@ -3,7 +3,9 @@ package detector
 import (
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"net"
+	"slices"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/events"
@@ -274,7 +276,8 @@ func (b *BGPAnalyzer) detectBGPHijack(asPath []uint32, ipInfo *PacketIPInfo, tim
 		for _, as := range asPath {
 			asCounts[as]++
 		}
-		for as, count := range asCounts {
+		for _, as := range slices.Sorted(maps.Keys(asCounts)) {
+			count := asCounts[as]
 			if count > 3 {
 				b.reportBGPAnomaly(report, "AS Path Prepending Detected", ipInfo, timestamp,
 					fmt.Sprintf("AS%d appears %d times in path from %s - verify if intentional", as, count, ipInfo.SrcIP))

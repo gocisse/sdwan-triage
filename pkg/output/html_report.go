@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"html"
 	"html/template"
+	"maps"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -1196,7 +1198,8 @@ func generateNetworkJSON(r *models.TriageReport) string {
 
 	// Create nodes with enhanced information
 	nodeIndex := 0
-	for ip, stats := range nodeStats {
+	for _, ip := range slices.Sorted(maps.Keys(nodeStats)) {
+		stats := nodeStats[ip]
 		nodeMap[ip] = nodeIndex
 		nodes = append(nodes, map[string]interface{}{
 			"id":          ip,
@@ -1445,7 +1448,8 @@ func generateTrafficStats(r *models.TriageReport) ([]ProtocolStatView, []TopTalk
 	}
 
 	var protocolStats []ProtocolStatView
-	for proto, bytes := range protocolBytes {
+	for _, proto := range slices.Sorted(maps.Keys(protocolBytes)) {
+		bytes := protocolBytes[proto]
 		pct := float64(0)
 		if totalBytes > 0 {
 			pct = float64(bytes) / float64(totalBytes) * 100
@@ -1474,10 +1478,10 @@ func generateTrafficStats(r *models.TriageReport) ([]ProtocolStatView, []TopTalk
 		bytes uint64
 	}
 	var ipList []ipStat
-	for ip, bytes := range ipBytes {
-		ipList = append(ipList, ipStat{ip, bytes})
+	for _, ip := range slices.Sorted(maps.Keys(ipBytes)) {
+		ipList = append(ipList, ipStat{ip, ipBytes[ip]})
 	}
-	sort.Slice(ipList, func(i, j int) bool {
+	sort.SliceStable(ipList, func(i, j int) bool {
 		return ipList[i].bytes > ipList[j].bytes
 	})
 
@@ -1801,7 +1805,8 @@ func convertAppIdentifications(apps []models.IdentifiedApp) []AppIdentificationV
 
 func convertApplicationStats(breakdown map[string]models.AppCategory) []AppStatView {
 	var result []AppStatView
-	for _, app := range breakdown {
+	for _, appKey := range slices.Sorted(maps.Keys(breakdown)) {
+		app := breakdown[appKey]
 		result = append(result, AppStatView{
 			Name:        html.EscapeString(app.Name),
 			Port:        app.Port,
@@ -1810,8 +1815,8 @@ func convertApplicationStats(breakdown map[string]models.AppCategory) []AppStatV
 			ByteCount:   formatBytesForTemplate(app.ByteCount),
 		})
 	}
-	// Sort by packet count descending
-	sort.Slice(result, func(i, j int) bool {
+	// Sort by packet count descending (stable: ties keep the sorted-key order)
+	sort.SliceStable(result, func(i, j int) bool {
 		return result[i].PacketCount > result[j].PacketCount
 	})
 	return result
@@ -1819,7 +1824,8 @@ func convertApplicationStats(breakdown map[string]models.AppCategory) []AppStatV
 
 func convertQoSClasses(classes map[string]*models.QoSClassMetrics) []QoSClassView {
 	var result []QoSClassView
-	for _, c := range classes {
+	for _, className := range slices.Sorted(maps.Keys(classes)) {
+		c := classes[className]
 		if c != nil {
 			result = append(result, QoSClassView{
 				ClassName:       html.EscapeString(c.ClassName),
@@ -1832,8 +1838,8 @@ func convertQoSClasses(classes map[string]*models.QoSClassMetrics) []QoSClassVie
 			})
 		}
 	}
-	// Sort by packet count descending
-	sort.Slice(result, func(i, j int) bool {
+	// Sort by packet count descending (stable: ties keep the sorted-key order)
+	sort.SliceStable(result, func(i, j int) bool {
 		return result[i].PacketCount > result[j].PacketCount
 	})
 	return result
@@ -2044,7 +2050,8 @@ func convertGeoLocations(locations map[string]int, locationIPs map[string][]stri
 		return nil
 	}
 	result := make([]GeoLocationView, 0, len(locations))
-	for country, count := range locations {
+	for _, country := range slices.Sorted(maps.Keys(locations)) {
+		count := locations[country]
 		ips := locationIPs[country]
 		// Escape IPs for HTML safety
 		escapedIPs := make([]string, len(ips))
@@ -2057,8 +2064,8 @@ func convertGeoLocations(locations map[string]int, locationIPs map[string][]stri
 			IPs:     escapedIPs,
 		})
 	}
-	// Sort by count descending
-	sort.Slice(result, func(i, j int) bool {
+	// Sort by count descending (stable: ties keep the sorted-key order)
+	sort.SliceStable(result, func(i, j int) bool {
 		return result[i].Count > result[j].Count
 	})
 	return result

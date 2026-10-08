@@ -1,6 +1,8 @@
 package detectors
 
 import (
+	"maps"
+	"slices"
 	"strconv"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -136,7 +138,9 @@ func (d *PacketLossDetector) GetMetrics() *models.PacketLossMetrics {
 	}
 
 	// Calculate per-flow loss for flows with significant loss
-	for _, flow := range d.tcpFlows {
+	// Sorted keys: PerFlowLoss order must not depend on map iteration order.
+	for _, flowKey := range slices.Sorted(maps.Keys(d.tcpFlows)) {
+		flow := d.tcpFlows[flowKey]
 		if flow.retransmissions > 0 && flow.packetsSent > 10 {
 			lossPercentage := (float64(flow.retransmissions) / float64(flow.packetsSent)) * 100
 			if lossPercentage > 1.0 { // Only report flows with >1% loss

@@ -3,6 +3,8 @@ package detector
 import (
 	"encoding/binary"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -723,6 +725,7 @@ func (l *LANProtocolAnalyzer) analyzeSTP(packet gopacket.Packet, eth *layers.Eth
 }
 
 // GetFindings returns all LAN protocol findings
+// Map iteration order is random: every list below is emitted in sorted-key order.
 func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	findings := &models.LANProtocolFindings{
 		VRRPSessions: make([]models.VRRPFinding, 0),
@@ -733,7 +736,8 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	}
 
 	// Convert VRRP sessions
-	for _, session := range l.vrrpSessions {
+	for _, sessionKey := range slices.Sorted(maps.Keys(l.vrrpSessions)) {
+		session := l.vrrpSessions[sessionKey]
 		finding := models.VRRPFinding{
 			VirtualRouterID: session.VirtualRouterID,
 			Priority:        session.Priority,
@@ -758,7 +762,8 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	}
 
 	// Convert CDP devices
-	for _, device := range l.cdpDevices {
+	for _, deviceKey := range slices.Sorted(maps.Keys(l.cdpDevices)) {
+		device := l.cdpDevices[deviceKey]
 		findings.CDPDevices = append(findings.CDPDevices, models.CDPFinding{
 			DeviceID:     device.DeviceID,
 			IPAddress:    device.IPAddress,
@@ -773,7 +778,8 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	}
 
 	// Convert LLDP devices
-	for _, device := range l.lldpDevices {
+	for _, deviceKey := range slices.Sorted(maps.Keys(l.lldpDevices)) {
+		device := l.lldpDevices[deviceKey]
 		findings.LLDPDevices = append(findings.LLDPDevices, models.LLDPFinding{
 			ChassisID:    device.ChassisID,
 			PortID:       device.PortID,
@@ -788,7 +794,8 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	}
 
 	// Convert HSRP groups
-	for _, group := range l.hsrpGroups {
+	for _, groupKey := range slices.Sorted(maps.Keys(l.hsrpGroups)) {
+		group := l.hsrpGroups[groupKey]
 		findings.HSRPGroups = append(findings.HSRPGroups, models.HSRPFinding{
 			GroupNumber:   group.GroupNumber,
 			State:         group.State,
@@ -803,7 +810,8 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 	}
 
 	// Convert STP bridges
-	for _, bridge := range l.stpBridges {
+	for _, bridgeKey := range slices.Sorted(maps.Keys(l.stpBridges)) {
+		bridge := l.stpBridges[bridgeKey]
 		findings.STPBridges = append(findings.STPBridges, models.STPFinding{
 			BridgeID:     bridge.BridgeID,
 			RootBridgeID: bridge.RootBridgeID,
@@ -823,7 +831,9 @@ func (l *LANProtocolAnalyzer) GetFindings() *models.LANProtocolFindings {
 // alongside the StabilityMonitor's own Finalize.
 func (l *LANProtocolAnalyzer) FinalizeStability(report *models.TriageReport) {
 	// ── HSRP Flapping ──────────────────────────────────────────
-	for _, group := range l.hsrpGroups {
+	// Sorted keys: finding order must not depend on Go map iteration order.
+	for _, key := range slices.Sorted(maps.Keys(l.hsrpGroups)) {
+		group := l.hsrpGroups[key]
 		if len(group.Transitions) < 3 {
 			continue
 		}
@@ -859,7 +869,8 @@ func (l *LANProtocolAnalyzer) FinalizeStability(report *models.TriageReport) {
 	}
 
 	// ── VRRP Flapping ──────────────────────────────────────────
-	for _, session := range l.vrrpSessions {
+	for _, key := range slices.Sorted(maps.Keys(l.vrrpSessions)) {
+		session := l.vrrpSessions[key]
 		if len(session.Transitions) < 3 {
 			continue
 		}

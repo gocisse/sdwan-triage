@@ -3,8 +3,10 @@ package output
 import (
 	"encoding/csv"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -1370,7 +1372,9 @@ func generateGeoLocationsCSV(locations map[string]int, filename string) error {
 		return err
 	}
 
-	for location, count := range locations {
+	// Sorted keys: row order must not depend on Go map iteration order.
+	for _, location := range slices.Sorted(maps.Keys(locations)) {
+		count := locations[location]
 		row := []string{location, fmt.Sprintf("%d", count)}
 		if err := writer.Write(row); err != nil {
 			return err

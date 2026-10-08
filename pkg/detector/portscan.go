@@ -2,6 +2,8 @@ package detector
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -159,7 +161,8 @@ func (p *PortScanAnalyzer) reportPortScan(srcIP, dstIP, scanType string, portsSc
 	// Get sample ports
 	var samplePorts []uint16
 	count := 0
-	for port := range ports {
+	// Lowest ports first: a deterministic sample (map order would pick 10 at random).
+	for _, port := range slices.Sorted(maps.Keys(ports)) {
 		if count >= 10 {
 			break
 		}

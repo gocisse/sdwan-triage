@@ -3,6 +3,8 @@ package output
 import (
 	"fmt"
 	"html/template"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -887,11 +889,8 @@ func formatDurationSeconds(duration float64) string {
 }
 
 func mapKeysToSlice(m map[string]bool) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
+	// Sorted: host lists must not follow map iteration order.
+	return slices.Sorted(maps.Keys(m))
 }
 
 // generateTroubleshootingFlow creates step-by-step troubleshooting guidance

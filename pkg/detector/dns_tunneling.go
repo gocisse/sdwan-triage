@@ -2,7 +2,9 @@ package detector
 
 import (
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -209,7 +211,10 @@ func calculateSubdomainEntropy(subdomains map[string]bool) float64 {
 
 	total := float64(len(allChars))
 	entropy := 0.0
-	for _, count := range freq {
+	// Sorted runes: float addition is order-dependent, and map order made the
+	// entropy value (and, near the threshold, the finding) vary between runs.
+	for _, c := range slices.Sorted(maps.Keys(freq)) {
+		count := freq[c]
 		p := float64(count) / total
 		if p > 0 {
 			entropy -= p * math.Log2(p)

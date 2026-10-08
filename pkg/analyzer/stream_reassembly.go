@@ -1098,8 +1098,12 @@ func (sr *StreamReassembler) GetStreamsSorted() []*models.StreamData {
 	for _, stream := range sr.state.Streams {
 		streams = append(streams, stream)
 	}
+	// streams came from a map: ties fall back to FlowID so the order is total.
 	sort.Slice(streams, func(i, j int) bool {
-		return streams[i].TotalBytes > streams[j].TotalBytes
+		if streams[i].TotalBytes != streams[j].TotalBytes {
+			return streams[i].TotalBytes > streams[j].TotalBytes
+		}
+		return streams[i].FlowID < streams[j].FlowID
 	})
 	return streams
 }

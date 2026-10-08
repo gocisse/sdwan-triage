@@ -2,6 +2,8 @@ package detector
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -303,7 +305,8 @@ func (t *TCPAdvancedAnalyzer) analyzeOutOfOrder(tcp *layers.TCP, ipInfo *PacketI
 
 // Finalize generates findings from accumulated out-of-order data
 func (t *TCPAdvancedAnalyzer) Finalize(report *models.TriageReport) {
-	for _, tracker := range t.oooFlows {
+	for _, flowKey := range slices.Sorted(maps.Keys(t.oooFlows)) {
+		tracker := t.oooFlows[flowKey]
 		if tracker.OOOCount < OutOfOrderMinCount || tracker.TotalPackets < 20 {
 			continue
 		}

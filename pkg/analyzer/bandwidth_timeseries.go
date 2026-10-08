@@ -197,34 +197,11 @@ func (ba *BandwidthAnalyzer) GetTimeSeries() *models.BandwidthTimeSeries {
 	for _, key := range keys {
 		bucket := ba.buckets[key]
 
-		// Find top protocol
-		topProtocol := ""
-		topProtocolBytes := uint64(0)
-		for proto, bytes := range bucket.protocolBytes {
-			if bytes > topProtocolBytes {
-				topProtocol = proto
-				topProtocolBytes = bytes
-			}
-		}
-
-		// Find top talkers
-		topSrc := ""
-		topSrcBytes := uint64(0)
-		for src, bytes := range bucket.srcBytes {
-			if bytes > topSrcBytes {
-				topSrc = src
-				topSrcBytes = bytes
-			}
-		}
-
-		topDst := ""
-		topDstBytes := uint64(0)
-		for dst, bytes := range bucket.dstBytes {
-			if bytes > topDstBytes {
-				topDst = dst
-				topDstBytes = bytes
-			}
-		}
+		// Top protocol / talkers: highest bytes; ties resolve to the lexically
+		// smallest key so the result never depends on map iteration order.
+		topProtocol := topByBytes(bucket.protocolBytes)
+		topSrc := topByBytes(bucket.srcBytes)
+		topDst := topByBytes(bucket.dstBytes)
 
 		// Calculate bytes per second for this bucket
 		bucketTotal := bucket.bytesIn + bucket.bytesOut
@@ -421,4 +398,16 @@ func (ba *BandwidthAnalyzer) GetPlainEnglishSummary(report *models.TriageReport,
 	}
 
 	return summary
+}
+
+// topByBytes returns the key with the largest value (ties: smallest key), or ""
+// when every value is zero.
+func topByBytes(m map[string]uint64) string {
+	top, topBytes := "", uint64(0)
+	for k, v := range m {
+		if v > topBytes || (v == topBytes && v > 0 && k < top) {
+			top, topBytes = k, v
+		}
+	}
+	return top
 }

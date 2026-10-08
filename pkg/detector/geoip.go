@@ -2,8 +2,10 @@ package detector
 
 import (
 	"fmt"
+	"maps"
 	"net"
 	"os"
+	"slices"
 	"sync"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -487,7 +489,9 @@ func (g *GeoIPAnalyzer) GetLocationDetails() []models.GeoIPDetail {
 
 	const maxEntries = 500
 	details := make([]models.GeoIPDetail, 0, len(g.ipLocationCache))
-	for ip, loc := range g.ipLocationCache {
+	// Sorted IPs: with the maxEntries cap, map order decided WHICH 500 were kept.
+	for _, ip := range slices.Sorted(maps.Keys(g.ipLocationCache)) {
+		loc := g.ipLocationCache[ip]
 		if loc.IsPrivate || (loc.Latitude == 0 && loc.Longitude == 0) {
 			continue
 		}

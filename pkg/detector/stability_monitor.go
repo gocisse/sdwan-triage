@@ -2,6 +2,8 @@ package detector
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/events"
@@ -413,7 +415,9 @@ func (sm *StabilityMonitor) Finalize(report *models.TriageReport) {
 }
 
 func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
-	for _, session := range sm.bfdSessions {
+	// Sorted keys: finding order must not depend on Go map iteration order.
+	for _, key := range slices.Sorted(maps.Keys(sm.bfdSessions)) {
+		session := sm.bfdSessions[key]
 		if len(session.transitions) == 0 {
 			continue
 		}
@@ -470,7 +474,8 @@ func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
 }
 
 func (sm *StabilityMonitor) finalizeIKE(report *models.TriageReport) {
-	for _, session := range sm.ikeSessions {
+	for _, key := range slices.Sorted(maps.Keys(sm.ikeSessions)) {
+		session := sm.ikeSessions[key]
 		if len(session.initTimes) <= 1 {
 			continue
 		}

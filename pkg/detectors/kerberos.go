@@ -4,6 +4,8 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"maps"
+	"slices"
 )
 
 type KerberosDetector struct {
@@ -105,8 +107,8 @@ func (d *KerberosDetector) ProcessPacket(packet gopacket.Packet) {
 
 func (d *KerberosDetector) GetFlows() []models.KerberosFlow {
 	flows := make([]models.KerberosFlow, 0, len(d.flows))
-	for _, flow := range d.flows {
-		flows = append(flows, *flow)
+	for _, key := range slices.Sorted(maps.Keys(d.flows)) {
+		flows = append(flows, *d.flows[key])
 	}
 	return flows
 }

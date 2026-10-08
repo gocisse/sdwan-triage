@@ -3,9 +3,11 @@ package analyzer
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -684,23 +686,31 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 	score := 0
 	issues := make(map[string]int)
+	// issueOrder records the order in which issue types are added below, which
+	// follows the severity grouping of the weights (critical +10 first). It is
+	// the deterministic tie-break for TopIssue.
+	var issueOrder []string
+	noteIssue := func(name string, count int) {
+		issues[name] = count
+		issueOrder = append(issueOrder, name)
+	}
 
 	// Critical findings (+10 points each)
 	if len(report.ARPConflicts) > 0 {
 		score += len(report.ARPConflicts) * 10
-		issues["ARP Conflicts"] = len(report.ARPConflicts)
+		noteIssue("ARP Conflicts", len(report.ARPConflicts))
 	}
 	if len(report.DNSAnomalies) > 0 {
 		score += len(report.DNSAnomalies) * 10
-		issues["DNS Anomalies"] = len(report.DNSAnomalies)
+		noteIssue("DNS Anomalies", len(report.DNSAnomalies))
 	}
 	if len(report.Security.TLSSecurityFindings) > 0 {
 		score += len(report.Security.TLSSecurityFindings) * 10
-		issues["TLS Security Issues"] = len(report.Security.TLSSecurityFindings)
+		noteIssue("TLS Security Issues", len(report.Security.TLSSecurityFindings))
 	}
 	if len(report.Security.IOCFindings) > 0 {
 		score += len(report.Security.IOCFindings) * 10
-		issues["IOC Matches"] = len(report.Security.IOCFindings)
+		noteIssue("IOC Matches", len(report.Security.IOCFindings))
 	}
 
 	// Warning findings (+5 points each, capped)
@@ -710,27 +720,27 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 			retransScore = 20 // Cap at 100 points
 		}
 		score += retransScore * 5
-		issues["TCP Retransmissions"] = len(report.TCPRetransmissions)
+		noteIssue("TCP Retransmissions", len(report.TCPRetransmissions))
 	}
 	if len(report.FailedHandshakes) > 0 {
 		score += len(report.FailedHandshakes) * 5
-		issues["Failed Handshakes"] = len(report.FailedHandshakes)
+		noteIssue("Failed Handshakes", len(report.FailedHandshakes))
 	}
 	if len(report.SuspiciousTraffic) > 0 {
 		score += len(report.SuspiciousTraffic) * 5
-		issues["Suspicious Traffic"] = len(report.SuspiciousTraffic)
+		noteIssue("Suspicious Traffic", len(report.SuspiciousTraffic))
 	}
 	if len(report.Security.PortScanFindings) > 0 {
 		score += len(report.Security.PortScanFindings) * 5
-		issues["Port Scan Indicators"] = len(report.Security.PortScanFindings)
+		noteIssue("Port Scan Indicators", len(report.Security.PortScanFindings))
 	}
 	if len(report.RTTAnalysis) > 0 {
 		score += len(report.RTTAnalysis) * 2
-		issues["High RTT Flows"] = len(report.RTTAnalysis)
+		noteIssue("High RTT Flows", len(report.RTTAnalysis))
 	}
 	if len(report.HTTPErrors) > 0 {
 		score += len(report.HTTPErrors) * 2
-		issues["HTTP Errors"] = len(report.HTTPErrors)
+		noteIssue("HTTP Errors", len(report.HTTPErrors))
 	}
 
 	// New detector findings
@@ -742,7 +752,7 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 				score += 5
 			}
 		}
-		issues["DHCP Issues"] = len(report.DHCPFindings)
+		noteIssue("DHCP Issues", len(report.DHCPFindings))
 	}
 	if len(report.NTPFindings) > 0 {
 		for _, f := range report.NTPFindings {
@@ -752,23 +762,23 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 				score += 3
 			}
 		}
-		issues["NTP Issues"] = len(report.NTPFindings)
+		noteIssue("NTP Issues", len(report.NTPFindings))
 	}
 	if len(report.DNSTunnelingFindings) > 0 {
 		score += len(report.DNSTunnelingFindings) * 15
-		issues["DNS Tunneling"] = len(report.DNSTunnelingFindings)
+		noteIssue("DNS Tunneling", len(report.DNSTunnelingFindings))
 	}
 	if len(report.C2BeaconingFindings) > 0 {
 		score += len(report.C2BeaconingFindings) * 15
-		issues["C2 Beaconing"] = len(report.C2BeaconingFindings)
+		noteIssue("C2 Beaconing", len(report.C2BeaconingFindings))
 	}
 	if len(report.TCPWindowFindings) > 0 {
 		score += len(report.TCPWindowFindings) * 3
-		issues["TCP Window Issues"] = len(report.TCPWindowFindings)
+		noteIssue("TCP Window Issues", len(report.TCPWindowFindings))
 	}
 	if len(report.TCPOutOfOrderFlows) > 0 {
 		score += len(report.TCPOutOfOrderFlows) * 3
-		issues["TCP Out-of-Order"] = len(report.TCPOutOfOrderFlows)
+		noteIssue("TCP Out-of-Order", len(report.TCPOutOfOrderFlows))
 	}
 	if len(report.StabilityFindings) > 0 {
 		for _, f := range report.StabilityFindings {
@@ -780,7 +790,7 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 				score += 5
 			}
 		}
-		issues["Interface Flapping"] = len(report.StabilityFindings)
+		noteIssue("Interface Flapping", len(report.StabilityFindings))
 	}
 
 	// P0 guard: the additive model is unbounded (len(slice)*weight). Cap the
@@ -805,17 +815,8 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 		report.RiskLevel = "Critical"
 	}
 
-	// Find top issue
-	maxCount := 0
-	topIssue := ""
-	for issue, count := range issues {
-		if count > maxCount {
-			maxCount = count
-			topIssue = issue
-		}
-	}
-	report.TopIssue = topIssue
-	report.TopIssueCount = maxCount
+	// Find top issue (deterministic: see pickTopIssue)
+	report.TopIssue, report.TopIssueCount = pickTopIssue(issues, issueOrder)
 
 	// Generate recommended actions
 	report.RecommendedActions = p.generateRecommendations(report, issues)
@@ -944,9 +945,26 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 		flows = append(flows, flow)
 	}
 
-	// Sort by bytes descending
+	// Sort by bytes descending. flows was built from a map, so the comparator must
+	// be a total order: ties fall back to the flow identity (never map order).
 	sort.Slice(flows, func(i, j int) bool {
-		return flows[i].TotalBytes > flows[j].TotalBytes
+		a, b := flows[i], flows[j]
+		if a.TotalBytes != b.TotalBytes {
+			return a.TotalBytes > b.TotalBytes
+		}
+		if a.SrcIP != b.SrcIP {
+			return a.SrcIP < b.SrcIP
+		}
+		if a.SrcPort != b.SrcPort {
+			return a.SrcPort < b.SrcPort
+		}
+		if a.DstIP != b.DstIP {
+			return a.DstIP < b.DstIP
+		}
+		if a.DstPort != b.DstPort {
+			return a.DstPort < b.DstPort
+		}
+		return a.Protocol < b.Protocol
 	})
 
 	// Calculate percentages for all flows
@@ -992,7 +1010,8 @@ func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
 	voip := &models.VoIPAnalysis{}
 
 	// Convert SIP calls
-	for _, call := range sipCalls {
+	for _, callKey := range slices.Sorted(maps.Keys(sipCalls)) {
+		call := sipCalls[callKey]
 		voip.TotalCalls++
 		switch call.State {
 		case "ESTABLISHED":
@@ -1016,7 +1035,8 @@ func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
 	// Convert RTP streams
 	var totalJitter float64
 	var totalLost, totalPackets uint64
-	for _, stream := range rtpStreams {
+	for _, streamKey := range slices.Sorted(maps.Keys(rtpStreams)) {
+		stream := rtpStreams[streamKey]
 		voip.TotalRTPStreams++
 		totalJitter += stream.Jitter
 		totalLost += stream.LostPackets
@@ -1048,8 +1068,8 @@ func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
 func (p *Processor) finalizeTunnelAnalysis(report *models.TriageReport) {
 	tunnels := p.tunnelAnalyzer.GetTunnels()
 
-	// Deterministic emission order for tunnel.observed events (map iteration
-	// order is random; the existing TunnelAnalysis slice order is unchanged).
+	// Deterministic order for the tunnel.observed events AND the TunnelAnalysis
+	// slice (map iteration order is random): sorted by tunnel key.
 	keys := make([]string, 0, len(tunnels))
 	for k := range tunnels {
 		keys = append(keys, k)
@@ -1075,7 +1095,8 @@ func (p *Processor) finalizeTunnelAnalysis(report *models.TriageReport) {
 		})
 	}
 
-	for _, tunnel := range tunnels {
+	for _, k := range keys {
+		tunnel := tunnels[k]
 		report.TunnelAnalysis = append(report.TunnelAnalysis, models.TunnelFinding{
 			Type:        tunnel.Type,
 			SrcIP:       tunnel.SrcIP,
@@ -1106,7 +1127,8 @@ func (p *Processor) finalizeSDWANAnalysis(report *models.TriageReport) {
 	p.sdwanAnalyzer.Finalize()
 	vendors := p.sdwanAnalyzer.GetDetectedVendors()
 
-	for _, vendor := range vendors {
+	for _, vendorKey := range slices.Sorted(maps.Keys(vendors)) {
+		vendor := vendors[vendorKey]
 		report.SDWANVendors = append(report.SDWANVendors, models.SDWANVendor{
 			Name:        vendor.Vendor,
 			Confidence:  vendor.Confidence,
@@ -1223,19 +1245,58 @@ func (p *Processor) buildTCPHandshakeCorrelatedFlows(report *models.TriageReport
 	}
 
 	// Convert map to slice and sort events by timestamp within each flow
-	for _, flow := range correlatedFlows {
+	// Sorted keys + stable sorts: equal timestamps must not be ordered by map iteration.
+	for _, flowKey := range slices.Sorted(maps.Keys(correlatedFlows)) {
+		flow := correlatedFlows[flowKey]
 		// Sort events by timestamp
-		sort.Slice(flow.Events, func(i, j int) bool {
+		sort.SliceStable(flow.Events, func(i, j int) bool {
 			return flow.Events[i].Timestamp < flow.Events[j].Timestamp
 		})
 		report.TCPHandshakeCorrelatedFlows = append(report.TCPHandshakeCorrelatedFlows, *flow)
 	}
 
 	// Sort correlated flows by first event timestamp
-	sort.Slice(report.TCPHandshakeCorrelatedFlows, func(i, j int) bool {
+	sort.SliceStable(report.TCPHandshakeCorrelatedFlows, func(i, j int) bool {
 		if len(report.TCPHandshakeCorrelatedFlows[i].Events) > 0 && len(report.TCPHandshakeCorrelatedFlows[j].Events) > 0 {
 			return report.TCPHandshakeCorrelatedFlows[i].Events[0].Timestamp < report.TCPHandshakeCorrelatedFlows[j].Events[0].Timestamp
 		}
 		return false
 	})
+}
+
+// pickTopIssue returns the issue type with the highest count. Ties are broken
+// by priority order: the order in which calculateRiskScore adds issue types
+// (most severe weight class first), so the same report always yields the same
+// TopIssue. Go map iteration order must never decide the result. Names missing
+// from order (not expected) rank after listed ones, in lexical order.
+func pickTopIssue(issues map[string]int, order []string) (string, int) {
+	rank := make(map[string]int, len(order))
+	for i, name := range order {
+		if _, dup := rank[name]; !dup {
+			rank[name] = i
+		}
+	}
+	const unlisted = int(^uint(0) >> 1)
+	rankOf := func(name string) int {
+		if r, ok := rank[name]; ok {
+			return r
+		}
+		return unlisted
+	}
+	best, bestCount := "", 0
+	for name, count := range issues {
+		if count <= 0 {
+			continue
+		}
+		switch {
+		case count > bestCount:
+			best, bestCount = name, count
+		case count == bestCount:
+			ra, rb := rankOf(name), rankOf(best)
+			if ra < rb || (ra == rb && name < best) {
+				best = name
+			}
+		}
+	}
+	return best, bestCount
 }

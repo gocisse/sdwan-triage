@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -324,7 +326,10 @@ func AnalyzePayload(payload []byte) (vendorKey string, signatureDesc string) {
 		return "", ""
 	}
 
-	for vKey, info := range sdwanVendorSignatures {
+	// Sorted vendor keys: when several vendors match, the first match wins, so the
+	// scan order must be fixed (map order made the detected vendor vary).
+	for _, vKey := range slices.Sorted(maps.Keys(sdwanVendorSignatures)) {
+		info := sdwanVendorSignatures[vKey]
 		for _, sig := range info.PayloadSignatures {
 			if matchPayloadSignature(payload, sig) {
 				return vKey, sig.Description
@@ -336,7 +341,8 @@ func AnalyzePayload(payload []byte) (vendorKey string, signatureDesc string) {
 	// This catches DTLS-wrapped overlay tunnels where the SNI reveals the vendor.
 	if sni := extractSNIFromDTLS(payload); sni != "" {
 		sniLower := strings.ToLower(sni)
-		for vKey, info := range sdwanVendorSignatures {
+		for _, vKey := range slices.Sorted(maps.Keys(sdwanVendorSignatures)) {
+			info := sdwanVendorSignatures[vKey]
 			for _, pattern := range info.SNIPatterns {
 				if strings.Contains(sniLower, pattern) {
 					return vKey, fmt.Sprintf("DTLS SNI: %s", sni)
@@ -446,7 +452,9 @@ func (s *SDWANVendorAnalyzer) GetPrimaryVendor() *SDWANDetection {
 	var primary *SDWANDetection
 	maxPackets := 0
 
-	for _, detection := range s.detectedVendors {
+	// Ties on packet count resolve to the smallest vendor key (not map order).
+	for _, key := range slices.Sorted(maps.Keys(s.detectedVendors)) {
+		detection := s.detectedVendors[key]
 		if detection.PacketCount > maxPackets {
 			maxPackets = detection.PacketCount
 			primary = detection

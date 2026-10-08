@@ -4,6 +4,8 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"maps"
+	"slices"
 )
 
 type LDAPDetector struct {
@@ -96,8 +98,8 @@ func (d *LDAPDetector) ProcessPacket(packet gopacket.Packet) {
 
 func (d *LDAPDetector) GetFlows() []models.LDAPFlow {
 	flows := make([]models.LDAPFlow, 0, len(d.flows))
-	for _, flow := range d.flows {
-		flows = append(flows, *flow)
+	for _, key := range slices.Sorted(maps.Keys(d.flows)) {
+		flows = append(flows, *d.flows[key])
 	}
 	return flows
 }

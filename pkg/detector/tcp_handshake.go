@@ -2,6 +2,8 @@ package detector
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/events"
@@ -183,7 +185,10 @@ func (t *TCPHandshakeTracker) TrackHandshake(packet gopacket.Packet, state *mode
 
 // CheckTimeouts marks flows as failed if they timeout
 func (t *TCPHandshakeTracker) CheckTimeouts(currentTime time.Time, timeout time.Duration, report *models.TriageReport) {
-	for flowKey, flow := range t.flows {
+	// Sorted keys: timeouts are appended to the report (and emitted as events) in
+	// this order, so it must not depend on Go map iteration order.
+	for _, flowKey := range slices.Sorted(maps.Keys(t.flows)) {
+		flow := t.flows[flowKey]
 		if flow.State == StateEstablished || flow.State == StateFailed {
 			continue
 		}
@@ -269,8 +274,8 @@ func (t *TCPHandshakeTracker) DroppedPending() int { return t.droppedPending }
 
 // ExportAllFlows exports all remaining flows to the report (including incomplete ones)
 func (t *TCPHandshakeTracker) ExportAllFlows(report *models.TriageReport) {
-	for _, flow := range t.flows {
-		t.addToReport(flow, report)
+	for _, flowKey := range slices.Sorted(maps.Keys(t.flows)) {
+		t.addToReport(t.flows[flowKey], report)
 	}
 }
 

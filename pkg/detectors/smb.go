@@ -2,6 +2,8 @@ package detectors
 
 import (
 	"encoding/binary"
+	"maps"
+	"slices"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
 	"github.com/google/gopacket"
@@ -112,8 +114,8 @@ func (d *SMBDetector) ProcessPacket(packet gopacket.Packet) {
 
 func (d *SMBDetector) GetFlows() []models.SMBFlow {
 	flows := make([]models.SMBFlow, 0, len(d.flows))
-	for _, flow := range d.flows {
-		flows = append(flows, *flow)
+	for _, key := range slices.Sorted(maps.Keys(d.flows)) {
+		flows = append(flows, *d.flows[key])
 	}
 	return flows
 }

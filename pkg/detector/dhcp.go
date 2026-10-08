@@ -2,6 +2,8 @@ package detector
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -190,9 +192,8 @@ func (d *DHCPAnalyzer) trackServer(serverIP, serverMAC string, timestamp time.Ti
 		}
 
 		knownServers := make([]string, 0, len(d.servers))
-		for ip := range d.servers {
-			knownServers = append(knownServers, ip)
-		}
+		// Sorted: the known-server list in the finding must not follow map order.
+		knownServers = append(knownServers, slices.Sorted(maps.Keys(d.servers))...)
 
 		report.DHCPFindings = append(report.DHCPFindings, models.DHCPFinding{
 			Timestamp:    ts,
