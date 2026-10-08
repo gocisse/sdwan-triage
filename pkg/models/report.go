@@ -137,6 +137,13 @@ type TriageReport struct {
 	// metadata only: it never feeds RiskScore, Findings, Events or health severity.
 	Completeness *CaptureCompleteness `json:"capture_completeness,omitempty"`
 
+	// AnalysisStatus is an analysis status ORTHOGONAL to health: it is set only
+	// when there was no evidence to judge (AnalysisStatusNoData) and is absent
+	// for every analysis that examined at least one packet. NoDataReason says why.
+	// When set, no health level (GOOD/FAIR/WARNING/CRITICAL) may be presented.
+	AnalysisStatus string `json:"analysis_status,omitempty"`
+	NoDataReason   string `json:"no_data_reason,omitempty"`
+
 	// TimelineTruncated is the number of timeline events that were NOT retained
 	// because MaxTimelineEvents was reached. Retained events are a uniform,
 	// deterministic sample across the whole capture (see AddTimelineEvent).
@@ -1002,4 +1009,18 @@ type CaptureCompleteness struct {
 func (c *CaptureCompleteness) IsPartial() bool {
 	return c != nil && (c.PacketsUnsupported > 0 || c.PacketsDecodeFailed > 0 ||
 		c.PacketsSkipped > 0 || c.ReadErrors > 0)
+}
+
+// Analysis status values (orthogonal to the health levels).
+const (
+	AnalysisStatusNoData = "no_data"
+
+	NoDataReasonEmptyCapture         = "empty_capture"          // the capture file contains no packets
+	NoDataReasonFilterMatchedNothing = "filter_matched_nothing" // packets exist, the user's filter excluded all of them
+)
+
+// IsNoData reports whether the analysis had no evidence to judge. A NO_DATA
+// report must never be presented as GOOD (or any other health level).
+func (r *TriageReport) IsNoData() bool {
+	return r != nil && r.AnalysisStatus == AnalysisStatusNoData
 }

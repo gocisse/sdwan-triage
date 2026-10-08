@@ -475,6 +475,12 @@ For more information and documentation:
 		color.New(color.FgYellow).Fprintf(os.Stderr, "⚠ PARTIAL ANALYSIS: %s\n", notice)
 	}
 
+	// NO_DATA (empty capture / filter matched nothing): say so on stderr in every
+	// output mode; stdout carries the report or JSON. The process exits 2 below.
+	if notice := output.NoDataNotice(report); notice != "" {
+		color.New(color.FgYellow).Fprintf(os.Stderr, "○ %s\n", notice)
+	}
+
 	// Output results
 	if *jsonOutput {
 		encoder := json.NewEncoder(os.Stdout)
@@ -489,12 +495,14 @@ For more information and documentation:
 	} else {
 		// Print human-readable output
 		output.PrintExecutiveSummary(report)
-		output.PrintKeyFindings(report)
-		output.PrintDetailedReport(report)
+		if !report.IsNoData() { // nothing was analyzed: no tables of zeros
+			output.PrintKeyFindings(report)
+			output.PrintDetailedReport(report)
 
-		// Print TCP handshake analysis if requested or if there are failures
-		if *showHandshakes || (len(report.TCPHandshakeFlows) > 0 && *failedOnly) {
-			output.PrintHandshakeAnalysis(report, *showHandshakes, *failedOnly)
+			// Print TCP handshake analysis if requested or if there are failures
+			if *showHandshakes || (len(report.TCPHandshakeFlows) > 0 && *failedOnly) {
+				output.PrintHandshakeAnalysis(report, *showHandshakes, *failedOnly)
+			}
 		}
 	}
 
@@ -616,6 +624,13 @@ For more information and documentation:
 			color.Cyan("\n━━━ PCAP COMPARISON MODE ━━━")
 			runPCAPComparison(flag.Arg(0), flag.Arg(1), *verbose, *jsonOutput, *htmlOutput)
 		}
+	}
+
+	// Exit codes: 0 = analyzed with evidence, 1 = error / could not analyze,
+	// 2 = analysis completed but there was no evidence to judge (NO_DATA).
+	// Health severity does not influence the exit code.
+	if report.IsNoData() {
+		os.Exit(2)
 	}
 }
 

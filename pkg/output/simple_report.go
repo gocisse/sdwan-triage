@@ -25,6 +25,15 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 	fmt.Println("📊 OVERALL NETWORK HEALTH")
 	fmt.Println(strings.Repeat("─", 60))
 
+	// NO_DATA: nothing was analyzed, so no statement about the network is made.
+	if report.IsNoData() {
+		for _, line := range noDataSimpleLines(report) {
+			yellow.Printf("○ %s\n", line)
+		}
+		fmt.Println()
+		return
+	}
+
 	healthStatus := getHealthStatus(report)
 	switch healthStatus {
 	case "Healthy":

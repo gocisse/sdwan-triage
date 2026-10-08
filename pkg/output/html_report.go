@@ -88,6 +88,10 @@ type ReportData struct {
 	// was complete); see completenessLines.
 	CompletenessLines []string
 
+	// NoDataLines explains a NO_DATA analysis (empty when the analysis had data).
+	// HealthStatus is "no_data" in that case so no good/warning/critical badge is shown.
+	NoDataLines []string
+
 	// Health status
 	HealthStatus  string // "good", "warning", "critical"
 	RiskScore     int
@@ -957,6 +961,12 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 
 	// Evidence scope (provable input limitations only)
 	data.CompletenessLines = completenessLines(r)
+
+	// NO_DATA is an analysis status, not a health level: never show a health badge.
+	if r.IsNoData() {
+		data.HealthStatus = "no_data"
+		data.NoDataLines = noDataLines(r)
+	}
 
 	// Add educational content
 	data.ExecutiveSummaryExplanation = template.HTML(GetExecutiveSummaryExplanation())

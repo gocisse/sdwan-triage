@@ -280,6 +280,11 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		healthStatus = "WARNING"
 	}
 
+	// NO_DATA: nothing was analyzed, so the legacy counts above must not read as GOOD.
+	if r.IsNoData() {
+		healthStatus = noDataStatus
+	}
+
 	// Write summary rows
 	rows := [][]string{
 		{"Report Generated", time.Now().Format("2006-01-02 15:04:05"), "Timestamp of report generation"},
@@ -310,6 +315,10 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		// Protocol Analysis metrics
 		{"BGP Hijack Indicators", fmt.Sprintf("%d", len(r.BGPHijackIndicators)), "Potential BGP hijack indicators"},
 		{"DNS Queries Recorded", fmt.Sprintf("%d", len(r.DNSDetails)), "Total DNS queries captured"},
+	}
+
+	if r.IsNoData() {
+		rows = append(rows, []string{"Analysis Status", r.AnalysisStatus, noDataOneLine(r)}, []string{"No Data Reason", r.NoDataReason, "Why no health judgment was made"})
 	}
 
 	// Evidence scope: additive row, only for provably incomplete analyses.

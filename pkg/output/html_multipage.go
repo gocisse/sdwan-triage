@@ -174,15 +174,15 @@ func generateDashboardPage(data *ReportData, outputPath string) error {
 
 	contentTemplate := `{{define "content"}}
                 <!-- KPI Dashboard Section -->
-                <section id="dashboard">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}
+                <section id="dashboard">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}
                     <div class="kpi-grid">
                         <div class="kpi-card">
-                            <div class="kpi-icon {{if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}danger{{end}}">
-                                {{if eq .HealthStatus "good"}}<i class="fas fa-check-circle"></i>{{else if eq .HealthStatus "warning"}}<i class="fas fa-exclamation-triangle"></i>{{else}}<i class="fas fa-times-circle"></i>{{end}}
+                            <div class="kpi-icon {{if eq .HealthStatus "no_data"}}no-data{{else if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}danger{{end}}">
+                                {{if eq .HealthStatus "no_data"}}<i class="fas fa-question-circle"></i>{{else if eq .HealthStatus "good"}}<i class="fas fa-check-circle"></i>{{else if eq .HealthStatus "warning"}}<i class="fas fa-exclamation-triangle"></i>{{else}}<i class="fas fa-times-circle"></i>{{end}}
                             </div>
                             <div class="kpi-content">
                                 <div class="kpi-label">Network Health</div>
-                                <div class="kpi-value">{{if eq .HealthStatus "good"}}Good{{else if eq .HealthStatus "warning"}}Warning{{else}}Critical{{end}}</div>
+                                <div class="kpi-value">{{if eq .HealthStatus "no_data"}}No data{{else if eq .HealthStatus "good"}}Good{{else if eq .HealthStatus "warning"}}Warning{{else}}Critical{{end}}</div>
                             </div>
                         </div>
                         <div class="kpi-card">
@@ -291,10 +291,14 @@ func generateExecutiveSummaryPage(data *ReportData, outputPath string) error {
                             <i class="fas fa-chart-line"></i>
                             <h2>Executive Summary</h2>
                         </div>
-                        <div class="card-body">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}
+                        <div class="card-body">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}
                             {{.ExecutiveSummaryExplanation}}
                             
-                            {{if eq .HealthStatus "good"}}
+                            {{if eq .HealthStatus "no_data"}}
+                            <div class="health-badge">
+                                <i class="fas fa-question-circle"></i> Network Health: NO DATA
+                            </div>
+                            {{else if eq .HealthStatus "good"}}
                             <div class="health-badge health-good">
                                 <i class="fas fa-check-circle"></i> Network Health: GOOD{{if .CompletenessLines}} (analyzed packets only){{end}}
                             </div>

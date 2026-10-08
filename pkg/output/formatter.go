@@ -20,6 +20,20 @@ func PrintExecutiveSummary(r *models.TriageReport) {
 
 	fmt.Println()
 
+	// NO_DATA is an analysis status, not a health level: nothing was analyzed, so
+	// no verdict (and no table of zeros that would read as reassurance) is shown.
+	if r.IsNoData() {
+		color.New(color.Bold, color.FgYellow).Println("○ " + noDataBanner)
+		for _, line := range noDataLines(r) {
+			fmt.Println("  " + line)
+		}
+		for _, line := range completenessLines(r) {
+			color.Yellow("%s", line)
+		}
+		fmt.Println()
+		return
+	}
+
 	// Health Status (see healthVerdict for the evidence it considers)
 	switch healthVerdict(r) {
 	case healthGood:

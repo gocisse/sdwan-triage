@@ -262,6 +262,7 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		if filter != nil && !filter.IsEmpty() {
 			// Quick pre-filter check on raw data if possible
 			if !p.quickFilterCheck(data, linkType, filter) {
+				p.decode.filtered++ // excluded by the user's filter: not a decode failure
 				continue
 			}
 		}
@@ -273,7 +274,6 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 			p.logDebug("Skipping nil packet at position %d", packetCount+1)
 			continue
 		}
-		p.decode.record(packet)
 
 		// Safely set metadata
 		if packet.Metadata() != nil {
@@ -284,8 +284,10 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 
 		// Final filter check with full packet (if quick check passed)
 		if filter != nil && !filter.IsEmpty() && !p.matchesFilter(packet, filter) {
+			p.decode.filtered++
 			continue
 		}
+		p.decode.record(packet)
 
 		// Tell the event recorder which packet detectors are about to observe
 		if p.recorder != nil {
@@ -329,9 +331,14 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		p.logWarning("Analysis completed with issues: %d packets skipped, %d read errors", p.skippedPackets, p.errorCount)
 	}
 
-	// A non-empty capture of which nothing could be decoded must never turn
-	// into a normal (and misleadingly GOOD) report.
-	if p.decode.read > 0 && p.decode.decoded == 0 {
+	// Classify what the packet loop saw:
+	//   - packets existed that the tool could not analyze (unsupported /
+	//     undecodable) must never turn into a normal (and misleadingly GOOD)
+	//     report: that is an error;
+	//   - nothing to analyze (empty capture, or the filter excluded every packet)
+	//     is NO_DATA: a report is still produced, but no health judgment is made.
+	outcome, noDataReason := p.decode.classify()
+	if outcome == outcomeError {
 		return p.decode.noDecodableError()
 	}
 
@@ -342,7 +349,29 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 	// Evidence-scope metadata only: set last so nothing above can read it.
 	report.Completeness = p.buildCompleteness()
 
+	if outcome == outcomeNoData {
+		markNoData(report, noDataReason)
+	}
+
 	return nil
+}
+
+// markNoData records that there was no evidence to judge. The analysis status is
+// orthogonal to health; the plain-English summary (which would otherwise say
+// "Healthy" for an all-zero report) is corrected for this case only.
+func markNoData(report *models.TriageReport, reason string) {
+	report.AnalysisStatus = models.AnalysisStatusNoData
+	report.NoDataReason = reason
+	report.PlainEnglishSummary = &models.PlainEnglishSummary{
+		OverallHealth:     "No Data",
+		HealthIcon:        "⚪",
+		HealthColor:       "health-neutral",
+		KeyFindings:       []string{},
+		QuickActions:      []string{"Verify the capture interface, filter, duration and capture again."},
+		TrafficGaps:       []string{},
+		PerformanceIssues: []string{},
+		SecurityAlerts:    []string{},
+	}
 }
 
 // safeAnalyzePacket wraps analyzePacket with panic recovery
