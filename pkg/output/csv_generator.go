@@ -254,11 +254,6 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		return err
 	}
 
-	// Calculate health status
-	criticalIssues := len(r.DNSAnomalies) + len(r.ARPConflicts) + len(r.Security.IOCFindings)
-	performanceIssues := len(r.TCPRetransmissions) + len(r.FailedHandshakes)
-	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings)
-
 	// Count ICMP anomalies
 	icmpAnomalyCount := 0
 	for _, f := range r.ICMPAnalysis {
@@ -273,16 +268,11 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		voipCallCount = r.VoIPAnalysis.TotalCalls
 	}
 
-	healthStatus := "GOOD"
-	if criticalIssues > 0 {
-		healthStatus = "CRITICAL"
-	} else if performanceIssues > 0 || securityConcerns > 0 {
-		healthStatus = "WARNING"
-	}
-
-	// NO_DATA: nothing was analyzed, so the legacy counts above must not read as GOOD.
-	if r.IsNoData() {
-		healthStatus = noDataStatus
+	// Health comes from the single authoritative network health (no thresholds of
+	// its own). NO_DATA: nothing was analyzed, so no health level exists.
+	healthStatus := noDataStatus
+	if level, ok := networkHealthOf(r); ok {
+		healthStatus = strings.ToUpper(level)
 	}
 
 	// Write summary rows

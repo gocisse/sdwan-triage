@@ -351,6 +351,11 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 
 	if outcome == outcomeNoData {
 		markNoData(report, noDataReason)
+	} else {
+		// The ONE authoritative health conclusion, computed once, after every
+		// input of the health algorithm exists (Findings, stability, handshakes…).
+		report.NetworkHealth = models.ComputeNetworkHealth(report)
+		applyHealthToPlainEnglish(report)
 	}
 
 	return nil
@@ -1328,4 +1333,19 @@ func pickTopIssue(issues map[string]int, order []string) (string, int) {
 		}
 	}
 	return best, bestCount
+}
+
+// applyHealthToPlainEnglish makes plain_english_summary.overall_health agree with
+// the authoritative network health (it was previously derived from RiskScore, so
+// the same capture could read Healthy there and FAIR in the terminal). The legacy
+// three-label vocabulary is kept for existing consumers: good→Healthy,
+// fair/warning→Warning, critical→Critical. Other summary fields are untouched.
+func applyHealthToPlainEnglish(report *models.TriageReport) {
+	if report.PlainEnglishSummary == nil {
+		return
+	}
+	label, icon, color := models.PlainEnglishHealthLabel(report.NetworkHealth)
+	report.PlainEnglishSummary.OverallHealth = label
+	report.PlainEnglishSummary.HealthIcon = icon
+	report.PlainEnglishSummary.HealthColor = color
 }

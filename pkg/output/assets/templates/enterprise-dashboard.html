@@ -141,13 +141,13 @@
         <section id="dashboard" class="dashboard-section">{{if .CompletenessLines}}<div class="completeness-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:6px;background:rgba(245,158,11,0.12);">{{range .CompletenessLines}}<div>{{.}}</div>{{end}}</div>{{end}}{{if .NoDataLines}}<div class="no-data-notice" role="alert" style="margin:0 0 16px 0;padding:12px 16px;border:1px solid #6b7280;border-left:4px solid #6b7280;border-radius:6px;background:rgba(107,114,128,0.12);"><div><strong>NETWORK HEALTH: NO DATA</strong> &ndash; No packets were available to analyze</div>{{range .NoDataLines}}<div>{{.}}</div>{{end}}</div>{{end}}
             <div class="kpi-grid">
                 <!-- Network Health KPI -->
-                <div class="kpi-card {{if eq .HealthStatus "no_data"}}no-data{{else if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "warning"}}warning{{else}}critical{{end}}">
+                <div class="kpi-card {{if eq .HealthStatus "no_data"}}no-data{{else if eq .HealthStatus "good"}}success{{else if eq .HealthStatus "fair"}}warning{{else if eq .HealthStatus "warning"}}warning{{else}}critical{{end}}">
                     <div class="kpi-header">
                         <div class="kpi-icon">
                             <i class="fas fa-heartbeat"></i>
                         </div>
                         <span class="kpi-badge">
-                            {{if eq .HealthStatus "no_data"}}No data{{else if eq .HealthStatus "good"}}{{if .CompletenessLines}}No issues observed{{else}}Healthy{{end}}{{else if eq .HealthStatus "warning"}}Warning{{else}}Critical{{end}}
+                            {{if eq .HealthStatus "no_data"}}No data{{else if eq .HealthStatus "good"}}{{if .CompletenessLines}}No issues observed{{else}}Healthy{{end}}{{else if eq .HealthStatus "fair"}}Minor issues{{else if eq .HealthStatus "warning"}}Warning{{else}}Critical{{end}}
                         </span>
                     </div>
                     <div class="kpi-value">{{if eq .HealthStatus "no_data"}}No data{{else}}{{.HealthStatus | title}}{{end}}</div>

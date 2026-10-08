@@ -247,7 +247,7 @@ func TestCompleteness_SimpleReport(t *testing.T) {
 	}
 	// Severity text for a Critical simple report is unchanged by completeness.
 	crit := func(c *models.CaptureCompleteness) string {
-		r := &models.TriageReport{FailedHandshakes: make([]models.TCPFlow, 60), Completeness: c}
+		r := &models.TriageReport{ARPConflicts: make([]models.ARPConflict, 1), Completeness: c}
 		return captureStdout(t, func() { GenerateSimpleReport(r, "x.pcap") })
 	}
 	if !strings.Contains(crit(nil), "serious problems requiring immediate action") || !strings.Contains(crit(partialUnsupported()), "serious problems requiring immediate action") {

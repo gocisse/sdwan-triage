@@ -828,16 +828,10 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	securityConcerns := len(r.SuspiciousTraffic) + len(r.Security.PortScanFindings) + len(r.Security.TLSSecurityFindings) + icmpAnomalies
 	data.TotalFindings = criticalIssues + performanceIssues + securityConcerns
 
-	// Set health status based on risk level
-	switch data.RiskLevel {
-	case "low":
-		data.HealthStatus = "good"
-	case "medium":
-		data.HealthStatus = "warning"
-	case "high", "critical":
-		data.HealthStatus = "critical"
-	default:
-		data.HealthStatus = "good"
+	// Health status: the single authoritative network health (good|fair|warning|
+	// critical), NOT the risk level. NO_DATA (set below) has no health level.
+	if level, ok := networkHealthOf(r); ok {
+		data.HealthStatus = level
 	}
 
 	// Statistics - comprehensive

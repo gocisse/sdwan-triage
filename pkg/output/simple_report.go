@@ -34,18 +34,23 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 		return
 	}
 
-	healthStatus := getHealthStatus(report)
-	switch healthStatus {
-	case "Healthy":
+	// The headline comes from the single authoritative network health (the same
+	// value the terminal, CSV, HTML and JSON use); this report has no thresholds
+	// of its own.
+	health, _ := networkHealthOf(report)
+	switch health {
+	case models.NetworkHealthGood:
 		if isPartialAnalysis(report) {
 			// Not an affirmative statement about the network: part of the input was not analyzed.
 			green.Printf("✓ No problems were found in the packets that could be analyzed\n")
 		} else {
 			green.Printf("✓ Your network is healthy and performing well\n")
 		}
-	case "Warning":
+	case models.NetworkHealthFair:
+		yellow.Printf("○ Your network has minor issues worth a look\n")
+	case models.NetworkHealthWarning:
 		yellow.Printf("⚠ Your network has some issues that need attention\n")
-	case "Critical":
+	case models.NetworkHealthCritical:
 		red.Printf("✗ Your network has serious problems requiring immediate action\n")
 	}
 	for _, line := range completenessLines(report) {
@@ -175,44 +180,6 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 	fmt.Println()
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 	fmt.Println()
-}
-
-func getHealthStatus(report *models.TriageReport) string {
-	criticalIssues := 0
-	warningIssues := 0
-
-	// Check for critical issues
-	if len(report.Security.IOCFindings) > 0 {
-		criticalIssues++
-	}
-	if len(report.FailedHandshakes) > 50 {
-		criticalIssues++
-	}
-	if report.PacketLoss != nil && report.PacketLoss.LossPercentage > 5 {
-		criticalIssues++
-	}
-
-	// Check for warnings
-	if len(report.TCPRetransmissions) > 100 {
-		warningIssues++
-	}
-	if len(report.DNSAnomalies) > 10 {
-		warningIssues++
-	}
-	if len(report.Security.PortScanFindings) > 0 {
-		warningIssues++
-	}
-	if report.PacketLoss != nil && report.PacketLoss.LossPercentage > 1 {
-		warningIssues++
-	}
-
-	if criticalIssues > 0 {
-		return "Critical"
-	}
-	if warningIssues > 0 {
-		return "Warning"
-	}
-	return "Healthy"
 }
 
 func hasSecurityIssues(report *models.TriageReport) bool {

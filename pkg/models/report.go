@@ -137,6 +137,14 @@ type TriageReport struct {
 	// metadata only: it never feeds RiskScore, Findings, Events or health severity.
 	Completeness *CaptureCompleteness `json:"capture_completeness,omitempty"`
 
+	// NetworkHealth is the ONE authoritative machine-readable health conclusion:
+	// "good" | "fair" | "warning" | "critical" (NetworkHealth* constants). It is
+	// set once at the end of Process for analyzed reports and is absent when the
+	// analysis had no data (AnalysisStatus = no_data) and on errors (no report is
+	// emitted). Every output surface renders this value; none computes its own.
+	// It is NOT derived from RiskLevel (risk is not health).
+	NetworkHealth string `json:"network_health,omitempty"`
+
 	// AnalysisStatus is an analysis status ORTHOGONAL to health: it is set only
 	// when there was no evidence to judge (AnalysisStatusNoData) and is absent
 	// for every analysis that examined at least one packet. NoDataReason says why.

@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/config"
@@ -171,6 +172,15 @@ func (g *PDFGenerator) addExecutiveSummary(report *models.TriageReport) {
 	g.pdf.CellFormat(30, 8, "QUIC Flows:", "", 0, "L", false, 0, "")
 	g.pdf.SetFont("Arial", "", 10)
 	g.pdf.CellFormat(0, 8, fmt.Sprintf("%d", len(report.QUICFlows)), "", 1, "L", false, 0, "")
+
+	// Network health (the single authoritative value). Distinct from the Risk box
+	// below: risk is not health. NO_DATA has no health level (see below).
+	if level, ok := networkHealthOf(report); ok {
+		g.pdf.Ln(2)
+		g.pdf.SetFont("Arial", "B", 10)
+		g.pdf.CellFormat(0, 6, "Network Health: "+strings.ToUpper(level), "", 1, "L", false, 0, "")
+		g.pdf.SetFont("Arial", "", 10)
+	}
 
 	// NO_DATA: nothing was analyzed; say so explicitly (no health verdict exists).
 	if note := noDataOneLine(report); note != "" {
