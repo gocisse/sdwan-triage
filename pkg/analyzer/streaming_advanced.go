@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -147,6 +148,14 @@ func (sp *AdvancedStreamingProcessor) ProcessFile(ctx context.Context, filename 
 		return nil, err
 	}
 	defer capHandle.Close()
+
+	// pcapng files carry the link type per packet and NgReader.LinkType() is
+	// meaningless for them; a PacketSource has one fixed link type, so it would
+	// silently mis-decode. Mixed-link pcapng streaming is not supported yet
+	// (Phase 4.18b): refuse explicitly instead of producing a wrong report.
+	if capHandle.Format == FormatPCAPNG {
+		return nil, fmt.Errorf("advanced streaming analysis does not support pcapng captures yet (per-packet link types); convert to pcap or use the standard analyzer")
+	}
 
 	// Start worker pool
 	sp.startWorkers(ctx)

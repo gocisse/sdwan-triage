@@ -412,7 +412,12 @@ For more information and documentation:
 	reader := capHandle.Reader
 
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Capture file opened successfully (format: %s, link type: %v)\n", capHandle.Format, reader.LinkType())
+		if capHandle.Format == analyzer.FormatPCAPNG {
+			// pcapng carries the link type per packet; a single capture-wide value would be misleading.
+			fmt.Fprintf(os.Stderr, "[DEBUG] Capture file opened successfully (format: %s, link types: per packet)\n", capHandle.Format)
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Capture file opened successfully (format: %s, link type: %v)\n", capHandle.Format, reader.LinkType())
+		}
 	}
 
 	// Initialize report and state
@@ -462,6 +467,12 @@ For more information and documentation:
 	if err := processor.Process(reader, state, report, filter); err != nil {
 		fmt.Fprintf(os.Stderr, "Error processing PCAP: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Some packets may have been skipped (unsupported link type): say so.
+	// stderr, so `-json` keeps stdout as pure JSON.
+	if notice := processor.DecodeSummary().PartialDecodeNotice(); notice != "" {
+		color.New(color.FgYellow).Fprintf(os.Stderr, "⚠ PARTIAL ANALYSIS: %s\n", notice)
 	}
 
 	// Output results

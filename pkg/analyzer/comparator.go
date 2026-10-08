@@ -288,6 +288,7 @@ func (c *Comparator) streamFile(filePath string, onPacket func(*packetMeta)) (in
 
 	reader := handle.Reader
 	index := 0
+	var st decodeStats
 
 	for {
 		data, ci, err := reader.ReadPacketData()
@@ -295,11 +296,21 @@ func (c *Comparator) streamFile(filePath string, onPacket func(*packetMeta)) (in
 			break // EOF
 		}
 
-		pkt := gopacket.NewPacket(data, reader.LinkType(), gopacket.Lazy)
+		// Use the packet's own link type (pcapng carries it per packet).
+		linkType, perPacket := PacketLinkType(reader, ci)
+		st.read++
+		if perPacket && !IsSupportedLinkType(linkType) {
+			st.addUnsupported(linkType)
+			index++
+			continue
+		}
+
+		pkt := gopacket.NewPacket(data, linkType, gopacket.Lazy)
 		if pkt == nil {
 			index++
 			continue
 		}
+		st.record(pkt)
 
 		meta := packetMeta{
 			Index:     index,
@@ -462,6 +473,9 @@ func (c *Comparator) streamFile(filePath string, onPacket func(*packetMeta)) (in
 		index++
 	}
 
+	if st.read > 0 && st.decoded == 0 {
+		return index, st.noDecodableError()
+	}
 	return index, nil
 }
 

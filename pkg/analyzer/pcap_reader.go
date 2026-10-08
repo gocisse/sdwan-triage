@@ -100,6 +100,46 @@ func OpenCapture(filePath string) (*CaptureHandle, error) {
 	return handle, nil
 }
 
+// PacketLinkType returns the link type that must be used to decode the packet
+// described by ci. pcapng files are opened with WantMixedLinkType, in which
+// case NgReader.LinkType() is meaningless (zero value, i.e. LinkTypeNull) and
+// the packet's own interface link type is carried in ci.AncillaryData[0].
+// perPacket reports whether the link type came from the packet itself; for
+// classic pcap (no ancillary data) the reader-wide link type is returned
+// unchanged and perPacket is false.
+//
+// Note: gopacket's layers.LinkType is a uint8, so pcapng link types >= 256
+// (e.g. 274, IEEE 802.3br mPackets) arrive truncated (274 -> 18).
+func PacketLinkType(r PacketReader, ci gopacket.CaptureInfo) (lt layers.LinkType, perPacket bool) {
+	if len(ci.AncillaryData) > 0 {
+		if v, ok := ci.AncillaryData[0].(layers.LinkType); ok {
+			return v, true
+		}
+	}
+	return r.LinkType(), false
+}
+
+// IsSupportedLinkType reports whether packets of this (per-packet, pcapng)
+// link type are decoded by the analyzer. Anything else is counted as
+// unsupported and never handed to the detectors.
+func IsSupportedLinkType(lt layers.LinkType) bool {
+	switch lt {
+	case layers.LinkTypeEthernet, layers.LinkTypeRaw, layers.LinkTypeIPv4,
+		layers.LinkTypeIPv6, layers.LinkTypeLinuxSLL:
+		return true
+	}
+	return false
+}
+
+// LinkTypeLabel renders a link type for user-facing messages.
+func LinkTypeLabel(lt layers.LinkType) string {
+	if lt == 18 {
+		// gopacket truncates pcapng link type 274 (IEEE 802.3br mPackets) to 18.
+		return "18 (pcapng link type 274, IEEE 802.3br mPackets, truncated by the decoder library)"
+	}
+	return fmt.Sprintf("%d", uint8(lt))
+}
+
 // OpenCaptureFromReader creates a PacketReader from an io.Reader when
 // the magic bytes have already been consumed (e.g. bytes.Buffer in tests).
 // It always creates a pcap reader for backward compatibility with tests.

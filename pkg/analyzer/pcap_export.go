@@ -84,11 +84,21 @@ func (pe *PCAPExporter) ExportStream(filter ExportFilter) (*ExportResult, error)
 	}
 	defer outputFile.Close()
 
-	// Create PCAP writer
+	// Create PCAP writer. A classic pcap output has exactly one link type.
+	// Classic pcap input: reader-wide link type, header written up front.
+	// pcapng input: the link type is per packet (reader.LinkType() is
+	// meaningless), so the header is written once the first packet is seen and
+	// every later packet must share that link type.
 	writer := pcapgo.NewWriter(outputFile)
-	if err := writer.WriteFileHeader(65536, reader.LinkType()); err != nil {
-		result.Error = fmt.Errorf("failed to write PCAP header: %w", err)
-		return result, result.Error
+	headerWritten := false
+	var outLinkType layers.LinkType
+	if capHandle.Format != FormatPCAPNG {
+		outLinkType = reader.LinkType()
+		if err := writer.WriteFileHeader(65536, outLinkType); err != nil {
+			result.Error = fmt.Errorf("failed to write PCAP header: %w", err)
+			return result, result.Error
+		}
+		headerWritten = true
 	}
 
 	// Process packets
@@ -104,8 +114,27 @@ func (pe *PCAPExporter) ExportStream(filter ExportFilter) (*ExportResult, error)
 			continue // Skip bad packets
 		}
 
+		linkType, perPacket := PacketLinkType(reader, ci)
+		if perPacket {
+			if !IsSupportedLinkType(linkType) {
+				result.Error = fmt.Errorf("export aborted: capture contains packets with unsupported link type %s", LinkTypeLabel(linkType))
+				return result, result.Error
+			}
+			if !headerWritten {
+				outLinkType = linkType
+				if err := writer.WriteFileHeader(65536, outLinkType); err != nil {
+					result.Error = fmt.Errorf("failed to write PCAP header: %w", err)
+					return result, result.Error
+				}
+				headerWritten = true
+			} else if linkType != outLinkType {
+				result.Error = fmt.Errorf("export aborted: capture mixes link types (%d and %d) and cannot be written to a single pcap file", uint8(outLinkType), uint8(linkType))
+				return result, result.Error
+			}
+		}
+
 		// Parse packet
-		packet := gopacket.NewPacket(data, reader.LinkType(), gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+		packet := gopacket.NewPacket(data, linkType, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
 		if packet == nil {
 			continue
 		}
@@ -122,6 +151,14 @@ func (pe *PCAPExporter) ExportStream(filter ExportFilter) (*ExportResult, error)
 
 		packetCount++
 		byteCount += uint64(len(data))
+	}
+
+	// Empty pcapng input never triggered the lazy header write.
+	if !headerWritten {
+		if err := writer.WriteFileHeader(65536, layers.LinkTypeEthernet); err != nil {
+			result.Error = fmt.Errorf("failed to write PCAP header: %w", err)
+			return result, result.Error
+		}
 	}
 
 	result.Success = true

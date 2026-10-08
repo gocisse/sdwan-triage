@@ -75,6 +75,7 @@ type Processor struct {
 	lastPacketTime       time.Time // capture timestamp of the most recent packet analysed
 	MaxEvents            int       // capacity of the typed event index; 0 = events.DefaultMaxEvents
 	recorder             *events.Recorder
+	decode               decodeStats
 }
 
 func (p *Processor) maxHeap() uint64 {
@@ -224,6 +225,7 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 		p.recorder = rec
 	}
 	var packetIndex uint64 // ordinal of the packet in the capture file, including filtered/skipped ones
+	p.decode = decodeStats{}
 
 	for {
 		data, ci, err := reader.ReadPacketData()
@@ -242,22 +244,32 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 			continue
 		}
 
+		// Decode with the packet's own link type (pcapng carries it per packet;
+		// classic pcap falls back to the reader-wide link type).
+		linkType, perPacket := PacketLinkType(reader, ci)
+		p.decode.read++
+		if perPacket && !IsSupportedLinkType(linkType) {
+			p.decode.addUnsupported(linkType)
+			continue
+		}
+
 		// Early filter check: Apply filter before packet creation for performance
 		// This avoids expensive packet parsing for filtered packets
 		if filter != nil && !filter.IsEmpty() {
 			// Quick pre-filter check on raw data if possible
-			if !p.quickFilterCheck(data, reader.LinkType(), filter) {
+			if !p.quickFilterCheck(data, linkType, filter) {
 				continue
 			}
 		}
 
 		// Safely create packet with error handling
-		packet := gopacket.NewPacket(data, reader.LinkType(), gopacket.Default)
+		packet := gopacket.NewPacket(data, linkType, gopacket.Default)
 		if packet == nil {
 			p.skippedPackets++
 			p.logDebug("Skipping nil packet at position %d", packetCount+1)
 			continue
 		}
+		p.decode.record(packet)
 
 		// Safely set metadata
 		if packet.Metadata() != nil {
@@ -311,6 +323,12 @@ func (p *Processor) Process(reader PacketReader, state *models.AnalysisState, re
 	// Report any issues encountered
 	if p.skippedPackets > 0 || p.errorCount > 0 {
 		p.logWarning("Analysis completed with issues: %d packets skipped, %d read errors", p.skippedPackets, p.errorCount)
+	}
+
+	// A non-empty capture of which nothing could be decoded must never turn
+	// into a normal (and misleadingly GOOD) report.
+	if p.decode.read > 0 && p.decode.decoded == 0 {
+		return p.decode.noDecodableError()
 	}
 
 	// Finalize report
