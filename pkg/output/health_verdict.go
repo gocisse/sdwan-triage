@@ -38,7 +38,13 @@ const performanceWarnThreshold = 5
 //     does not contribute.
 //   - Findings with High/Critical severity and a basis other than time_proximity
 //     → at least WARNING.
-//   - DNS anomalies or ARP conflicts → CRITICAL (existing behavior, unchanged).
+//   - ARP conflicts → CRITICAL (existing behavior, unchanged).
+//   - DNS: NOT CRITICAL. Only observed DNS server failures (kind server_failure,
+//     e.g. SERVFAIL/REFUSED) count, as distinct (server, name) incidents, in the
+//     performance bucket. NXDOMAIN, non-standard server, private answer,
+//     suspicious domain and unanswered queries do not affect health: an
+//     unanswered query is absence of evidence (capture asymmetry, filtering,
+//     truncation), not an observed failure.
 //
 // RiskScore is intentionally not an input.
 func healthVerdict(r *models.TriageReport) healthLevel {
@@ -49,7 +55,7 @@ func healthVerdict(r *models.TriageReport) healthLevel {
 		}
 	}
 
-	performance := len(r.TCPRetransmissions) + handshakeFailures(r) + len(r.RTTAnalysis)
+	performance := len(r.TCPRetransmissions) + handshakeFailures(r) + len(r.RTTAnalysis) + dnsServerFailureIncidents(r)
 	if performance > 0 {
 		raise(healthFair)
 	}
@@ -88,7 +94,10 @@ func healthVerdict(r *models.TriageReport) healthLevel {
 		}
 	}
 
-	if len(r.DNSAnomalies) > 0 || len(r.ARPConflicts) > 0 {
+	// ARP conflicts remain CRITICAL. DNS anomalies no longer do: they are
+	// observations, and only observed server failures feed the performance bucket
+	// above (see dnsServerFailureIncidents).
+	if len(r.ARPConflicts) > 0 {
 		raise(healthCritical)
 	}
 	return level
@@ -101,4 +110,20 @@ func handshakeFailures(r *models.TriageReport) int {
 		return countHandshakes(r.TCPHandshakeFlows).failed()
 	}
 	return len(r.FailedHandshakes)
+}
+
+// dnsServerFailureIncidents counts distinct DNS server-failure incidents: one
+// per (server, query name) pair, so a resolver failing the same name repeatedly
+// is one incident rather than one per packet. Anomalies without a kind (for
+// example from older JSON) are not interpreted: the kind is never inferred from
+// Reason text.
+func dnsServerFailureIncidents(r *models.TriageReport) int {
+	type incident struct{ server, query string }
+	seen := make(map[incident]struct{})
+	for _, a := range r.DNSAnomalies {
+		if a.Kind == models.DNSKindServerFailure {
+			seen[incident{a.ServerIP, a.Query}] = struct{}{}
+		}
+	}
+	return len(seen)
 }

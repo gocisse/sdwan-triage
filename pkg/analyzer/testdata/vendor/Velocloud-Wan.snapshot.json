@@ -2,7 +2,7 @@
   "_note": "Snapshot of CURRENT engine behavior on a vendor capture. Not verified truth: green means unchanged, not correct. Regenerate only with SDWAN_UPDATE_SNAPSHOTS=1 and review the diff.",
   "pcap": "Velocloud-Wan",
   "event_counts": {
-    "dns.anomaly": 32,
+    "dns.anomaly": 11,
     "tcp.handshake_failed": 3,
     "tcp.rtt_spike": 6,
     "tunnel.observed": 16
@@ -16,7 +16,7 @@
     "c2_beaconing_findings": 0,
     "device_fingerprinting": 5,
     "dhcp_findings": 0,
-    "dns_anomalies": 32,
+    "dns_anomalies": 11,
     "dns_details": 31,
     "failed_handshakes": 0,
     "http2_flows": 0,
@@ -57,6 +57,6 @@
   "risk_score": 100,
   "risk_level": "Critical",
   "top_issue": "DNS Anomalies",
-  "top_issue_count": 32,
+  "top_issue_count": 11,
   "recommended_actions_count": 2
 }

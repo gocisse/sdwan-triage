@@ -417,6 +417,18 @@ type IdentifiedApp struct {
 	SuspiciousReason string   `json:"suspicious_reason,omitempty"`
 }
 
+// DNS anomaly kinds. The kind is assigned where the anomaly is produced and is
+// never inferred from Reason text. Only DNSKindServerFailure influences the
+// health verdict; every kind remains an observation in the report.
+const (
+	DNSKindServerFailure     = "server_failure"      // response with a failure RCODE other than NXDOMAIN (SERVFAIL, REFUSED, FORMERR, NOTIMP, ...)
+	DNSKindNXDomain          = "nxdomain"            // response with RCODE NXDOMAIN (the name does not exist: a normal resolution result)
+	DNSKindNoResponse        = "no_response"         // query without a matching response in the capture (absence of evidence)
+	DNSKindNonStandardServer = "non_standard_server" // answer from a public responder outside the hard-coded resolver list
+	DNSKindPrivateAnswer     = "private_answer"      // private/reserved address returned for a public-TLD name
+	DNSKindSuspiciousDomain  = "suspicious_domain"   // name matched the TLD / label-count / length heuristics
+)
+
 type DNSAnomaly struct {
 	Timestamp float64 `json:"timestamp"`
 	Query     string  `json:"query"`
@@ -424,6 +436,7 @@ type DNSAnomaly struct {
 	ServerIP  string  `json:"server_ip"`
 	ServerMAC string  `json:"server_mac"`
 	Reason    string  `json:"reason"`
+	Kind      string  `json:"kind,omitempty"` // one of the DNSKind* constants
 }
 
 type TCPFlow struct {

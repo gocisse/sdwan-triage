@@ -105,20 +105,19 @@ func TestHealth_Findings(t *testing.T) {
 }
 
 func TestHealth_ExistingCriticalUnchanged(t *testing.T) {
-	hvLevel(t, "DNS", &models.TriageReport{DNSAnomalies: make([]models.DNSAnomaly, 1)}, healthCritical)
 	hvLevel(t, "ARP", &models.TriageReport{ARPConflicts: make([]models.ARPConflict, 1)}, healthCritical)
 	everything := &models.TriageReport{
-		DNSAnomalies:      make([]models.DNSAnomaly, 1),
+		ARPConflicts:      make([]models.ARPConflict, 1),
 		TCPHandshakeFlows: hvFailed(10),
 		StabilityFindings: []models.StabilityFinding{{Severity: "Critical"}},
 		TCPWindowFindings: []models.TCPWindowFinding{{Type: "Zero Window"}},
 		Findings:          []models.Finding{{Severity: models.SeverityCritical, Basis: models.FindingBasisObserved}},
 	}
-	hvLevel(t, "DNS + everything", everything, healthCritical)
+	hvLevel(t, "ARP + everything", everything, healthCritical)
 }
 
 func TestHealth_MixedCases(t *testing.T) {
-	hvLevel(t, "handshake + DNS", &models.TriageReport{TCPHandshakeFlows: hvFailed(2), DNSAnomalies: make([]models.DNSAnomaly, 1)}, healthCritical)
+	hvLevel(t, "handshake + ARP", &models.TriageReport{TCPHandshakeFlows: hvFailed(2), ARPConflicts: make([]models.ARPConflict, 1)}, healthCritical)
 	hvLevel(t, "stability + retransmission", &models.TriageReport{
 		StabilityFindings:  []models.StabilityFinding{{Severity: "High"}},
 		TCPRetransmissions: make([]models.TCPFlow, 1)}, healthWarning)

@@ -58,6 +58,16 @@ func dnsResponseCodeName(code uint16) string {
 	}
 }
 
+// dnsFailureKind classifies a failure RCODE. NXDOMAIN means the name does not
+// exist, which is an ordinary resolution result; every other failure RCODE is a
+// server/protocol failure.
+func dnsFailureKind(code uint16) string {
+	if layers.DNSResponseCode(code) == layers.DNSResponseCodeNXDomain {
+		return models.DNSKindNXDomain
+	}
+	return models.DNSKindServerFailure
+}
+
 // Analyze processes a DNS packet and updates the report
 func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisState, report *models.TriageReport) {
 	dnsLayer := packet.Layer(layers.LayerTypeDNS)
@@ -172,9 +182,31 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				}
 			}
 
-			// Check for anomalies and mark the record
+			// Check for anomalies and mark the record. The heuristics run per
+			// answer, but an anomaly is emitted at most once per response and
+			// kind: a response carrying six A records is one observation, not six.
 			isAnomalous := false
 			reason := ""
+			emitted := make(map[string]bool)
+			emit := func(kind, why, answerIP string) {
+				isAnomalous = true
+				reason = why
+				if emitted[kind] {
+					return
+				}
+				emitted[kind] = true
+				anomaly := models.DNSAnomaly{
+					Timestamp: timestamp,
+					Query:     queryName,
+					AnswerIP:  answerIP,
+					ServerIP:  srcIP,
+					ServerMAC: srcMAC,
+					Reason:    why,
+					Kind:      kind,
+				}
+				report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
+				emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
+			}
 
 			for _, answer := range dns.Answers {
 				if answer.Type == layers.DNSTypeA || answer.Type == layers.DNSTypeAAAA {
@@ -182,33 +214,17 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 
 					// Check if DNS server is non-standard (not a known DNS server)
 					if !models.IsPrivateOrReservedIP(srcIP) && !isKnownDNSServer(srcIP) {
-						isAnomalous = true
-						reason = "Response from non-standard DNS server"
+						emit(models.DNSKindNonStandardServer, "Response from non-standard DNS server", answerIP)
 					}
 
 					// Check for private IP in response to public domain query
 					if models.IsPublicDomain(queryName) && models.IsPrivateOrReservedIP(answerIP) {
-						isAnomalous = true
-						reason = "Private IP returned for public domain (possible DNS hijacking)"
+						emit(models.DNSKindPrivateAnswer, "Private IP returned for public domain (possible DNS hijacking)", answerIP)
 					}
 
 					// Check for suspicious TLDs
 					if isSuspiciousDomain(queryName) {
-						isAnomalous = true
-						reason = "Suspicious domain pattern detected"
-					}
-
-					if isAnomalous {
-						anomaly := models.DNSAnomaly{
-							Timestamp: timestamp,
-							Query:     queryName,
-							AnswerIP:  answerIP,
-							ServerIP:  srcIP,
-							ServerMAC: srcMAC,
-							Reason:    reason,
-						}
-						report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
-						emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
+						emit(models.DNSKindSuspiciousDomain, "Suspicious domain pattern detected", answerIP)
 					}
 				}
 			}
@@ -239,6 +255,7 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				ServerIP:  srcIP,
 				ServerMAC: srcMAC,
 				Reason:    fmt.Sprintf("DNS %s for %s", dnsResponseCodeName(responseCode), queryName),
+				Kind:      dnsFailureKind(responseCode),
 			}
 			report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
 			emitDNSAnomaly(report, packet.Metadata().Timestamp, anomaly)
@@ -324,6 +341,7 @@ func (d *DNSAnalyzer) Finalize(endOfCapture time.Time, report *models.TriageRepo
 			Query:     k.name,
 			ServerIP:  first.DestinationIP,
 			Reason:    reason,
+			Kind:      models.DNSKindNoResponse,
 		}
 		report.DNSAnomalies = append(report.DNSAnomalies, anomaly)
 		// Finalize runs after the last packet: stamp with the first unanswered
@@ -339,6 +357,9 @@ func (d *DNSAnalyzer) Finalize(endOfCapture time.Time, report *models.TriageRepo
 // emitDNSAnomaly mirrors a DNSAnomaly into the typed event store.
 func emitDNSAnomaly(report *models.TriageReport, ts time.Time, a models.DNSAnomaly) {
 	attrs := map[string]string{"query": a.Query, "reason": a.Reason, "server_ip": a.ServerIP}
+	if a.Kind != "" {
+		attrs["kind"] = a.Kind
+	}
 	if a.AnswerIP != "" {
 		attrs["answer_ip"] = a.AnswerIP
 	}

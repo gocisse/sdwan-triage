@@ -57,7 +57,7 @@ const (
 
 	// DNSAnomaly: a DNS observation the DNS detector classified as anomalous
 	// (failure RCODE, unanswered query, suspicious answer). Attrs: query,
-	// reason, server_ip, and answer_ip when applicable.
+	// reason, kind (models.DNSKind*), server_ip, and answer_ip when applicable.
 	DNSAnomaly Kind = "dns.anomaly"
 )
 

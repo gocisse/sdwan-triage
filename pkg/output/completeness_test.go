@@ -106,7 +106,7 @@ func TestCompleteness_SeverityLabelsUnchangedWhenPartial(t *testing.T) {
 		{"WARNING", func() *models.TriageReport {
 			return &models.TriageReport{StabilityFindings: []models.StabilityFinding{{Severity: "High"}}}
 		}, "NETWORK HEALTH: WARNING - Issues detected that need review"},
-		{"CRITICAL", func() *models.TriageReport { return &models.TriageReport{DNSAnomalies: make([]models.DNSAnomaly, 1)} }, "NETWORK HEALTH: CRITICAL - Immediate attention required"},
+		{"CRITICAL", func() *models.TriageReport { return &models.TriageReport{ARPConflicts: make([]models.ARPConflict, 1)} }, "NETWORK HEALTH: CRITICAL - Immediate attention required"},
 	}
 	for _, tc := range cases {
 		complete := captureStdout(t, func() { PrintExecutiveSummary(tc.mk()) })
@@ -126,7 +126,7 @@ func TestCompleteness_SeverityLabelsUnchangedWhenPartial(t *testing.T) {
 }
 
 func TestCompleteness_ReadErrorNoticeMakesNoLossClaim(t *testing.T) {
-	r := &models.TriageReport{DNSAnomalies: make([]models.DNSAnomaly, 1), Completeness: readErrorOnly()}
+	r := &models.TriageReport{ARPConflicts: make([]models.ARPConflict, 1), Completeness: readErrorOnly()}
 	out := captureStdout(t, func() { PrintExecutiveSummary(r) })
 	for _, want := range []string{"NETWORK HEALTH: CRITICAL", "INCOMPLETE CAPTURE FILE: the capture ended unexpectedly (1 read error(s)).", "Trailing packets may be missing."} {
 		if !strings.Contains(out, want) {
