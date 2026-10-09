@@ -35,6 +35,7 @@ type Processor struct {
 	arpAnalyzer          *detector.ARPAnalyzer
 	httpAnalyzer         *detector.HTTPAnalyzer
 	tlsAnalyzer          *detector.TLSAnalyzer
+	udpServiceAnalyzer   *detector.UDPServiceAnalyzer
 	trafficAnalyzer      *detector.TrafficAnalyzer
 	quicAnalyzer         *detector.QUICAnalyzer
 	qosAnalyzer          *detector.QoSAnalyzer
@@ -100,6 +101,7 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		arpAnalyzer:          detector.NewARPAnalyzer(),
 		httpAnalyzer:         detector.NewHTTPAnalyzer(),
 		tlsAnalyzer:          detector.NewTLSAnalyzer(),
+		udpServiceAnalyzer:   detector.NewUDPServiceAnalyzer(),
 		trafficAnalyzer:      detector.NewTrafficAnalyzer(),
 		quicAnalyzer:         detector.NewQUICAnalyzer(),
 		qosAnalyzer:          detector.NewQoSAnalyzer(qosEnabled),
@@ -469,6 +471,9 @@ func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
 		// Traffic analysis (writes to UDPFlowState, AppStats)
 		NewAnalyzerFunc("Traffic", p.trafficAnalyzer.Analyze),
 
+		// UDP request/response visibility (Phase 4.36; own state, report written at Finalize)
+		NewAnalyzerFunc("UDP-Services", p.udpServiceAnalyzer.Analyze),
+
 		// Security detectors (write to SecurityState maps)
 		NewAnalyzerFunc("PortScan", p.portScanAnalyzer.Analyze),
 
@@ -562,6 +567,15 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 
 	// DNS queries that never received a response (judged in capture time)
 	p.dnsAnalyzer.Finalize(p.lastPacketTime, report)
+
+	// ICMP error messages grouped with their quoted flows (Phase 4.33)
+	p.icmpAnalyzer.Finalize(report)
+
+	// TLS alerts and ClientHello-without-ServerHello connections (Phase 4.34)
+	p.tlsAnalyzer.Finalize(p.lastPacketTime, report)
+
+	// UDP request/response visibility for well-known services (Phase 4.36)
+	p.udpServiceAnalyzer.Finalize(p.lastPacketTime, report)
 
 	// Build RTT histogram from collected samples
 	p.buildRTTHistogram(state, report)
@@ -709,6 +723,15 @@ func (p *Processor) finalizeReport(state *models.AnalysisState, report *models.T
 	// (additive; legacy report fields are untouched).
 	report.Findings = BuildFindings(report)
 
+	// Additive SYN / SYN-ACK repeat evidence is emitted last so that every
+	// existing event (and the event IDs quoted in Finding evidence) is unchanged.
+	p.tcpAnalyzer.Finalize(report)
+
+	// Disclose any bound/reset that limited TCP evidence (nil when none occurred).
+	report.TCPEvidenceCompleteness = buildTCPEvidenceCompleteness(report.Events, p.tcpAnalyzer.EvidenceStats())
+	// Bounded, observational per-flow view of the TCP evidence events (nil when none).
+	report.TCPFlowEvidence = BuildTCPFlowEvidence(report)
+
 	// Summarise the typed event store for the JSON report
 	if report.Events != nil && report.Events.Len() > 0 {
 		report.EventCounts = make(map[string]int)
@@ -733,13 +756,18 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 	}
 
 	// Critical findings (+10 points each)
-	if len(report.ARPConflicts) > 0 {
-		score += len(report.ARPConflicts) * 10
-		noteIssue("ARP Conflicts", len(report.ARPConflicts))
+	// Conflicts whose every MAC is a documented virtual redundant-gateway MAC (Phase 4.35)
+	// are listed in the report but are not a critical finding.
+	if n := report.UnexplainedARPConflicts(); n > 0 {
+		score += n * 10
+		noteIssue("ARP Conflicts", n)
 	}
-	if len(report.DNSAnomalies) > 0 {
-		score += len(report.DNSAnomalies) * 10
-		noteIssue("DNS Anomalies", len(report.DNSAnomalies))
+	// DNS contributes through server failures and private-address answers only (Phase 4.40);
+	// NXDOMAIN, no observed response, unlisted responders and heuristic domain matches stay
+	// visible in dns_anomalies / dns_resolver_summary but do not score or become the top issue.
+	if n, _, _ := dnsRiskCount(report); n > 0 {
+		score += n * 10
+		noteIssue("DNS Anomalies", n)
 	}
 	if len(report.Security.TLSSecurityFindings) > 0 {
 		score += len(report.Security.TLSSecurityFindings) * 10
@@ -801,9 +829,12 @@ func (p *Processor) calculateRiskScore(report *models.TriageReport) {
 		}
 		noteIssue("NTP Issues", len(report.NTPFindings))
 	}
-	if len(report.DNSTunnelingFindings) > 0 {
-		score += len(report.DNSTunnelingFindings) * 15
-		noteIssue("DNS Tunneling", len(report.DNSTunnelingFindings))
+	// The heuristic records one match per (source, base domain); one host resolving many
+	// domains in a burst is one behaviour, so the weight (unchanged, 15) is applied per
+	// distinct source IP (Phase 4.42). Every match stays in dns_tunneling_findings.
+	if n := dnsTunnelingSourceCount(report); n > 0 {
+		score += n * 15
+		noteIssue("DNS Tunneling", n)
 	}
 	if len(report.C2BeaconingFindings) > 0 {
 		score += len(report.C2BeaconingFindings) * 15
@@ -868,7 +899,7 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 		actions = append(actions, "CRITICAL: Investigate ARP spoofing immediately. Locate the device causing the conflict and verify network security.")
 	}
 	if issues["DNS Anomalies"] > 0 {
-		actions = append(actions, "CRITICAL: Review DNS anomalies for potential DNS hijacking or poisoning attacks.")
+		actions = append(actions, dnsActionText(report))
 	}
 	if issues["IOC Matches"] > 0 {
 		actions = append(actions, "CRITICAL: Indicators of Compromise detected. Isolate affected systems and perform forensic analysis.")
@@ -887,7 +918,7 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 		actions = append(actions, "MEDIUM: Failed TCP handshakes may indicate firewall blocks, service unavailability, or network issues.")
 	}
 	if issues["Suspicious Traffic"] > 0 {
-		actions = append(actions, "MEDIUM: Suspicious traffic patterns detected. Review for potential malware or unauthorized access.")
+		actions = append(actions, "MEDIUM: Traffic matching suspicious-traffic heuristics was detected (see suspicious_traffic). Review the listed flows; a heuristic match alone does not establish compromise or unauthorized access.")
 	}
 	if issues["Port Scan Indicators"] > 0 {
 		actions = append(actions, "MEDIUM: Port scanning activity detected. Review source IPs and consider blocking if malicious.")
@@ -902,7 +933,7 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 		actions = append(actions, "HIGH: NTP anomalies detected. Check for NTP amplification attacks and verify NTP server configuration.")
 	}
 	if issues["DNS Tunneling"] > 0 {
-		actions = append(actions, "CRITICAL: DNS tunneling suspected. Investigate the source host for malware. Block suspicious domains and enable DNS security.")
+		actions = append(actions, dnsTunnelingActionText)
 	}
 	if issues["C2 Beaconing"] > 0 {
 		actions = append(actions, "CRITICAL: C2 beaconing pattern detected. Isolate the source host immediately and perform forensic analysis.")

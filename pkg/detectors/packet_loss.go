@@ -106,15 +106,19 @@ func (d *PacketLossDetector) ProcessPacket(packet gopacket.Packet) {
 	}
 
 	seqNum := tcp.Seq
-	// TCP keep-alive probe: 1 byte at highest_next-1, repeats by design.
-	if len(tcp.Payload) == 1 && flow.highestValid && seqNum == flow.highestNext-1 {
+	// The retransmission decision is the shared rule in models.ClassifyTCPSegment
+	// (also used by pkg/detector/tcp.go). This consumer keeps its own eligibility
+	// filter above (no SYN/FIN/RST, payload only), its own history, and its own
+	// counters.
+	switch models.ClassifyTCPSegment(flow.seq, flow.highestNext, flow.highestValid, seqNum, len(tcp.Payload)) {
+	case models.SegmentKeepAliveShape:
+		// TCP keep-alive probe: 1 byte at highest_next-1, repeats by design.
 		return
-	}
-	if flow.seq.Seen(seqNum) {
+	case models.SegmentRetransmission:
 		// Duplicate or retransmission
 		flow.retransmissions++
 		d.retransmissions++
-	} else {
+	default:
 		flow.seq.Record(seqNum, packet.Metadata().Timestamp)
 	}
 	next := seqNum + uint32(len(tcp.Payload))

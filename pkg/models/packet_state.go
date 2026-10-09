@@ -43,6 +43,30 @@ type TCPFlowState struct {
 	RTTMax     float64
 
 	TotalBytes uint64
+
+	// seqDir and ackRun hold the optional Phase 4.30b sequence/duplicate-ACK state
+	// for this direction. They are allocated lazily by SequenceState/DupAckState and
+	// are nil (zero cost) until a later phase starts using them; the flow cache's
+	// bounded LRU eviction frees them with the flow.
+	seqDir *TCPSeqDir
+	ackRun *TCPDupAckRun
+}
+
+// SequenceState returns this direction's sequence state, creating it on first use.
+func (s *TCPFlowState) SequenceState() *TCPSeqDir {
+	if s.seqDir == nil {
+		s.seqDir = &TCPSeqDir{}
+	}
+	return s.seqDir
+}
+
+// DupAckState returns the duplicate-ACK run state of this direction as an ACK
+// sender, creating it on first use.
+func (s *TCPFlowState) DupAckState() *TCPDupAckRun {
+	if s.ackRun == nil {
+		s.ackRun = &TCPDupAckRun{}
+	}
+	return s.ackRun
 }
 
 // NewTCPFlowState creates a TCP flow state with bounded internal storage.
@@ -69,7 +93,7 @@ func (s *TCPFlowState) ObserveSegment(seq uint32, consumed uint32) {
 // number sent so far in this direction (RFC 1122 §4.2.3.6; matches Wireshark's
 // tcp.analysis.keep_alive rule).
 func (s *TCPFlowState) IsKeepAlive(seq uint32, payloadLen int) bool {
-	return payloadLen <= 1 && s.HighestNextValid && seq == s.HighestNextSeq-1
+	return IsKeepAliveShape(s.HighestNextSeq, s.HighestNextValid, seq, payloadLen)
 }
 
 // SeqAfterOrEqual reports a >= b in TCP modular (wrap-around) arithmetic.
@@ -332,6 +356,17 @@ func (s *AnalysisState) GetTCPFlow(flowKey string) *TCPFlowState {
 }
 
 // SetTCPFlow stores a TCP flow state
+// PeekTCPFlow returns the flow state WITHOUT updating its LRU recency, so that
+// evidence code can look at a flow without changing which flow is evicted first.
+func (s *AnalysisState) PeekTCPFlow(flowKey string) *TCPFlowState {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if val, ok := s.tcpFlowsCache.Peek(flowKey); ok {
+		return val
+	}
+	return nil
+}
+
 func (s *AnalysisState) SetTCPFlow(flowKey string, state *TCPFlowState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -20,7 +20,9 @@ const (
 	TCPRetransmission Kind = "tcp.retransmission"
 
 	// BFDDown: a BFD session observed transitioning from Up to a non-Up state.
-	// Values: prev_state, new_state (RFC 5880 numeric). Attrs: src_ip, peer_ip.
+	// Values: prev_state, new_state (RFC 5880 numeric). Attrs: src_ip, peer_ip,
+	// new_state_name, diag (RFC 5880 §4.1 diagnostic code carried by the packet that showed
+	// the transition) and diag_name. The code is the sender's report about its own session.
 	BFDDown Kind = "bfd.down"
 
 	// TCPRTTSpike: a measured round-trip time at or above the TCP analyzer's
@@ -44,6 +46,59 @@ const (
 	// buffer full). One event per such segment. Values: zero_count (running
 	// per-flow count). Attrs: src_ip, dst_ip.
 	TCPZeroWindow Kind = "tcp.zero_window"
+
+	// TCPSYNRetransmission: a repeated TCP SYN or SYN-ACK observed in the capture
+	// (same initial sequence number, and for SYN-ACK the same acknowledgement
+	// number, as an earlier still-pending handshake packet on the same direction
+	// of the same 4-tuple). It records OBSERVED REPEATED HANDSHAKE PACKETS only:
+	// it is not proof of packet loss and does not say where a packet was lost or
+	// whether the sender or a capture duplicate produced the repeat (use
+	// since_previous_ms to judge). A repeat whose first copy precedes the capture
+	// cannot be seen. One event per repeated packet, capped at 10,000 events per
+	// capture so that it cannot exhaust the shared event index; repeats beyond
+	// the cap still advance state but are not emitted. Independent of
+	// tcp.retransmission (never counted there). FlowKey: direction of the repeated
+	// packet. Values: seq, ack (0 for SYN), attempt (1 = initial, so the first
+	// repeat is 2), since_first_ms, since_previous_ms, first_ts_us. Attrs:
+	// segment ("SYN" | "SYN-ACK"), src_ip, dst_ip.
+	TCPSYNRetransmission Kind = "tcp.syn_retransmission"
+
+	// TCPSequenceGap: a sequence-consuming TCP segment (payload, SYN or FIN) began
+	// beyond the highest sequence position seen so far in that direction, leaving
+	// the range [gap_start, gap_end) unobserved at that moment. It is an OBSERVED
+	// SEQUENCE GAP, not proof of packet loss: it can equally be capture loss,
+	// asymmetric visibility, a capture that began mid-connection, or reordering.
+	// Pure ACKs (keep-alives included) never create one. One event per gap,
+	// emitted after all other events (existing IDs unchanged), capped at 10,000 per
+	// capture. Timestamp/Packets: the segment that exposed the gap. FlowKey: the
+	// direction that carried the data. Values: gap_start, gap_end, gap_bytes,
+	// filled_bytes, remaining_bytes, and fill_delay_ms/filled_ts_us (resolution
+	// filled) or acked_ts_us (acked_beyond). Attrs: resolution ("filled" - later
+	// segments covered the whole range; "acked_beyond" - the peer's ACK reached the
+	// gap end while the range was not fully observed, evidence of acknowledgement
+	// not of loss; "unresolved"), baseline ("syn" | "midstream"), limitation
+	// (optional: rst | restart | state_lost | expired | tracking_cap - why tracking
+	// stopped early), src_ip, dst_ip.
+	TCPSequenceGap Kind = "tcp.sequence_gap"
+
+	// TCPDuplicateACKRun: a run of duplicate ACKs - pure ACKs (no payload, no
+	// SYN/FIN/RST) repeating the previous ACK's acknowledgment number AND advertised
+	// window while the peer had data outstanding (RFC 5681 criteria; idle keep-alive
+	// ACK repeats never qualify, and nothing qualifies when the peer's sequence
+	// position is unknown). It records OBSERVED repeated ACKs only: not packet loss,
+	// not a confirmed fast retransmit, not a fault location. One event per run with
+	// at least one duplicate, emitted after all other events (existing IDs unchanged)
+	// when the run ends or at the end of the capture; capped at 10,000 per capture.
+	// FlowKey: the ACK sender's direction. Timestamp: the run's first ACK; Packets:
+	// [first ACK, last duplicate] recorder ordinals. Values: ack, window, dup_count
+	// (duplicates after the initial ACK), duration_ms, first_ts_us, last_ts_us,
+	// sack_acks (duplicates that carried SACK) and, when SACK was observed, sack0_left,
+	// sack0_right ... sack3_right (edges of the most recent such duplicate; supporting
+	// observation only). Attrs: ended_by (non_pure_ack | ack_changed | window_changed |
+	// no_outstanding_data | peer_position_unknown | capture_end | state_lost), sack ("observed" | "none"),
+	// consistent_with_fast_retransmit_trigger ("true" only when dup_count >= 3, the
+	// RFC 5681 threshold; it does not say a retransmission happened), src_ip, dst_ip.
+	TCPDuplicateACKRun Kind = "tcp.duplicate_ack_run"
 
 	// TunnelObserved: an encapsulation/VPN/SD-WAN tunnel was seen on the wire.
 	// One event per distinct tunnel, stamped with its first packet. Values:

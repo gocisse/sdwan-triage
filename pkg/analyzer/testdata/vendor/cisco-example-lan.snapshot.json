@@ -3,9 +3,12 @@
   "pcap": "cisco-example-lan",
   "event_counts": {
     "dns.anomaly": 466,
+    "tcp.duplicate_ack_run": 5,
     "tcp.handshake_failed": 101,
     "tcp.retransmission": 9,
     "tcp.rtt_spike": 6,
+    "tcp.sequence_gap": 2349,
+    "tcp.syn_retransmission": 2,
     "tunnel.observed": 4
   },
   "events_dropped": 0,
@@ -56,7 +59,7 @@
   "total_bytes": 4572167,
   "risk_score": 100,
   "risk_level": "Critical",
-  "top_issue": "DNS Anomalies",
-  "top_issue_count": 466,
+  "top_issue": "TCP Retransmissions",
+  "top_issue_count": 9,
   "recommended_actions_count": 4
 }

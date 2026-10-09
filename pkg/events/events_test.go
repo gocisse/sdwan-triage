@@ -167,3 +167,44 @@ func TestIndex_Deterministic(t *testing.T) {
 		t.Error("identical emissions produced different indexes")
 	}
 }
+
+// Phase 4.31a: rejected events are attributed to their kind, and the per-kind
+// counts always add up to Dropped().
+func TestIndex_DroppedByKindAttributesRejectedEvents(t *testing.T) {
+	ix := NewIndex(3)
+	base := time.Unix(1_700_000_000, 0)
+	kinds := []Kind{TCPRetransmission, TCPSequenceGap, TCPSequenceGap, TCPDuplicateACKRun, TCPSYNRetransmission, TCPSequenceGap, TCPRetransmission}
+	var accepted int
+	for i, k := range kinds {
+		if ix.Add(Event{ID: uint64(i + 1), Kind: k, Timestamp: base.Add(time.Duration(i) * time.Second)}) {
+			accepted++
+		}
+	}
+	if accepted != 3 || ix.Len() != 3 || ix.Dropped() != 4 {
+		t.Fatalf("accepted=%d len=%d dropped=%d, want 3/3/4", accepted, ix.Len(), ix.Dropped())
+	}
+	got := ix.DroppedByKind()
+	want := map[Kind]int{TCPDuplicateACKRun: 1, TCPSYNRetransmission: 1, TCPSequenceGap: 1, TCPRetransmission: 1}
+	if len(got) != len(want) {
+		t.Fatalf("DroppedByKind = %v, want %v", got, want)
+	}
+	sum := 0
+	for k, n := range want {
+		if got[k] != n {
+			t.Errorf("dropped[%s] = %d, want %d", k, got[k], n)
+		}
+		sum += got[k]
+	}
+	if sum != ix.Dropped() {
+		t.Errorf("per-kind sum %d != Dropped() %d", sum, ix.Dropped())
+	}
+	// The returned map is a copy.
+	got[TCPRetransmission] = 99
+	if ix.DroppedByKind()[TCPRetransmission] != 1 {
+		t.Error("DroppedByKind aliases internal state")
+	}
+	// Nothing dropped => empty map.
+	if n := len(NewIndex(10).DroppedByKind()); n != 0 {
+		t.Errorf("empty index reports %d dropped kinds", n)
+	}
+}

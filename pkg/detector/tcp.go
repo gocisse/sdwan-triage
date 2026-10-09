@@ -15,13 +15,35 @@ import (
 // events on the report's event index rather than via private callbacks.
 type TCPAnalyzer struct {
 	rttSpikeThreshMs float64 // RTT threshold to emit a tcp.rtt_spike event
+
+	// handshakeRepeats tracks repeated SYN / SYN-ACK packets (Phase 4.29c). It is
+	// independent of retransmission accounting and only emits its own event kind.
+	handshakeRepeats *handshakeRepeatTracker
+
+	// seqGaps records observed forward sequence gaps (Phase 4.30c); additive and
+	// independent of retransmission accounting.
+	seqGaps *sequenceGapTracker
+
+	// dupAcks records duplicate-ACK runs (Phase 4.30d); additive and independent.
+	dupAcks *dupAckRunTracker
 }
 
 // NewTCPAnalyzer creates a new TCP analyzer
 func NewTCPAnalyzer() *TCPAnalyzer {
 	return &TCPAnalyzer{
 		rttSpikeThreshMs: 200.0, // 200ms default threshold
+		handshakeRepeats: newHandshakeRepeatTracker(),
+		seqGaps:          newSequenceGapTracker(),
+		dupAcks:          newDupAckRunTracker(),
 	}
+}
+
+// Finalize emits the collected tcp.syn_retransmission events. The processor calls
+// it after all other event emitters so that existing events keep their IDs.
+func (t *TCPAnalyzer) Finalize(report *models.TriageReport) {
+	t.handshakeRepeats.flush(report)
+	t.seqGaps.flush(report)
+	t.dupAcks.flush(report)
 }
 
 // SetHighRTTThreshold sets the RTT spike threshold in milliseconds
@@ -70,6 +92,10 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		state.SetTCPFlow(flowKey, flowState)
 	}
 
+	// Repeated SYN / SYN-ACK evidence (separate event kind; touches only its own
+	// state, so nothing below is affected).
+	t.handshakeRepeats.observe(tcp, flowKey, reverseFlowKey, srcIP, dstIP, timestamp, report)
+
 	// Track handshakes
 	t.analyzeHandshake(tcp, srcIP, dstIP, srcPort, dstPort, flowKey, reverseFlowKey, timestamp, state, report)
 
@@ -111,6 +137,13 @@ func (t *TCPAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		}
 		flowState.ObserveSegment(tcp.Seq, consumed)
 	}
+
+	// Observed forward sequence gaps (separate event kind; own state).
+	t.seqGaps.observe(packet, tcp, flowState, state, flowKey, reverseFlowKey, srcIP, dstIP, timestamp, report)
+
+	// Duplicate-ACK runs (separate event kind; own state; runs after the gap tracker
+	// has updated the peer direction's sequence position).
+	t.dupAcks.observe(packet, tcp, flowState, state, flowKey, reverseFlowKey, srcIP, dstIP, timestamp, report)
 
 	// Track bytes
 	payloadLen := uint64(len(tcp.Payload))
@@ -215,16 +248,18 @@ func (t *TCPAnalyzer) analyzeHandshake(tcp *layers.TCP, srcIP, dstIP string, src
 
 // detectRetransmissions identifies TCP retransmissions
 func (t *TCPAnalyzer) detectRetransmissions(tcp *layers.TCP, srcIP, dstIP string, srcPort, dstPort uint16, flowKey string, timestamp time.Time, flowState *models.TCPFlowState, report *models.TriageReport) {
-	// A TCP keep-alive probe (<=1 byte at highest_next_seq-1) legitimately
-	// repeats its sequence number every interval; it is not a retransmission.
-	// Only this exact pattern is excluded — a 1-byte segment elsewhere in the
-	// stream is still eligible for retransmission detection.
-	if flowState.IsKeepAlive(tcp.Seq, len(tcp.Payload)) {
-		return
-	}
-
-	// Check if we've seen this sequence number before (retransmission)
-	if len(tcp.Payload) > 0 && flowState.Seq.Seen(tcp.Seq) {
+	// The decision is the shared rule in models.ClassifyTCPSegment (also used by
+	// pkg/detectors/packet_loss.go):
+	//   - a segment with the keep-alive shape (<=1 byte at highest_next_seq-1) is
+	//     not a retransmission. Only this exact pattern is excluded - a 1-byte
+	//     segment elsewhere in the stream is still eligible. The shape is not
+	//     verified to be a real keep-alive: a repeated payload-less SYN also
+	//     matches it, so SYN retransmissions are currently excluded here rather
+	//     than recognised (documented limitation, Phase 4.29);
+	//   - otherwise payload > 0 with an already-seen starting sequence number is
+	//     a retransmission.
+	// History updates, events and flow accounting stay in this consumer.
+	if models.ClassifyTCPSegment(flowState.Seq, flowState.HighestNextSeq, flowState.HighestNextValid, tcp.Seq, len(tcp.Payload)) == models.SegmentRetransmission {
 		flow := models.TCPFlow{
 			SrcIP:   srcIP,
 			SrcPort: srcPort,

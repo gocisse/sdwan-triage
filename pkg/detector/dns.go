@@ -33,11 +33,20 @@ type DNSAnalyzer struct {
 	// records (FIFO; retries share id+name). Bounded by the number of
 	// unanswered queries in the capture; answered entries are removed.
 	pending map[dnsPendingKey][]int
+
+	// Match metadata for the resolver summary (Phase 4.32). It only OBSERVES how the
+	// existing correlation behaved; it changes no match decision.
+	//   lead: query index -> index of the first query of its retry group (same client,
+	//   transaction ID and name sent again while no response had been observed).
+	//   ambiguous: answered query whose response was matched by name only, or came from
+	//   an address other than the one queried.
+	lead      map[int]int
+	ambiguous map[int]bool
 }
 
 // NewDNSAnalyzer creates a new DNS analyzer
 func NewDNSAnalyzer() *DNSAnalyzer {
-	return &DNSAnalyzer{pending: make(map[dnsPendingKey][]int)}
+	return &DNSAnalyzer{pending: make(map[dnsPendingKey][]int), lead: make(map[int]int), ambiguous: make(map[int]bool)}
 }
 
 // dnsResponseCodeName maps failure RCODEs to their conventional names.
@@ -115,6 +124,21 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 		}
 		report.DNSDetails = append(report.DNSDetails, record)
 		pk := dnsPendingKey{id: dns.ID, name: queryName}
+		if prior := d.pending[pk]; len(prior) > 0 {
+			// Same transaction ID and name while a query of it is still unanswered: a retry
+			// (or a capture duplicate). Record the group; the match logic is unchanged.
+			for _, idx := range prior {
+				if report.DNSDetails[idx].SourceIP == srcIP {
+					l, ok := d.lead[idx]
+					if !ok {
+						l = idx
+						d.lead[idx] = idx
+					}
+					d.lead[len(report.DNSDetails)-1] = l
+					break
+				}
+			}
+		}
 		d.pending[pk] = append(d.pending[pk], len(report.DNSDetails)-1)
 
 		// Add timeline event
@@ -149,6 +173,9 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 			for j, idx := range idxs {
 				if report.DNSDetails[idx].SourceIP == dstIP {
 					matchIdx = idx
+					if report.DNSDetails[idx].DestinationIP != srcIP {
+						d.ambiguous[idx] = true // answered from an address other than the one queried
+					}
 					d.pending[pk] = append(idxs[:j:j], idxs[j+1:]...)
 					if len(d.pending[pk]) == 0 {
 						delete(d.pending, pk)
@@ -162,6 +189,7 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 				rec := &report.DNSDetails[i]
 				if rec.QueryName == queryName && rec.ResponseTimestamp == nil && rec.SourceIP == dstIP {
 					matchIdx = i
+					d.ambiguous[i] = true // matched by name only: the transaction ID differs
 					break
 				}
 			}
@@ -294,6 +322,11 @@ func (d *DNSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 //
 // One anomaly is emitted per (client, name) pair.
 func (d *DNSAnalyzer) Finalize(endOfCapture time.Time, report *models.TriageReport) {
+	// Observational per-resolver response summary (Phase 4.32). It shares
+	// isRetryOfAnsweredTransaction with the unanswered-query anomalies below so the two
+	// cannot disagree about which sends belong to an answered transaction.
+	report.DNSResolverSummary = buildDNSResolverSummary(report.DNSDetails, d.lead, d.ambiguous, endOfCapture, dnsSummaryMaxResolvers, dnsSummaryMaxSamples)
+
 	if endOfCapture.IsZero() || len(report.DNSDetails) == 0 {
 		return
 	}
@@ -309,6 +342,13 @@ func (d *DNSAnalyzer) Finalize(endOfCapture time.Time, report *models.TriageRepo
 	for i := range report.DNSDetails {
 		rec := &report.DNSDetails[i]
 		if rec.ResponseTimestamp != nil {
+			continue
+		}
+		// A repeated send of a transaction that WAS answered (unambiguously) is not an
+		// unanswered query: the client asked again and the transaction received its
+		// response. Genuinely unanswered transactions, including other transactions for
+		// the same name, are still reported.
+		if isRetryOfAnsweredTransaction(report.DNSDetails, d.lead, d.ambiguous, i) {
 			continue
 		}
 		k := groupKey{rec.SourceIP, rec.QueryName}

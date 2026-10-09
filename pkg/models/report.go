@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -130,6 +132,32 @@ type TriageReport struct {
 	Emitter       events.Emitter `json:"-"`
 	EventCounts   map[string]int `json:"event_counts,omitempty"`
 	EventsDropped int            `json:"events_dropped,omitempty"`
+
+	// TCPEvidenceCompleteness is present ONLY when TCP evidence collection was
+	// affected by a bound or reset (Phase 4.31a). Its absence does not mean the
+	// capture is complete: it only means none of the conditions counted there
+	// occurred (see the type documentation for what is not covered).
+	TCPEvidenceCompleteness *TCPEvidenceCompleteness `json:"tcp_evidence_completeness,omitempty"`
+
+	// TCPFlowEvidence is a bounded, observational per-flow view of the TCP evidence
+	// events (Phase 4.31b); absent when no TCP evidence was detected.
+	TCPFlowEvidence *TCPFlowEvidenceSummary `json:"tcp_flow_evidence,omitempty"`
+
+	// DNSResolverSummary accounts for observed DNS responses per queried address
+	// (Phase 4.32); absent when the capture holds no DNS query. Observational only.
+	DNSResolverSummary *DNSResolverSummary `json:"dns_resolver_summary,omitempty"`
+
+	// ICMPErrorEvidence groups ICMP/ICMPv6 error messages by type, code, reporter and
+	// quoted original flow (Phase 4.33); absent when none was observed. Observational only.
+	ICMPErrorEvidence *ICMPErrorEvidence `json:"icmp_error_evidence,omitempty"`
+
+	// TLSHandshakeEvidence lists connections with TLS alerts or a ClientHello without an
+	// observed ServerHello (Phase 4.34); absent when there are none. Observational only.
+	TLSHandshakeEvidence *TLSHandshakeEvidence `json:"tls_handshake_evidence,omitempty"`
+
+	// UDPServiceResponses accounts for requests and observed replies of a few well-known
+	// UDP request/response services (Phase 4.36); absent when none was observed.
+	UDPServiceResponses *UDPServiceResponses `json:"udp_service_responses,omitempty"`
 
 	// Completeness records provable limitations of the INPUT analysis (packets
 	// not analyzed, truncated capture file). It is nil for a complete analysis,
@@ -480,6 +508,17 @@ type ARPConflict struct {
 	IP   string `json:"ip"`
 	MAC1 string `json:"mac1"`
 	MAC2 string `json:"mac2"`
+
+	// Phase 4.35 (additive). MAC1Frame / MAC2Frame are the capture frames of the first ARP
+	// reply from each MAC; OtherMACs lists further MACs that answered for the IP (bounded).
+	// Classification is ARPConflictVirtualGateway when EVERY MAC that answered is in a
+	// documented virtual redundant-gateway range, otherwise ARPConflictUnexplained (also the
+	// meaning of an empty value). Explanation states what the capture does and does not show.
+	MAC1Frame      uint64   `json:"mac1_frame,omitempty"`
+	MAC2Frame      uint64   `json:"mac2_frame,omitempty"`
+	OtherMACs      []string `json:"other_macs,omitempty"`
+	Classification string   `json:"classification,omitempty"`
+	Explanation    string   `json:"explanation,omitempty"`
 }
 
 type HTTPError struct {
@@ -1038,4 +1077,80 @@ const (
 // report must never be presented as GOOD (or any other health level).
 func (r *TriageReport) IsNoData() bool {
 	return r != nil && r.AnalysisStatus == AnalysisStatusNoData
+}
+
+// ARP conflict classifications.
+const (
+	// ARPConflictVirtualGateway: all MACs that answered for the IP are virtual redundant-
+	// gateway MACs (VRRP/CARP, HSRP, GLBP). Such protocols answer ARP with these addresses
+	// by design (GLBP load-balances with several; failover moves the IP between them).
+	ARPConflictVirtualGateway = "virtual_gateway_macs"
+	// ARPConflictUnexplained: the capture does not explain the differing MACs.
+	ARPConflictUnexplained = "unexplained"
+)
+
+// VirtualGatewayMACKind names the redundancy protocol whose documented virtual-MAC range
+// contains mac ("VRRP/CARP", "HSRP", "HSRPv2", "GLBP"), or "" when it is in none of them.
+// mac is "aa:bb:cc:dd:ee:ff" (any case). A match shows the address is in the range, not
+// that a genuine redundancy group owns it.
+func VirtualGatewayMACKind(mac string) string {
+	var b [6]byte
+	if n, err := fmt.Sscanf(strings.ToLower(mac), "%02x:%02x:%02x:%02x:%02x:%02x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]); n != 6 || err != nil {
+		return ""
+	}
+	switch {
+	case b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x5e && b[3] == 0x00 && b[4] == 0x01:
+		return "VRRP/CARP"
+	case b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x0c && b[3] == 0x07 && b[4] == 0xac:
+		return "HSRP"
+	case b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x0c && b[3] == 0x9f && b[4]&0xf0 == 0xf0:
+		return "HSRPv2"
+	case b[0] == 0x00 && b[1] == 0x07 && b[2] == 0xb4 && b[3] == 0x00:
+		return "GLBP"
+	}
+	return ""
+}
+
+// Classify sets Classification and Explanation from the MACs recorded so far.
+func (c *ARPConflict) Classify() {
+	macs := append([]string{c.MAC1, c.MAC2}, c.OtherMACs...)
+	kinds := map[string]bool{}
+	all := true
+	for _, m := range macs {
+		k := VirtualGatewayMACKind(m)
+		if k == "" {
+			all = false
+			break
+		}
+		kinds[k] = true
+	}
+	if !all {
+		c.Classification = ARPConflictUnexplained
+		c.Explanation = "Replies for this IP address came from different MAC addresses. The capture shows the replies, not why: a duplicate IP address, " +
+			"a device or network-card replacement, proxy ARP, a redundancy protocol, address translation or spoofing would all look like this."
+		return
+	}
+	var names []string
+	for _, k := range []string{"GLBP", "HSRP", "HSRPv2", "VRRP/CARP"} {
+		if kinds[k] {
+			names = append(names, k)
+		}
+	}
+	c.Classification = ARPConflictVirtualGateway
+	c.Explanation = "Every MAC address that answered for this IP is in a documented virtual redundant-gateway range (" + strings.Join(names, ", ") +
+		"). Those protocols answer ARP with such addresses by design (GLBP load-balances with several; a failover moves the IP between them), so this is " +
+		"consistent with a redundant gateway rather than a duplicate IP address. The capture cannot verify that the addresses belong to a genuine group."
+}
+
+// UnexplainedARPConflicts counts conflicts not classified as virtual-gateway MACs.
+// Reports and tests that predate the classification (empty value) count as unexplained,
+// which keeps their behaviour unchanged.
+func (r *TriageReport) UnexplainedARPConflicts() int {
+	n := 0
+	for _, c := range r.ARPConflicts {
+		if c.Classification != ARPConflictVirtualGateway {
+			n++
+		}
+	}
+	return n
 }

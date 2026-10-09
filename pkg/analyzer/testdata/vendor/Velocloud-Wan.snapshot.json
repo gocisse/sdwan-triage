@@ -5,6 +5,7 @@
     "dns.anomaly": 11,
     "tcp.handshake_failed": 3,
     "tcp.rtt_spike": 6,
+    "tcp.syn_retransmission": 6,
     "tunnel.observed": 16
   },
   "events_dropped": 0,
@@ -54,9 +55,9 @@
     "SD-WAN Control Plane/VELOCLOUD-VCMP-002": 6
   },
   "total_bytes": 1599568,
-  "risk_score": 100,
-  "risk_level": "Critical",
-  "top_issue": "DNS Anomalies",
-  "top_issue_count": 11,
-  "recommended_actions_count": 2
+  "risk_score": 26,
+  "risk_level": "High",
+  "top_issue": "HTTP Errors",
+  "top_issue_count": 8,
+  "recommended_actions_count": 1
 }

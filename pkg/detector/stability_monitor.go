@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/events"
@@ -68,6 +69,60 @@ func bfdStateName(s uint8) string {
 
 // ── Internal tracking structs ───────────────────────────────────────────────
 
+// bfdDownInfo is what the packet showing an Up → non-Up transition said about it.
+type bfdDownInfo struct {
+	diag     uint8
+	newState uint8
+	frame    uint64
+}
+
+// bfdDiagName names an RFC 5880 §4.1 diagnostic code.
+func bfdDiagName(d uint8) string {
+	switch d {
+	case 0:
+		return "No Diagnostic"
+	case 1:
+		return "Control Detection Time Expired"
+	case 2:
+		return "Echo Function Failed"
+	case 3:
+		return "Neighbor Signaled Session Down"
+	case 4:
+		return "Forwarding Plane Reset"
+	case 5:
+		return "Path Down"
+	case 6:
+		return "Concatenated Path Down"
+	case 7:
+		return "Administratively Down"
+	case 8:
+		return "Reverse Concatenated Path Down"
+	}
+	return fmt.Sprintf("Unknown diagnostic %d", d)
+}
+
+// bfdDownHint states what the sender's own diagnostic code says and what it does not. The
+// code is the sender's report about its own session; this capture does not show the cause.
+func bfdDownHint(d bfdDownInfo) string {
+	const tail = " Check 'show bfd neighbors detail' on both endpoints."
+	switch {
+	case d.newState == bfdStateAdminDown || d.diag == 7:
+		return "The sender reported Administratively Down: a deliberate local shutdown or configuration change, not a detected path failure." + tail
+	case d.diag == 1:
+		return "The sender reported that its control detection time expired, i.e. it had stopped receiving the peer's BFD control packets. " +
+			"Whether the cause is the underlay path, the peer or filtering is not established by this capture; check whether the peer's packets are present in it." + tail
+	case d.diag == 2:
+		return "The sender reported that the BFD echo function failed (echo packets it sent were not returned); the cause is not established by this capture." + tail
+	case d.diag == 3:
+		return "The sender went down after the neighbor signalled Down; look at the neighbor's own state and diagnostic code for the reason." + tail
+	case d.diag >= 4 && d.diag <= 6, d.diag == 8:
+		return "The sender reported \"" + bfdDiagName(d.diag) + "\" (a path or forwarding-plane condition it detected or was told about); this capture does not establish where." + tail
+	case d.diag == 0:
+		return "The sender went down without a diagnostic code, so the capture shows the state change but not its cause (underlay, peer or configuration)." + tail
+	}
+	return "The sender reported \"" + bfdDiagName(d.diag) + "\"; this capture shows the state change, not its cause." + tail
+}
+
 // bfdSession tracks BFD state transitions per peer pair.
 type bfdSession struct {
 	srcIP       string
@@ -75,6 +130,9 @@ type bfdSession struct {
 	lastState   uint8
 	transitions []time.Time // timestamps of Up→Down or Down→Up transitions (bounded)
 	downEvents  []time.Time // timestamps of Up→Down transitions only (bounded)
+	// downInfo is parallel to downEvents (Phase 4.38): the diagnostic code, new state and
+	// capture frame carried by the packet that showed each Up → non-Up transition.
+	downInfo    []bfdDownInfo
 	firstSeen   time.Time
 	lastSeen    time.Time
 	packetCount int
@@ -84,9 +142,16 @@ type bfdSession struct {
 type ikeSession struct {
 	initiatorIP string
 	responderIP string
-	initTimes   []time.Time // timestamps of IKE_SA_INIT packets
-	firstSeen   time.Time
-	lastSeen    time.Time
+	// initTimes holds one timestamp per DISTINCT IKE SA initiation (Phase 4.37): the first
+	// packet of each initiator SPI / IKEv1 initiator cookie. Repeats of the same initiation
+	// are retransmissions and are counted in retransmits, not in initTimes.
+	initTimes      []time.Time
+	spis           map[string]bool // initiator SPIs seen (bounded by maxTrackedTransitions)
+	retransmits    int
+	untrackedSPIs  int
+	firstInitFrame uint64
+	firstSeen      time.Time
+	lastSeen       time.Time
 }
 
 // stpTCNTracker tracks STP Topology Change Notification BPDUs.
@@ -211,8 +276,11 @@ func (sm *StabilityMonitor) analyzeBFD(packet gopacket.Packet, udp *layers.UDP, 
 			session.transitions = append(session.transitions, ts)
 		}
 		if session.lastState == bfdStateUp && currentState != bfdStateUp {
+			frame, _ := currentFrame(report, ts)
+			diag := payload[0] & 0x1f
 			if len(session.downEvents) < maxTrackedTransitions {
 				session.downEvents = append(session.downEvents, ts)
+				session.downInfo = append(session.downInfo, bfdDownInfo{diag: diag, newState: currentState, frame: frame})
 			}
 			report.Emit(events.Event{
 				Kind:      events.BFDDown,
@@ -221,7 +289,8 @@ func (sm *StabilityMonitor) analyzeBFD(packet gopacket.Packet, udp *layers.UDP, 
 					"prev_state": float64(session.lastState),
 					"new_state":  float64(currentState),
 				},
-				Attrs:  map[string]string{"src_ip": ipInfo.SrcIP, "peer_ip": ipInfo.DstIP, "new_state_name": bfdStateName(currentState)},
+				Attrs: map[string]string{"src_ip": ipInfo.SrcIP, "peer_ip": ipInfo.DstIP, "new_state_name": bfdStateName(currentState),
+					"diag": fmt.Sprintf("%d", diag), "diag_name": bfdDiagName(diag)},
 				Source: "Stability",
 			})
 		}
@@ -271,19 +340,30 @@ func (sm *StabilityMonitor) analyzeIKE(packet gopacket.Packet, udp *layers.UDP, 
 	// Byte 18: Exchange Type
 	exchangeType := ikePayload[18]
 
-	// Byte 19: Flags — bit 3 (0x08) = Initiator flag
+	// Byte 19: Flags — bit 3 (0x08) = Initiator flag, bit 5 (0x20) = Response flag (IKEv2)
 	flags := ikePayload[19]
 	isInitiator := (flags & 0x08) != 0
+	isResponse := (flags & 0x20) != 0
 
-	// We care about IKE_SA_INIT (exchange type 34) from the initiator.
-	// IKEv1 Main Mode (exchange type 2) is also relevant.
+	// A NEW IKE SA initiation (Phase 4.37) is the first message of an exchange, identified by
+	// the initiator SPI: an IKEv2 IKE_SA_INIT request (exchange 34, initiator flag, not a
+	// response, responder SPI zero) or the first IKEv1 Main Mode message (exchange 2,
+	// message ID 0, responder cookie zero). Responses and the later Main Mode messages that
+	// the same side sends are not initiations; repeats of the same initiator SPI are
+	// retransmissions.
+	responderSPIZero := true
+	for _, b := range ikePayload[8:16] {
+		if b != 0 {
+			responderSPIZero = false
+		}
+	}
 	isIKESAInit := false
-	if majorVersion == 2 && exchangeType == 34 && isInitiator {
+	if majorVersion == 2 && exchangeType == 34 && isInitiator && !isResponse && responderSPIZero {
 		isIKESAInit = true
 	} else if majorVersion == 1 && exchangeType == 2 {
-		// IKEv1 Main Mode — check that the message ID is 0 (first exchange)
+		// IKEv1 Main Mode — the initiator's first message has message ID 0 and no responder cookie yet
 		msgID := uint32(ikePayload[20])<<24 | uint32(ikePayload[21])<<16 | uint32(ikePayload[22])<<8 | uint32(ikePayload[23])
-		if msgID == 0 {
+		if msgID == 0 && responderSPIZero {
 			isIKESAInit = true
 		}
 	}
@@ -291,6 +371,7 @@ func (sm *StabilityMonitor) analyzeIKE(packet gopacket.Packet, udp *layers.UDP, 
 	if !isIKESAInit {
 		return
 	}
+	spiKey := fmt.Sprintf("v%d/%x", majorVersion, ikePayload[0:8])
 
 	ipInfo := ExtractIPInfo(packet)
 	if ipInfo == nil {
@@ -300,13 +381,16 @@ func (sm *StabilityMonitor) analyzeIKE(packet gopacket.Packet, udp *layers.UDP, 
 	sessionKey := fmt.Sprintf("%s->%s", ipInfo.SrcIP, ipInfo.DstIP)
 
 	session, exists := sm.ikeSessions[sessionKey]
+	frame, _ := currentFrame(report, ts)
 	if !exists {
 		sm.ikeSessions[sessionKey] = &ikeSession{
-			initiatorIP: ipInfo.SrcIP,
-			responderIP: ipInfo.DstIP,
-			initTimes:   []time.Time{ts},
-			firstSeen:   ts,
-			lastSeen:    ts,
+			initiatorIP:    ipInfo.SrcIP,
+			responderIP:    ipInfo.DstIP,
+			initTimes:      []time.Time{ts},
+			spis:           map[string]bool{spiKey: true},
+			firstInitFrame: frame,
+			firstSeen:      ts,
+			lastSeen:       ts,
 		}
 
 		event := models.TimelineEvent{
@@ -322,6 +406,16 @@ func (sm *StabilityMonitor) analyzeIKE(packet gopacket.Packet, udp *layers.UDP, 
 	}
 
 	session.lastSeen = ts
+	if session.spis[spiKey] {
+		// The same initiator SPI again: a retransmission of an initiation, not a new SA.
+		session.retransmits++
+		return
+	}
+	if len(session.spis) >= maxTrackedTransitions {
+		session.untrackedSPIs++
+		return
+	}
+	session.spis[spiKey] = true
 	if len(session.initTimes) < maxTrackedTransitions {
 		session.initTimes = append(session.initTimes, ts)
 	}
@@ -441,7 +535,7 @@ func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
 				Type:          "BFD Session Down",
 				Severity:      "High",
 				Identifier:    fmt.Sprintf("%s ↔ %s", session.srcIP, session.peerIP),
-				Description:   fmt.Sprintf("BFD session between %s and %s transitioned Up → Down at %s (%d down event(s), %d state transitions in capture)", session.srcIP, session.peerIP, first.Format(time.RFC3339), len(session.downEvents), len(session.transitions)),
+				Description:   fmt.Sprintf("BFD session between %s and %s transitioned Up → Down at %s (%d down event(s), %d state transitions in capture)%s", session.srcIP, session.peerIP, first.Format(time.RFC3339), len(session.downEvents), len(session.transitions), bfdDownDetail(session)),
 				StateChanges:  len(session.downEvents),
 				WindowSeconds: last.Sub(first).Seconds(),
 				FirstSeen:     first.Format(time.RFC3339),
@@ -449,7 +543,7 @@ func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
 				SourceIP:      session.srcIP,
 				PeerIP:        session.peerIP,
 				Protocol:      "BFD",
-				RootCauseHint: "Peer stopped responding within the detect interval: underlay path loss, WAN circuit failure, or peer reload. Correlate with TCP retransmissions/gaps at the same time and check 'show bfd neighbors detail' on both endpoints.",
+				RootCauseHint: bfdFirstDownHint(session),
 			}
 			report.StabilityFindings = append(report.StabilityFindings, finding)
 			continue
@@ -465,7 +559,7 @@ func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
 				Type:          "BFD Flapping",
 				Severity:      "Critical",
 				Identifier:    fmt.Sprintf("%s ↔ %s", session.srcIP, session.peerIP),
-				Description:   fmt.Sprintf("BFD session between %s and %s flapping: %d state transitions detected (%d within a %.0fs window)", session.srcIP, session.peerIP, len(session.transitions), maxInWindow, bfdWindowSeconds),
+				Description:   fmt.Sprintf("BFD session between %s and %s flapping: %d state transitions detected (%d within a %.0fs window)%s", session.srcIP, session.peerIP, len(session.transitions), maxInWindow, bfdWindowSeconds, bfdDownSummary(session)),
 				StateChanges:  len(session.transitions),
 				WindowSeconds: window,
 				FirstSeen:     session.firstSeen.Format(time.RFC3339),
@@ -473,11 +567,57 @@ func (sm *StabilityMonitor) finalizeBFD(report *models.TriageReport) {
 				SourceIP:      session.srcIP,
 				PeerIP:        session.peerIP,
 				Protocol:      "BFD",
-				RootCauseHint: "WAN link instability, ISP flapping, or misconfigured BFD timers (reduce Tx/Rx interval multiplier). Check 'show bfd neighbors detail' on both endpoints.",
+				RootCauseHint: "Possible causes include underlay instability, BFD timer settings or peer restarts; this capture shows the state changes (and the sender's diagnostic codes, if any), not which cause applies. Check 'show bfd neighbors detail' on both endpoints.",
 			}
 			report.StabilityFindings = append(report.StabilityFindings, finding)
 		}
 	}
+}
+
+// bfdFirstDownHint returns the hint for the first Up → non-Up transition of a session.
+func bfdFirstDownHint(s *bfdSession) string {
+	if len(s.downInfo) == 0 {
+		return "The capture shows the state change, not its cause. Check 'show bfd neighbors detail' on both endpoints."
+	}
+	return bfdDownHint(s.downInfo[0])
+}
+
+// bfdDownDetail describes the packet that showed the first Down transition.
+func bfdDownDetail(s *bfdSession) string {
+	if len(s.downInfo) == 0 {
+		return ""
+	}
+	d := s.downInfo[0]
+	text := fmt.Sprintf("; the first Down packet from %s carried diagnostic code %d (%s)", s.srcIP, d.diag, bfdDiagName(d.diag))
+	if d.frame != 0 {
+		text += fmt.Sprintf(" at frame %d", d.frame)
+	}
+	return text
+}
+
+// bfdDownSummary counts the diagnostic codes carried by a session's Down transitions.
+func bfdDownSummary(s *bfdSession) string {
+	if len(s.downInfo) == 0 {
+		return ""
+	}
+	counts := map[uint8]int{}
+	for _, d := range s.downInfo {
+		counts[d.diag]++
+	}
+	codes := make([]int, 0, len(counts))
+	for c := range counts {
+		codes = append(codes, int(c))
+	}
+	slices.Sort(codes)
+	parts := make([]string, 0, len(codes))
+	for _, c := range codes {
+		parts = append(parts, fmt.Sprintf("%s ×%d", bfdDiagName(uint8(c)), counts[uint8(c)]))
+	}
+	text := fmt.Sprintf("; %d Up → Down transition(s) from %s, diagnostic codes: %s", len(s.downInfo), s.srcIP, strings.Join(parts, ", "))
+	if f := s.downInfo[0].frame; f != 0 {
+		text += fmt.Sprintf("; first at frame %d", f)
+	}
+	return text
 }
 
 func (sm *StabilityMonitor) finalizeIKE(report *models.TriageReport) {
@@ -497,10 +637,11 @@ func (sm *StabilityMonitor) finalizeIKE(report *models.TriageReport) {
 			}
 
 			finding := models.StabilityFinding{
-				Type:          "IKE Tunnel Rebuild",
-				Severity:      "High",
-				Identifier:    fmt.Sprintf("%s → %s", session.initiatorIP, session.responderIP),
-				Description:   fmt.Sprintf("IPsec tunnel between %s and %s is repeatedly rebuilding: %d IKE_SA_INIT requests (%d within a %.0fs window)", session.initiatorIP, session.responderIP, len(session.initTimes), maxInWindow, ikeWindowSeconds),
+				Type:       "IKE Tunnel Rebuild",
+				Severity:   "High",
+				Identifier: fmt.Sprintf("%s → %s", session.initiatorIP, session.responderIP),
+				Description: fmt.Sprintf("IPsec peers %s and %s show repeated IKE initiations: %d distinct IKE SAs initiated by %s (%d within a %.0fs window)%s; first initiation%s. Retransmissions of an initiation are not counted.",
+					session.initiatorIP, session.responderIP, len(session.initTimes), session.initiatorIP, maxInWindow, ikeWindowSeconds, ikeRetransText(session), ikeFrameText(session)),
 				StateChanges:  len(session.initTimes),
 				WindowSeconds: window,
 				FirstSeen:     session.firstSeen.Format(time.RFC3339),
@@ -508,11 +649,29 @@ func (sm *StabilityMonitor) finalizeIKE(report *models.TriageReport) {
 				SourceIP:      session.initiatorIP,
 				PeerIP:        session.responderIP,
 				Protocol:      "IKE",
-				RootCauseHint: "Underlying WAN link flapping causes IPsec tunnel teardown/rebuild. Check ISP link stability, DPD timers, and IKE lifetime settings. Run 'show crypto ikev2 sa detail'.",
+				RootCauseHint: "Repeated new IKE SAs can follow tunnel teardown or rekeying (for example underlay instability, DPD or lifetime settings, or peer restarts); this capture shows the initiations, not which cause applies. Check 'show crypto ikev2 sa detail' on both endpoints.",
 			}
 			report.StabilityFindings = append(report.StabilityFindings, finding)
 		}
 	}
+}
+
+func ikeRetransText(s *ikeSession) string {
+	if s.retransmits == 0 && s.untrackedSPIs == 0 {
+		return ""
+	}
+	t := fmt.Sprintf("; %d retransmission(s) of an initiation seen", s.retransmits)
+	if s.untrackedSPIs > 0 {
+		t += fmt.Sprintf(", %d further initiation(s) not tracked (bound reached)", s.untrackedSPIs)
+	}
+	return t
+}
+
+func ikeFrameText(s *ikeSession) string {
+	if s.firstInitFrame == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" at frame %d", s.firstInitFrame)
 }
 
 func (sm *StabilityMonitor) finalizeSTPTCN(report *models.TriageReport) {

@@ -28,6 +28,9 @@ type Index struct {
 	sorted   bool
 	byKind   map[Kind][]int // positions into events, valid when sorted
 	dropped  int
+	// droppedByKind attributes every rejected event to its kind (Phase 4.31a): an
+	// event that was generated but could not be stored because the index was full.
+	droppedByKind map[Kind]int
 }
 
 // NewIndex creates an index holding at most capacity events (0 → DefaultMaxEvents).
@@ -42,6 +45,10 @@ func NewIndex(capacity int) *Index {
 func (ix *Index) Add(e Event) bool {
 	if len(ix.events) >= ix.capacity {
 		ix.dropped++
+		if ix.droppedByKind == nil {
+			ix.droppedByKind = make(map[Kind]int)
+		}
+		ix.droppedByKind[e.Kind]++
 		return false
 	}
 	if ix.sorted && len(ix.events) > 0 {
@@ -65,6 +72,16 @@ func (ix *Index) Cap() int { return ix.capacity }
 
 // Dropped returns how many events were rejected because the index was full.
 func (ix *Index) Dropped() int { return ix.dropped }
+
+// DroppedByKind returns, per kind, how many events were rejected because the index
+// was full (a copy; empty when nothing was dropped). Their sum equals Dropped().
+func (ix *Index) DroppedByKind() map[Kind]int {
+	out := make(map[Kind]int, len(ix.droppedByKind))
+	for k, n := range ix.droppedByKind {
+		out[k] = n
+	}
+	return out
+}
 
 // Events returns all events in chronological order. The slice is shared with
 // the index and must not be modified.

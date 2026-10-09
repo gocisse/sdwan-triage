@@ -94,6 +94,9 @@ func writeFindingsSummary(w io.Writer, r *models.TriageReport) {
 			fmt.Fprintf(w, "    %s\n", note)
 		}
 	}
+	if note := tcpEvidenceCompletenessNote(r); note != "" {
+		fmt.Fprintf(w, "  • %s\n", note)
+	}
 	writeHandshakeSummary(w, r)
 	fmt.Fprintf(w, "  • ARP Conflicts:        %d\n", len(r.ARPConflicts))
 	fmt.Fprintf(w, "  • HTTP Errors:          %d\n", len(r.HTTPErrors))
@@ -216,6 +219,15 @@ func PrintDetailedReport(r *models.TriageReport) {
 		color.Red("━━━ ARP CONFLICTS ━━━")
 		for _, conflict := range r.ARPConflicts {
 			fmt.Printf("  • IP %s claimed by: %s and %s\n", conflict.IP, conflict.MAC1, conflict.MAC2)
+			if len(conflict.OtherMACs) > 0 {
+				fmt.Printf("    also answered by: %s\n", strings.Join(conflict.OtherMACs, ", "))
+			}
+			if conflict.MAC1Frame > 0 || conflict.MAC2Frame > 0 {
+				fmt.Printf("    first replies: frame %d (%s), frame %d (%s)\n", conflict.MAC1Frame, conflict.MAC1, conflict.MAC2Frame, conflict.MAC2)
+			}
+			if conflict.Explanation != "" {
+				fmt.Printf("    %s\n", conflict.Explanation)
+			}
 		}
 		fmt.Println()
 	}

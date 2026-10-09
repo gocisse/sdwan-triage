@@ -299,15 +299,9 @@ func (ba *BandwidthAnalyzer) GetPlainEnglishSummary(report *models.TriageReport,
 		summary.HealthColor = "health-critical"
 	}
 
-	// DNS findings
-	if len(report.DNSAnomalies) > 0 {
-		topDomain := ""
-		if len(report.DNSAnomalies) > 0 {
-			topDomain = report.DNSAnomalies[0].Query
-		}
-		summary.KeyFindings = append(summary.KeyFindings,
-			fmt.Sprintf("⚠️ %d DNS timeouts/anomalies detected. Top affected domain: %s",
-				len(report.DNSAnomalies), topDomain))
+	// DNS findings (Phase 4.40: consistent with the risk score; no attack wording)
+	if line := dnsSummaryLine(report); line != "" {
+		summary.KeyFindings = append(summary.KeyFindings, line)
 	}
 
 	// TLS findings

@@ -1,6 +1,7 @@
 package detector
 
 import (
+	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -45,12 +46,14 @@ var icmpv6TypeNames = map[uint8]string{
 // ICMPAnalyzer handles ICMP packet analysis
 type ICMPAnalyzer struct {
 	pingFloodThreshold int
+	errors             *icmpErrorTracker // Phase 4.33 error evidence (see icmp_errors.go)
 }
 
 // NewICMPAnalyzer creates a new ICMP analyzer
 func NewICMPAnalyzer() *ICMPAnalyzer {
 	return &ICMPAnalyzer{
 		pingFloodThreshold: 50,
+		errors:             newICMPErrorTracker(),
 	}
 }
 
@@ -87,6 +90,15 @@ func (i *ICMPAnalyzer) analyzeICMPv4(packet gopacket.Packet, icmp *layers.ICMPv4
 
 	// Track ICMP statistics
 	i.trackICMPStats(srcIP, icmpType, timestamp, state)
+
+	// Error evidence (Phase 4.33): exact type/code, quoted flow, frame, next-hop MTU.
+	if icmpType == 3 || icmpType == 11 || icmpType == 12 {
+		var mtu uint32
+		if icmpType == 3 && icmpCode == 4 && len(icmp.Contents) >= 8 {
+			mtu = uint32(binary.BigEndian.Uint16(icmp.Contents[6:8]))
+		}
+		i.observeErrorMessage(false, icmpType, icmpCode, srcIP, dstIP, icmp.Payload, mtu, timestamp, report)
+	}
 
 	// Check for anomalies
 	isAnomaly := false
@@ -136,6 +148,20 @@ func (i *ICMPAnalyzer) analyzeICMPv6(packet gopacket.Packet, icmp *layers.ICMPv6
 
 	// Track ICMP statistics
 	i.trackICMPStats(srcIP, icmpType, timestamp, state)
+
+	// Error evidence (Phase 4.33). The 4 bytes after the checksum are unused, the MTU
+	// (Packet Too Big) or the pointer (Parameter Problem); the quoted packet follows them.
+	if icmpType >= 1 && icmpType <= 4 {
+		var mtu uint32
+		var quote []byte
+		if len(icmp.Payload) >= 4 {
+			if icmpType == 2 {
+				mtu = binary.BigEndian.Uint32(icmp.Payload[0:4])
+			}
+			quote = icmp.Payload[4:]
+		}
+		i.observeErrorMessage(true, icmpType, icmpCode, srcIP, dstIP, quote, mtu, timestamp, report)
+	}
 
 	// Check for anomalies
 	isAnomaly := false

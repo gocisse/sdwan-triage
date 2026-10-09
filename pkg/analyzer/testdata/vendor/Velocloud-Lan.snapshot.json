@@ -4,7 +4,8 @@
   "event_counts": {
     "dns.anomaly": 1265,
     "tcp.handshake_failed": 14,
-    "tcp.rtt_spike": 4
+    "tcp.rtt_spike": 4,
+    "tcp.syn_retransmission": 89
   },
   "events_dropped": 0,
   "root_cause_chains": [],
@@ -52,6 +53,6 @@
   "risk_score": 100,
   "risk_level": "Critical",
   "top_issue": "DNS Anomalies",
-  "top_issue_count": 1265,
+  "top_issue_count": 22,
   "recommended_actions_count": 4
 }

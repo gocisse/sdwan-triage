@@ -52,7 +52,8 @@ const HealthPerformanceWarnThreshold = 5
 //   - Zero Window findings → at least warning. Small Window is informational.
 //   - Findings with High/Critical severity and a basis other than time_proximity
 //     → at least warning.
-//   - ARP conflicts → critical.
+//   - ARP conflicts → critical, except conflicts whose every MAC is a documented virtual
+//     redundant-gateway MAC (VRRP/CARP, HSRP, GLBP; Phase 4.35), which are listed but not critical.
 //   - DNS: never critical. Only observed DNS server failures (kind server_failure)
 //     count, as distinct (server, name) incidents, in the performance bucket.
 //     NXDOMAIN, non-standard server, private answer, suspicious domain and
@@ -106,7 +107,7 @@ func ComputeNetworkHealth(r *TriageReport) string {
 		}
 	}
 
-	if len(r.ARPConflicts) > 0 {
+	if r.UnexplainedARPConflicts() > 0 {
 		raise(NetworkHealthCritical)
 	}
 	return level

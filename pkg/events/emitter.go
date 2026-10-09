@@ -58,5 +58,13 @@ func (r *Recorder) Emit(e Event) {
 // Index returns the underlying index.
 func (r *Recorder) Index() *Index { return r.index }
 
+// CurrentPacket returns the ordinal and capture timestamp of the packet being
+// analysed, and whether one has been set. Detectors that must emit LATER (at
+// finalize time, so as not to interleave with other events' dense IDs) use it to
+// capture a PacketRef when they observe the packet.
+func (r *Recorder) CurrentPacket() (index uint64, ts time.Time, ok bool) {
+	return r.curIndex, r.curTime, r.haveCur
+}
+
 // Rejected returns how many events were discarded for lacking a capture timestamp.
 func (r *Recorder) Rejected() int { return r.rejected }

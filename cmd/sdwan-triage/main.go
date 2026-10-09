@@ -497,6 +497,11 @@ For more information and documentation:
 		output.PrintExecutiveSummary(report)
 		if !report.IsNoData() { // nothing was analyzed: no tables of zeros
 			output.PrintKeyFindings(report)
+			output.PrintTCPFlowEvidence(report)
+			output.PrintDNSResolverSummary(report)
+			output.PrintICMPErrorEvidence(report)
+			output.PrintTLSHandshakeEvidence(report)
+			output.PrintUDPServiceResponses(report)
 			output.PrintDetailedReport(report)
 
 			// Print TCP handshake analysis if requested or if there are failures

@@ -18,6 +18,8 @@ type TLSAnalyzer struct {
 	ja3PerFlow map[string]string
 	// ja3sPerFlow stores JA3S hash keyed by "srcIP:srcPort" (server-side flow key)
 	ja3sPerFlow map[string]string
+	// evidence tracks handshake/alert observations per connection (Phase 4.34).
+	evidence *tlsEvidenceTracker
 }
 
 // NewTLSAnalyzer creates a new TLS analyzer
@@ -25,6 +27,7 @@ func NewTLSAnalyzer() *TLSAnalyzer {
 	return &TLSAnalyzer{
 		ja3PerFlow:  make(map[string]string),
 		ja3sPerFlow: make(map[string]string),
+		evidence:    newTLSEvidenceTracker(),
 	}
 }
 
@@ -54,6 +57,10 @@ func (t *TLSAnalyzer) Analyze(packet gopacket.Packet, state *models.AnalysisStat
 	timestamp := float64(packet.Metadata().Timestamp.UnixNano()) / 1e9
 
 	payload := tcp.Payload
+
+	// Handshake/alert evidence (Phase 4.34): reads alert records and hello frames that the
+	// handshake-only logic below never sees. It changes nothing used by the code below.
+	t.evidence.observe(payload, srcIP, srcPort, dstIP, dstPort, packet.Metadata().Timestamp, report)
 
 	// Check for TLS handshake
 	if payload[0] != 0x16 { // TLS Handshake
