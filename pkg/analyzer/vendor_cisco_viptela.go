@@ -98,17 +98,19 @@ func (vid *ViptelaIssueDetector) detectOMPIssues(stream *models.StreamData) []De
 		return issues
 	}
 
-	// OMP route flap detection - rapid connection changes
+	// Heuristic observation only: a short, high-rate stream on the Viptela
+	// control/data port. Packet payloads are encrypted, so OMP session state,
+	// route changes and flapping are NOT observed.
 	if stream.Duration < 5 && stream.PacketCount > 20 {
 		issue := DetectedIssue{
 			ID:              "VIPTELA-OMP-001",
-			Title:           "OMP Route Flap Detected",
-			TechnicalDesc:   "Rapid OMP session state changes indicating route instability",
-			BusinessImpact:  "Traffic blackholing, suboptimal routing, application performance degradation",
-			Severity:        SeverityCritical,
+			Title:           "Short High-Rate Stream on Viptela Control/Data Port (heuristic observation)",
+			TechnicalDesc:   fmt.Sprintf("Observed %d packets in %.1fs on a stream using the Viptela control/data port (%d). This is a traffic-pattern observation only: the payload is encrypted, so OMP session state, route changes or instability were not observed and are not confirmed. A short stream can also simply be the start or end of the capture or normal tunnel traffic.", stream.PacketCount, stream.Duration, ViptelaOMPPort),
+			BusinessImpact:  "None established from this observation. Correlate with controller (vManage) OMP/BFD status before drawing conclusions.",
+			Severity:        SeverityInfo,
 			Confidence:      0.85,
 			Category:        CategorySDWANControl,
-			RootCause:       "WAN link instability, BFD timeouts, or vSmart connectivity issues",
+			RootCause:       "Not determined from packet evidence",
 			AffectedService: "Cisco Viptela OMP",
 
 			BaseFilter:      buildStreamFilter(stream),
@@ -118,15 +120,15 @@ func (vid *ViptelaIssueDetector) detectOMPIssues(stream *models.StreamData) []De
 			InvestigationSteps: []InvestigationStep{
 				{
 					Order:          1,
-					Purpose:        "Analyze OMP session state changes",
+					Purpose:        "Inspect timing and size of this stream",
 					DisplayFilter:  buildStreamFilter(stream),
-					ExpectedNormal: "Stable OMP session with periodic keepalives",
-					AbnormalSign:   "Rapid session teardown/establishment cycles",
+					ExpectedNormal: "Steady packet cadence for the tunnel",
+					AbnormalSign:   "Stream repeatedly starting and stopping across the capture",
 					CustomColumns:  []string{"frame.time_delta", "data.len"},
 				},
 				{
 					Order:          2,
-					Purpose:        "Check for BFD failures triggering OMP flaps",
+					Purpose:        "Check BFD packet cadence on the same path",
 					DisplayFilter:  "udp.port == 3784",
 					ExpectedNormal: "Regular BFD echo packets",
 					AbnormalSign:   "Missing BFD responses or timeouts",
@@ -142,7 +144,7 @@ func (vid *ViptelaIssueDetector) detectOMPIssues(stream *models.StreamData) []De
 
 			ImmediateActions: []RemediationAction{
 				{
-					Description:    "Check OMP peer status on vEdge",
+					Description:    "Confirm OMP peer status on vEdge (to confirm or rule out instability)",
 					Commands:       []string{"show omp peers", "show omp routes", "show omp tlocs"},
 					Verification:   "OMP peers in 'up' state with stable routes",
 					EstimatedTime:  "2 minutes",
@@ -161,16 +163,16 @@ func (vid *ViptelaIssueDetector) detectOMPIssues(stream *models.StreamData) []De
 
 			ShortTermFixes: []RemediationAction{
 				{
-					Description:    "Adjust BFD timers to reduce sensitivity",
+					Description:    "If OMP/BFD flapping is confirmed on the controller, consider adjusting BFD timers",
 					Commands:       []string{"bfd color <color> hello-interval 1000 multiplier 6", "commit"},
-					Verification:   "Reduced OMP flap frequency",
+					Verification:   "Only if controller logs confirm BFD/OMP flapping",
 					EstimatedTime:  "10 minutes",
 					RequiresChange: true,
 					SuccessRate:    0.75,
 					RollbackSteps:  []string{"bfd color <color> hello-interval 300 multiplier 3", "commit"},
 				},
 				{
-					Description:    "Clear OMP sessions to force re-establishment",
+					Description:    "If OMP peers are confirmed unhealthy, clear the OMP session to force re-establishment",
 					Commands:       []string{"clear omp peer <peer-ip>"},
 					Verification:   "OMP session re-established and stable",
 					EstimatedTime:  "5 minutes",
@@ -186,7 +188,7 @@ func (vid *ViptelaIssueDetector) detectOMPIssues(stream *models.StreamData) []De
 					EstimatedTime:   "1 week",
 					RequiresChange:  true,
 					SuccessRate:     0.95,
-					EscalationPoint: "Engage Cisco TAC for persistent OMP instability",
+					EscalationPoint: "Engage Cisco TAC if controller-side OMP instability is confirmed",
 				},
 			},
 
@@ -578,17 +580,19 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 		})
 	}
 
-	// --- Detection 2: AAR latency SLA violation ---
+	// --- Detection 2: large mean inter-packet interval (heuristic) ---
+	// avgGapMs is the mean time between consecutive packets of this stream; it
+	// reflects send cadence/idle time, NOT measured path latency.
 	if avgGapMs > ViptelaAARLatencyThreshMs && stream.Duration > 5.0 {
 		issues = append(issues, DetectedIssue{
 			ID:              "VIPTELA-AAR-002",
-			Title:           "AAR Latency SLA Violation — Traffic on High-Latency Path",
-			TechnicalDesc:   fmt.Sprintf("Average inter-packet gap %.1fms exceeds AAR latency threshold (%.0fms) for flow %s:%d→%s:%d — traffic not moved to lower-latency path", avgGapMs, ViptelaAARLatencyThreshMs, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort),
-			BusinessImpact:  "Latency-sensitive applications (voice, video, interactive) experiencing degraded performance; AAR not enforcing latency SLA",
-			Severity:        SeverityHigh,
+			Title:           "Large Average Inter-Packet Interval on Viptela Flow (heuristic observation)",
+			TechnicalDesc:   fmt.Sprintf("Average interval between packets %.1fms (reference %.0fms) for flow %s:%d→%s:%d. This is the spacing of the packets in this flow, not a measured network latency or AAR SLA result; periodic keepalive/probe traffic or an idle flow produces the same value.", avgGapMs, ViptelaAARLatencyThreshMs, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort),
+			BusinessImpact:  "None established from this observation. Path latency and AAR SLA compliance were not measured.",
+			Severity:        SeverityInfo,
 			Confidence:      0.75,
 			Category:        CategorySDWANData,
-			RootCause:       "No lower-latency path available, AAR latency SLA class not configured for this application, or BFD probe interval too long to detect latency change",
+			RootCause:       "Not determined from packet evidence",
 			AffectedService: "Cisco Viptela Application-Aware Routing",
 			BaseFilter:      buildStreamFilter(stream),
 			ExpandedFilter:  buildExpandedFilter(stream),
@@ -596,7 +600,7 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 			InvestigationSteps: []InvestigationStep{
 				{
 					Order:          1,
-					Purpose:        "Compare latency across available transport colors",
+					Purpose:        "Compare BFD-reported latency across available transport colors (to confirm or rule out a latency problem)",
 					DisplayFilter:  "udp.port == 3784",
 					ExpectedNormal: "BFD probes showing < 150ms RTT on at least one path",
 					AbnormalSign:   "All paths showing > 150ms RTT",
@@ -612,7 +616,7 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 			},
 			ImmediateActions: []RemediationAction{
 				{
-					Description:    "Check per-path latency metrics",
+					Description:    "Check per-path latency metrics to determine whether latency is actually a problem",
 					Commands:       []string{"show sdwan app-route stats", "show sdwan bfd sessions | include latency"},
 					Verification:   "Identify lowest-latency available path",
 					EstimatedTime:  "3 minutes",
@@ -622,7 +626,7 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 			},
 			ShortTermFixes: []RemediationAction{
 				{
-					Description:    "Update AAR SLA class to include latency threshold and assign to application",
+					Description:    "Only if per-path metrics show an SLA problem: update AAR SLA class to include latency threshold and assign to application",
 					Commands:       []string{"vManage: Configuration > Policies > Application-Aware Routing > SLA Class > Add latency threshold", "Assign SLA class to affected application in data policy"},
 					Verification:   "Traffic moves to lower-latency path",
 					EstimatedTime:  "20 minutes",

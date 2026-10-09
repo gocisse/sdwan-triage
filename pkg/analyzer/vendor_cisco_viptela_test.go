@@ -112,13 +112,15 @@ func TestDetectAARIssues_LatencyViolation(t *testing.T) {
 	for _, iss := range issues {
 		if iss.ID == "VIPTELA-AAR-002" {
 			found = true
-			if iss.Severity != SeverityHigh {
-				t.Errorf("expected High severity for latency violation, got %s", iss.Severity)
+			// Phase 4.27a: inter-packet interval is a heuristic observation,
+			// not a measured latency, so it is reported at Info severity.
+			if iss.Severity != SeverityInfo {
+				t.Errorf("expected Info severity for inter-packet interval observation, got %s", iss.Severity)
 			}
 		}
 	}
 	if !found {
-		t.Error("expected VIPTELA-AAR-002 latency SLA violation issue")
+		t.Error("expected VIPTELA-AAR-002 inter-packet interval issue")
 	}
 }
 

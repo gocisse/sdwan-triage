@@ -191,17 +191,19 @@ func (vcd *VeloCloudIssueDetector) detectVCMPIssues(stream *models.StreamData) [
 		issues = append(issues, issue)
 	}
 
-	// VCMP high latency
+	// Heuristic observation only: a long-lived stream on the VCMP port. The
+	// scorer's Degraded status here comes from stream duration exceeding the
+	// control-plane baseline; no VCMP response time is measured.
 	if stream.Duration > 5 && healthScore.Status == HealthStatusDegraded {
 		issue := DetectedIssue{
 			ID:              "VELOCLOUD-VCMP-002",
-			Title:           "VCMP High Latency",
-			TechnicalDesc:   "VCMP responses taking excessive time, indicating network or orchestrator issues",
-			BusinessImpact:  "Delayed configuration updates, stale monitoring data, slow policy enforcement",
-			Severity:        SeverityHigh,
+			Title:           "Long-Lived Stream on VeloCloud VCMP Port (heuristic observation)",
+			TechnicalDesc:   fmt.Sprintf("Stream on the VeloCloud VCMP port (%d) lasted %.1fs. Long-lived tunnel or management streams are normal; no VCMP request/response timing was measured, so latency or slow responses are not observed and not confirmed.", VeloCloudVCMPPort, stream.Duration),
+			BusinessImpact:  "None established from this observation.",
+			Severity:        SeverityInfo,
 			Confidence:      0.80,
 			Category:        CategorySDWANControl,
-			RootCause:       "Network congestion, orchestrator overload, or suboptimal routing",
+			RootCause:       "Not determined from packet evidence",
 			AffectedService: "VMware VeloCloud VCMP",
 
 			BaseFilter:      buildStreamFilter(stream),
@@ -210,7 +212,7 @@ func (vcd *VeloCloudIssueDetector) detectVCMPIssues(stream *models.StreamData) [
 
 			ImmediateActions: []RemediationAction{
 				{
-					Description:    "Check network path to orchestrator",
+					Description:    "If latency is suspected, check network path to orchestrator",
 					Commands:       []string{"traceroute to VCO IP", "Check Edge latency metrics in VCO"},
 					Verification:   "Latency within acceptable range (<100ms)",
 					EstimatedTime:  "3 minutes",
@@ -221,9 +223,9 @@ func (vcd *VeloCloudIssueDetector) detectVCMPIssues(stream *models.StreamData) [
 
 			ShortTermFixes: []RemediationAction{
 				{
-					Description:    "Optimize routing to VCO",
+					Description:    "Only if latency to the VCO is confirmed: optimize routing to VCO",
 					Commands:       []string{"Review business policy for management traffic", "Consider direct internet breakout for VCO"},
-					Verification:   "VCMP latency reduced",
+					Verification:   "Measured latency to VCO reduced",
 					EstimatedTime:  "30 minutes",
 					RequiresChange: true,
 					SuccessRate:    0.75,
