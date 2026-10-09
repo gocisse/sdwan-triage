@@ -627,7 +627,7 @@ export interface VoIPAnalysis {
   established_calls: number;
   failed_calls: number;
   total_rtp_streams: number;
-  avg_jitter_ms: number;
+  avg_jitter_ms: number | null; // null = unavailable (no stream with a known RTP clock rate)
   packet_loss_rate: number;
 }
 
@@ -650,7 +650,7 @@ export interface RTPStreamInfo {
   packet_count: number;
   byte_count: number;
   lost_packets: number;
-  jitter_ms: number;
+  jitter_ms: number | null; // null = unavailable (unknown RTP clock rate)
 }
 
 // ICMP finding

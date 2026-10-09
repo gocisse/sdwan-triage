@@ -108,6 +108,39 @@ var rtpPayloadTypes = map[uint8]string{
 	127: "Dynamic (127)",
 }
 
+// rtpClockRates maps static RTP payload types to their RTP timestamp clock
+// rate in Hz (RFC 3551 Tables 4 and 5). The RTP clock rate, not the codec's
+// sampling rate, governs timestamp arithmetic (G.722 is 8000 despite 16 kHz
+// sampling). Payload types absent from this map - dynamic 96-127 and
+// reserved/unassigned static types - have no known clock rate and therefore no
+// jitter value: the rate is never guessed from ports, sizes or payload shape.
+var rtpClockRates = map[uint8]uint32{
+	0:  8000,  // PCMU
+	3:  8000,  // GSM
+	4:  8000,  // G723
+	5:  8000,  // DVI4
+	6:  16000, // DVI4
+	7:  8000,  // LPC
+	8:  8000,  // PCMA
+	9:  8000,  // G722
+	10: 44100, // L16 stereo
+	11: 44100, // L16 mono
+	12: 8000,  // QCELP
+	13: 8000,  // CN
+	14: 90000, // MPA
+	15: 8000,  // G728
+	16: 11025, // DVI4
+	17: 22050, // DVI4
+	18: 8000,  // G729
+	25: 90000, // CelB
+	26: 90000, // JPEG
+	28: 90000, // nv
+	31: 90000, // H261
+	32: 90000, // MPV
+	33: 90000, // MP2T
+	34: 90000, // H263
+}
+
 // RTPAnalyzer handles RTP/RTCP traffic analysis
 type RTPAnalyzer struct {
 	streams map[string]*RTPStream
@@ -115,23 +148,42 @@ type RTPAnalyzer struct {
 
 // RTPStream represents an RTP media stream
 type RTPStream struct {
-	SSRC          uint32
-	SrcIP         string
-	DstIP         string
-	SrcPort       uint16
-	DstPort       uint16
-	PayloadType   uint8
-	PayloadName   string
-	FirstSeen     time.Time
-	LastSeen      time.Time
-	PacketCount   uint64
-	ByteCount     uint64
-	LastSeq       uint16
-	LostPackets   uint64
-	OutOfOrder    uint64
-	Jitter        float64
+	SSRC        uint32
+	SrcIP       string
+	DstIP       string
+	SrcPort     uint16
+	DstPort     uint16
+	PayloadType uint8
+	PayloadName string
+	FirstSeen   time.Time
+	LastSeen    time.Time
+	PacketCount uint64
+	ByteCount   uint64
+	LastSeq     uint16
+	LostPackets uint64
+	OutOfOrder  uint64
+	// Jitter is the RFC 3550 interarrival jitter estimate in RTP timestamp
+	// ticks of this stream's clock (ClockRate), NOT milliseconds. Use JitterMs.
+	Jitter float64
+	// ClockRate is the RTP clock rate in Hz fixed from the stream's first
+	// packet's payload type; 0 means unknown (jitter unavailable).
+	ClockRate uint32
+	// JitterSamples counts the packets that contributed to Jitter.
+	JitterSamples uint64
+	// LastTimestamp/LastArrival track the previous packet that carries the
+	// stream's initial payload type; they are used only for jitter.
 	LastTimestamp uint32
 	LastArrival   time.Time
+}
+
+// JitterMs returns the jitter in milliseconds. ok is false when the clock rate
+// is unknown or no packet has contributed a jitter sample, in which case the
+// value is unavailable (as opposed to a measured zero).
+func (s *RTPStream) JitterMs() (ms float64, ok bool) {
+	if s.ClockRate == 0 || s.JitterSamples == 0 {
+		return 0, false
+	}
+	return s.Jitter / float64(s.ClockRate) * 1000, true
 }
 
 // NewRTPAnalyzer creates a new RTP analyzer
@@ -277,6 +329,7 @@ func (r *RTPAnalyzer) parseRTPPacket(payload []byte, srcIP, dstIP string, srcPor
 			DstPort:       dstPort,
 			PayloadType:   payloadType,
 			PayloadName:   payloadName,
+			ClockRate:     rtpClockRates[payloadType],
 			FirstSeen:     timestamp,
 			LastSeen:      timestamp,
 			PacketCount:   0,
@@ -305,21 +358,35 @@ func (r *RTPAnalyzer) parseRTPPacket(payload []byte, srcIP, dstIP string, srcPor
 			}
 		}
 
-		// Calculate jitter (simplified RFC 3550 algorithm)
-		if stream.PacketCount > 1 {
-			arrivalDiff := timestamp.Sub(stream.LastArrival).Seconds() * 8000 // Assuming 8kHz sample rate
-			timestampDiff := float64(rtpTimestamp - stream.LastTimestamp)
-			d := arrivalDiff - timestampDiff
-			if d < 0 {
-				d = -d
+		// Jitter (RFC 3550 A.8) only for packets carrying the stream's initial
+		// payload type, whose clock rate is the one fixed at stream creation.
+		// A packet with another payload type still counts toward packet, byte
+		// and loss statistics but must not be measured with a clock rate that
+		// is not known to apply to it, nor move the jitter reference point.
+		if payloadType == stream.PayloadType {
+			if stream.ClockRate != 0 && stream.PacketCount > 1 {
+				// Arrival delta from capture timestamps, in ticks of the
+				// stream's own clock (integer nanoseconds first, so regular
+				// intervals such as 20 ms at 8 kHz yield exactly 160 ticks).
+				arrivalDiff := float64(timestamp.Sub(stream.LastArrival).Nanoseconds()) * float64(stream.ClockRate) / 1e9
+				// Modular signed RTP timestamp delta: correct across a genuine
+				// 32-bit rollover and negative for an earlier timestamp, with
+				// no unsigned-wrap artifact. Assumes consecutive samples are
+				// within +/-2^31 ticks; resets are not detected here.
+				timestampDiff := float64(int32(rtpTimestamp - stream.LastTimestamp))
+				d := arrivalDiff - timestampDiff
+				if d < 0 {
+					d = -d
+				}
+				stream.Jitter = stream.Jitter + (d-stream.Jitter)/16
+				stream.JitterSamples++
 			}
-			stream.Jitter = stream.Jitter + (d-stream.Jitter)/16
+			stream.LastTimestamp = rtpTimestamp
+			stream.LastArrival = timestamp
 		}
 	}
 
 	stream.LastSeq = seqNum
-	stream.LastTimestamp = rtpTimestamp
-	stream.LastArrival = timestamp
 }
 
 func (r *RTPAnalyzer) getStreamKey(srcIP, dstIP string, srcPort, dstPort uint16, ssrc uint32) string {
@@ -340,9 +407,11 @@ func (r *RTPAnalyzer) GetStreams() map[string]*RTPStream {
 }
 
 // GetStreamStats returns aggregate RTP statistics (only for streams
-// that meet the minimum packet threshold).
+// that meet the minimum packet threshold). avgJitter is in milliseconds, averaged
+// over streams whose jitter is available (0 when none).
 func (r *RTPAnalyzer) GetStreamStats() (totalStreams int, totalPackets, totalBytes, totalLost uint64, avgJitter float64) {
 	var jitterSum float64
+	var jitterStreams int
 	for _, stream := range r.streams {
 		if stream.PacketCount < minRTPStreamPackets {
 			continue
@@ -351,10 +420,13 @@ func (r *RTPAnalyzer) GetStreamStats() (totalStreams int, totalPackets, totalByt
 		totalPackets += stream.PacketCount
 		totalBytes += stream.ByteCount
 		totalLost += stream.LostPackets
-		jitterSum += stream.Jitter
+		if ms, ok := stream.JitterMs(); ok {
+			jitterSum += ms
+			jitterStreams++
+		}
 	}
-	if totalStreams > 0 {
-		avgJitter = jitterSum / float64(totalStreams)
+	if jitterStreams > 0 {
+		avgJitter = jitterSum / float64(jitterStreams)
 	}
 	return
 }

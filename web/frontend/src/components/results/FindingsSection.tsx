@@ -1733,7 +1733,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
     // VoIP Analysis
     const voip = results.voip_analysis;
     if (voip && (voip.total_rtp_streams > 0 || voip.total_calls > 0)) {
-      const hasJitter = voip.avg_jitter_ms > 30;
+      const hasJitter = voip.avg_jitter_ms != null && voip.avg_jitter_ms > 30;
       const hasLoss = voip.packet_loss_rate > 1;
       const voipSeverity = hasJitter || hasLoss ? 'Warning' : 'Info';
 
@@ -1745,7 +1745,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
           detectedVendors={detectedVendors}
           severity={voipSeverity}
           count={voip.total_rtp_streams + voip.total_calls}
-          description={`${voip.total_calls} SIP call${voip.total_calls !== 1 ? 's' : ''}, ${voip.total_rtp_streams} RTP stream${voip.total_rtp_streams !== 1 ? 's' : ''}${hasJitter ? `, avg jitter ${voip.avg_jitter_ms.toFixed(1)}ms` : ''}${hasLoss ? `, ${voip.packet_loss_rate.toFixed(1)}% loss` : ''}`}
+          description={`${voip.total_calls} SIP call${voip.total_calls !== 1 ? 's' : ''}, ${voip.total_rtp_streams} RTP stream${voip.total_rtp_streams !== 1 ? 's' : ''}${hasJitter && voip.avg_jitter_ms != null ? `, avg jitter ${voip.avg_jitter_ms.toFixed(1)}ms` : ''}${hasLoss ? `, ${voip.packet_loss_rate.toFixed(1)}% loss` : ''}`}
           knowledge={hasJitter ? issueKnowledgeBase.voip_jitter : null}
           eli5Mode={eli5Mode}
           details={
@@ -1760,7 +1760,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
                   <p className="text-xs text-slate-500">RTP Streams</p>
                 </div>
                 <div className={`rounded-lg p-3 text-center ${hasJitter ? 'bg-amber-500/10' : 'bg-slate-900/40'}`}>
-                  <p className={`text-lg font-bold ${hasJitter ? 'text-amber-400' : 'text-green-400'}`}>{voip.avg_jitter_ms.toFixed(1)}ms</p>
+                  <p className={`text-lg font-bold ${hasJitter ? 'text-amber-400' : 'text-green-400'}`}>{voip.avg_jitter_ms != null ? `${voip.avg_jitter_ms.toFixed(1)}ms` : 'n/a'}</p>
                   <p className="text-xs text-slate-500">Avg Jitter</p>
                 </div>
                 <div className={`rounded-lg p-3 text-center ${hasLoss ? 'bg-red-500/10' : 'bg-slate-900/40'}`}>
@@ -1788,7 +1788,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
                           <td className="px-3 py-2 font-mono text-slate-400">{s.dst_ip}</td>
                           <td className="px-3 py-2 text-slate-300">{s.payload_type}</td>
                           <td className="px-3 py-2 text-slate-400">{s.packet_count.toLocaleString()}</td>
-                          <td className={`px-3 py-2 ${s.jitter_ms > 30 ? 'text-amber-400' : 'text-slate-400'}`}>{s.jitter_ms.toFixed(1)}ms</td>
+                          <td className={`px-3 py-2 ${s.jitter_ms != null && s.jitter_ms > 30 ? 'text-amber-400' : 'text-slate-400'}`}>{s.jitter_ms != null ? `${s.jitter_ms.toFixed(1)}ms` : 'n/a'}</td>
                           <td className={`px-3 py-2 ${s.lost_packets > 0 ? 'text-red-400' : 'text-slate-400'}`}>{s.lost_packets}</td>
                         </tr>
                       ))}

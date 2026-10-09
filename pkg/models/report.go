@@ -633,7 +633,7 @@ type VoIPAnalysis struct {
 	EstablishedCalls int             `json:"established_calls"`
 	FailedCalls      int             `json:"failed_calls"`
 	TotalRTPStreams  int             `json:"total_rtp_streams"`
-	AvgJitter        float64         `json:"avg_jitter_ms"`
+	AvgJitter        *float64        `json:"avg_jitter_ms"` // ms; nil (null) when unavailable, 0 is a measured zero
 	PacketLossRate   float64         `json:"packet_loss_rate"`
 }
 
@@ -651,14 +651,14 @@ type SIPCallInfo struct {
 
 // RTPStreamInfo represents an RTP media stream
 type RTPStreamInfo struct {
-	SSRC        uint32  `json:"ssrc"`
-	SrcIP       string  `json:"src_ip"`
-	DstIP       string  `json:"dst_ip"`
-	PayloadType string  `json:"payload_type"`
-	PacketCount uint64  `json:"packet_count"`
-	ByteCount   uint64  `json:"byte_count"`
-	LostPackets uint64  `json:"lost_packets"`
-	Jitter      float64 `json:"jitter_ms"`
+	SSRC        uint32   `json:"ssrc"`
+	SrcIP       string   `json:"src_ip"`
+	DstIP       string   `json:"dst_ip"`
+	PayloadType string   `json:"payload_type"`
+	PacketCount uint64   `json:"packet_count"`
+	ByteCount   uint64   `json:"byte_count"`
+	LostPackets uint64   `json:"lost_packets"`
+	Jitter      *float64 `json:"jitter_ms"` // ms; nil (null) without a known RTP clock rate, 0 is a measured zero
 }
 
 // TunnelFinding represents a detected tunnel/encapsulation

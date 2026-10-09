@@ -224,7 +224,7 @@ export function getActiveFindings(results: AnalysisResults): Map<string, { count
   if (tcpOoo.length > 0) active.set('tcp_out_of_order', { count: tcpOoo.length, severity: 'Warning', label: 'TCP Out-of-Order' });
 
   const voip = results.voip_analysis;
-  if (voip && voip.avg_jitter_ms > 30) active.set('voip_jitter', { count: voip.total_rtp_streams, severity: 'Warning', label: 'VoIP Jitter' });
+  if (voip && voip.avg_jitter_ms != null && voip.avg_jitter_ms > 30) active.set('voip_jitter', { count: voip.total_rtp_streams, severity: 'Warning', label: 'VoIP Jitter' });
   if (voip && voip.failed_calls > 0) active.set('voip_quality', { count: voip.failed_calls, severity: 'Critical', label: 'VoIP Quality Issues' });
 
   const http = results.traffic_analysis?.filter(t => t.protocol === 'HTTP') || [];

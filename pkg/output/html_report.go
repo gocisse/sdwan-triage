@@ -524,10 +524,19 @@ type VoIPAnalysisView struct {
 	EstablishedCalls int
 	FailedCalls      int
 	TotalRTPStreams  int
-	AvgJitter        float64
+	AvgJitter        *float64 // ms; nil when unavailable
 	PacketLossRate   float64
 	SIPCalls         []SIPCallView
 	RTPStreams       []RTPStreamView
+}
+
+// AvgJitterText renders the average jitter for templates: "n/a" when
+// unavailable (no stream with a known RTP clock rate), "x.xx ms" otherwise.
+func (v *VoIPAnalysisView) AvgJitterText() string {
+	if v.AvgJitter == nil {
+		return "n/a"
+	}
+	return fmt.Sprintf("%.2f ms", *v.AvgJitter)
 }
 
 type SIPCallView struct {
@@ -549,7 +558,15 @@ type RTPStreamView struct {
 	PacketCount uint64
 	ByteCount   uint64
 	LostPackets uint64
-	Jitter      float64
+	Jitter      *float64 // ms; nil when unavailable
+}
+
+// JitterText renders the stream jitter (ms) for templates: "n/a" when unavailable.
+func (s RTPStreamView) JitterText() string {
+	if s.Jitter == nil {
+		return "n/a"
+	}
+	return fmt.Sprintf("%.2f", *s.Jitter)
 }
 
 type TunnelFindingView struct {
@@ -3376,7 +3393,7 @@ func getTemplateContent() string {
                                     <span class="stat-label">Failed</span>
                                 </div>
                                 <div class="stat-card">
-                                    <span class="stat-value">{{printf "%.2f" .VoIPAnalysis.AvgJitter}} ms</span>
+                                    <span class="stat-value">{{.VoIPAnalysis.AvgJitterText}}</span>
                                     <span class="stat-label">Avg Jitter</span>
                                 </div>
                             </div>
@@ -3411,7 +3428,7 @@ func getTemplateContent() string {
                                         <td>{{.PayloadType}}</td>
                                         <td>{{.PacketCount}}</td>
                                         <td class="{{if gt .LostPackets 0}}severity-medium{{end}}">{{.LostPackets}}</td>
-                                        <td>{{printf "%.2f" .Jitter}}</td>
+                                        <td>{{.JitterText}}</td>
                                     </tr>
                                     {{end}}
                                 </tbody>

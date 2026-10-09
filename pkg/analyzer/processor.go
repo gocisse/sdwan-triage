@@ -1071,11 +1071,17 @@ func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
 
 	// Convert RTP streams
 	var totalJitter float64
+	var jitterStreams int
 	var totalLost, totalPackets uint64
 	for _, streamKey := range slices.Sorted(maps.Keys(rtpStreams)) {
 		stream := rtpStreams[streamKey]
 		voip.TotalRTPStreams++
-		totalJitter += stream.Jitter
+		var streamJitter *float64
+		if ms, ok := stream.JitterMs(); ok {
+			streamJitter = &ms
+			totalJitter += ms
+			jitterStreams++
+		}
 		totalLost += stream.LostPackets
 		totalPackets += stream.PacketCount
 
@@ -1087,12 +1093,13 @@ func (p *Processor) finalizeVoIPAnalysis(report *models.TriageReport) {
 			PacketCount: stream.PacketCount,
 			ByteCount:   stream.ByteCount,
 			LostPackets: stream.LostPackets,
-			Jitter:      stream.Jitter,
+			Jitter:      streamJitter,
 		})
 	}
 
-	if voip.TotalRTPStreams > 0 {
-		voip.AvgJitter = totalJitter / float64(voip.TotalRTPStreams)
+	if jitterStreams > 0 {
+		avg := totalJitter / float64(jitterStreams)
+		voip.AvgJitter = &avg
 	}
 	if totalPackets > 0 {
 		voip.PacketLossRate = float64(totalLost) / float64(totalPackets) * 100

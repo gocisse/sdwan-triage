@@ -732,7 +732,7 @@ func generateNetworkPage(data *ReportData, outputPath string) error {
                         </div>
                         <div class="card-body">
                             <p><strong>Total Calls:</strong> {{.VoIPAnalysis.TotalCalls}} | <strong>Established:</strong> {{.VoIPAnalysis.EstablishedCalls}} | <strong>Failed:</strong> {{.VoIPAnalysis.FailedCalls}}</p>
-                            <p><strong>RTP Streams:</strong> {{.VoIPAnalysis.TotalRTPStreams}} | <strong>Avg Jitter:</strong> {{printf "%.2f" .VoIPAnalysis.AvgJitter}}ms | <strong>Packet Loss:</strong> {{printf "%.2f" .VoIPAnalysis.PacketLossRate}}%</p>
+                            <p><strong>RTP Streams:</strong> {{.VoIPAnalysis.TotalRTPStreams}} | <strong>Avg Jitter:</strong> {{.VoIPAnalysis.AvgJitterText}} | <strong>Packet Loss:</strong> {{printf "%.2f" .VoIPAnalysis.PacketLossRate}}%</p>
                             
                             {{if .VoIPAnalysis.SIPCalls}}
                             <h3>SIP Calls</h3>

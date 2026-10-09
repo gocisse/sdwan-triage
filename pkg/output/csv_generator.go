@@ -1300,6 +1300,14 @@ func generateSDWANVendorsCSV(vendors []models.SDWANVendor, filename string) erro
 	return nil
 }
 
+// jitterCSV formats a jitter value in ms; unavailable (nil) is "n/a".
+func jitterCSV(ms *float64) string {
+	if ms == nil {
+		return "n/a"
+	}
+	return fmt.Sprintf("%.2f", *ms)
+}
+
 // generateVoIPAnalysisCSV creates a CSV for VoIP/SIP/RTP analysis
 func generateVoIPAnalysisCSV(voip *models.VoIPAnalysis, filename string) error {
 	file, err := os.Create(filename)
@@ -1318,7 +1326,7 @@ func generateVoIPAnalysisCSV(voip *models.VoIPAnalysis, filename string) error {
 	writer.Write([]string{"Established Calls", fmt.Sprintf("%d", voip.EstablishedCalls)})
 	writer.Write([]string{"Failed Calls", fmt.Sprintf("%d", voip.FailedCalls)})
 	writer.Write([]string{"Total RTP Streams", fmt.Sprintf("%d", voip.TotalRTPStreams)})
-	writer.Write([]string{"Average Jitter (ms)", fmt.Sprintf("%.2f", voip.AvgJitter)})
+	writer.Write([]string{"Average Jitter (ms)", jitterCSV(voip.AvgJitter)})
 	writer.Write([]string{"Packet Loss Rate (%)", fmt.Sprintf("%.2f", voip.PacketLossRate)})
 	writer.Write([]string{""})
 
@@ -1356,7 +1364,7 @@ func generateVoIPAnalysisCSV(voip *models.VoIPAnalysis, filename string) error {
 				fmt.Sprintf("%d", stream.PacketCount),
 				fmt.Sprintf("%d", stream.ByteCount),
 				fmt.Sprintf("%d", stream.LostPackets),
-				fmt.Sprintf("%.2f", stream.Jitter),
+				jitterCSV(stream.Jitter),
 			})
 		}
 	}
