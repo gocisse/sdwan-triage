@@ -158,7 +158,10 @@ func TestDetectTunnelBondingIssues_WrongPort_NoIssues(t *testing.T) {
 	}
 }
 
-func TestDetectTunnelBondingIssues_HighOOO_POCOverwhelmed(t *testing.T) {
+// Phase 4.53: ARUBA-BOND-001 was retired (its out-of-order evidence is TCP-only and
+// did not establish a POC/bonding cause). The same inputs that used to raise it
+// must no longer produce it.
+func TestDetectTunnelBondingIssues_HighOOO_NoLongerEmitsRetiredBOND001(t *testing.T) {
 	det := NewArubaIssueDetector()
 	stream := makeArubaStream(12345, ArubaEdgeConnectPort, "UDP")
 	stream.Duration = 10.0
@@ -167,17 +170,10 @@ func TestDetectTunnelBondingIssues_HighOOO_POCOverwhelmed(t *testing.T) {
 	addArubaSegments(stream, 6, "client_to_server", 0.01, true, false, false)
 
 	issues := det.detectTunnelBondingIssues(stream)
-	found := false
 	for _, iss := range issues {
 		if iss.ID == "ARUBA-BOND-001" {
-			found = true
-			if iss.Severity != SeverityCritical {
-				t.Errorf("expected Critical severity for >15%% OOO, got %s", iss.Severity)
-			}
+			t.Errorf("retired finding ARUBA-BOND-001 was emitted: %+v", iss)
 		}
-	}
-	if !found {
-		t.Error("expected ARUBA-BOND-001 tunnel bonding OOO issue")
 	}
 }
 
@@ -390,7 +386,10 @@ func TestDetectArubaIssues_NonArubaPort_Empty(t *testing.T) {
 	}
 }
 
-func TestDetectArubaIssues_EdgeConnectPort_PathConditioningDetected(t *testing.T) {
+// Phase 4.53: ARUBA-PATH-001 was retired (TCP-only retransmission evidence; no
+// observation of path conditioning). High retransmit flags on the EdgeConnect port
+// must no longer raise it.
+func TestDetectArubaIssues_EdgeConnectPort_RetiredPATH001NotEmitted(t *testing.T) {
 	det := NewArubaIssueDetector()
 	stream := makeArubaStream(12345, ArubaEdgeConnectPort, "UDP")
 	stream.Duration = 10.0
@@ -399,13 +398,9 @@ func TestDetectArubaIssues_EdgeConnectPort_PathConditioningDetected(t *testing.T
 	addArubaSegments(stream, 2, "client_to_server", 0.01, false, true, false) // 10% retransmit
 
 	issues := det.DetectArubaIssues(stream)
-	found := false
 	for _, iss := range issues {
 		if iss.ID == "ARUBA-PATH-001" {
-			found = true
+			t.Errorf("retired finding ARUBA-PATH-001 was emitted: %+v", iss)
 		}
-	}
-	if !found {
-		t.Error("expected ARUBA-PATH-001 path conditioning issue via DetectArubaIssues")
 	}
 }

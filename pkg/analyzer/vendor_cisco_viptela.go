@@ -453,19 +453,10 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 	// We detect SLA violations by analyzing the stream's health metrics,
 	// and path selection failures by correlating BFD state with traffic patterns.
 
-	// --- Detection 1: SLA Violation — high loss on primary path, no switchover ---
-	// Measure loss rate via retransmit ratio
-	retransmitCount := 0
-	oooCount := 0
-	for _, seg := range stream.Segments {
-		if seg.IsRetransmit {
-			retransmitCount++
-		}
-		if seg.IsOutOfOrder {
-			oooCount++
-		}
-	}
-	lossRate := float64(retransmitCount) / float64(len(stream.Segments))
+	// --- Detection 1: retired. (Phase 4.53) VIPTELA-AAR-001 was retired: retransmission ratio as an AAR SLA / no-switchover indicator.
+	// The evidence was TCP sequence classification, which cannot be evaluated for the UDP tunnel
+	// traffic this detector targets, and it did not establish the vendor-specific cause.
+	// See plans/phase-4.52-vendor-finding-validity-audit.md. Not replaced.
 
 	// Measure latency via inter-segment gaps (proxy for RTT on data flows)
 	var totalGap float64
@@ -484,100 +475,6 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 	avgGapMs := 0.0
 	if gapCount > 0 {
 		avgGapMs = (totalGap / float64(gapCount)) * 1000.0
-	}
-
-	// SLA violation: loss > 5% AND stream duration > 10s (long enough to have triggered AAR)
-	if lossRate > ViptelaAARLossThreshold && stream.Duration > 10.0 {
-		severity := SeverityHigh
-		if lossRate > 0.10 {
-			severity = SeverityCritical
-		}
-		issues = append(issues, DetectedIssue{
-			ID:              "VIPTELA-AAR-001",
-			Title:           "AAR SLA Violation — High Retransmission Rate, No Path Switchover",
-			TechnicalDesc:   fmt.Sprintf("%.1f%% of segments on flow %s:%d→%s:%d were retransmissions over %.1fs — above the 5%% retransmission threshold used as an AAR SLA proxy; retransmissions alone do not confirm packet loss or that traffic remains on a degraded path", lossRate*100, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort, stream.Duration),
-			BusinessImpact:  "Business-critical application traffic shows a high retransmission rate; if the path is degraded, AAR may not be steering to a backup path as configured",
-			Severity:        severity,
-			Confidence:      0.85,
-			Category:        CategorySDWANData,
-			RootCause:       "AAR SLA class not applied to this flow, no backup path available, or BFD not detecting path degradation fast enough",
-			AffectedService: "Cisco Viptela Application-Aware Routing",
-			BaseFilter:      buildStreamFilter(stream),
-			ExpandedFilter:  buildExpandedFilter(stream) + " && tcp.analysis.retransmission",
-			OptimizedFilter: buildOptimizedFilter(stream),
-			InvestigationSteps: []InvestigationStep{
-				{
-					Order:          1,
-					Purpose:        "Check retransmissions on primary path (then confirm whether loss occurred)",
-					DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.retransmission",
-					ExpectedNormal: "< 1% retransmission rate",
-					AbnormalSign:   fmt.Sprintf("> 5%% retransmission — currently %.1f%%", lossRate*100),
-					CustomColumns:  []string{"tcp.analysis.retransmission", "frame.time_delta", "ip.dsfield.dscp"},
-				},
-				{
-					Order:          2,
-					Purpose:        "Verify AAR SLA class assignment for this flow",
-					DisplayFilter:  fmt.Sprintf("ip.addr == %s && ip.addr == %s", stream.SrcIP, stream.DstIP),
-					ExpectedNormal: "Traffic classified into correct SLA class with backup path",
-					AbnormalSign:   "Traffic in default (best-effort) class or no backup path defined",
-				},
-				{
-					Order:          3,
-					Purpose:        "Check BFD state on primary path",
-					DisplayFilter:  "udp.port == 3784",
-					ExpectedNormal: "BFD sessions up with regular echo intervals",
-					AbnormalSign:   "BFD session down or missing — path degradation not detected",
-				},
-			},
-			ImmediateActions: []RemediationAction{
-				{
-					Description:    "Check AAR SLA class status and path selection",
-					Commands:       []string{"show sdwan app-route sla-class", "show sdwan app-route stats", "show sdwan policy from-vsmart"},
-					Verification:   "SLA class applied to affected application, backup path available",
-					EstimatedTime:  "3 minutes",
-					RequiresChange: false,
-					SuccessRate:    0.85,
-				},
-				{
-					Description:    "Verify BFD sessions on all transport colors",
-					Commands:       []string{"show sdwan bfd sessions", "show sdwan bfd history"},
-					Verification:   "BFD sessions up on all configured transports",
-					EstimatedTime:  "2 minutes",
-					RequiresChange: false,
-					SuccessRate:    0.80,
-				},
-			},
-			ShortTermFixes: []RemediationAction{
-				{
-					Description:    "Tighten BFD timers to detect path degradation faster",
-					Commands:       []string{"bfd color <color> hello-interval 300 multiplier 3", "commit"},
-					Verification:   "BFD detects path degradation within 1 second",
-					EstimatedTime:  "10 minutes",
-					RequiresChange: true,
-					SuccessRate:    0.80,
-					RollbackSteps:  []string{"bfd color <color> hello-interval 1000 multiplier 6", "commit"},
-				},
-				{
-					Description:    "Verify AAR policy applied from vSmart",
-					Commands:       []string{"show sdwan policy from-vsmart", "show sdwan omp routes | include " + stream.DstIP},
-					Verification:   "AAR policy active and backup TLOC available",
-					EstimatedTime:  "5 minutes",
-					RequiresChange: false,
-					SuccessRate:    0.85,
-				},
-			},
-			LongTermSolutions: []RemediationAction{
-				{
-					Description:     "Add redundant transport color for AAR failover",
-					Verification:    "AAR switches to backup path within BFD detection time",
-					EstimatedTime:   "1-2 weeks",
-					RequiresChange:  true,
-					SuccessRate:     0.95,
-					EscalationPoint: "Engage Cisco TAC if AAR not switching despite BFD detecting path failure",
-				},
-			},
-			KnowledgeBaseRef: "KB-VIPTELA-AAR-001",
-		})
 	}
 
 	// --- Detection 2: large mean inter-packet interval (heuristic) ---

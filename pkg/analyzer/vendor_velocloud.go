@@ -775,69 +775,10 @@ func (vcd *VeloCloudIssueDetector) detectLAGIssues(stream *models.StreamData) []
 		}
 	}
 
-	// --- Detection 2: LAG hash imbalance — out-of-order packets as proxy ---
-	// When LAG hashing is uneven, one member carries most traffic.
-	// Out-of-order packets are a side effect of per-packet (not per-flow) LAG hashing.
-	oooCount := 0
-	retransmitCount := 0
-	for _, seg := range stream.Segments {
-		if seg.IsOutOfOrder {
-			oooCount++
-		}
-		if seg.IsRetransmit {
-			retransmitCount++
-		}
-	}
-
-	oooRate := float64(oooCount) / float64(len(stream.Segments))
-	if oooRate > 0.05 && retransmitCount < oooCount { // OOO without proportional retransmits = reordering, not loss
-		issues = append(issues, DetectedIssue{
-			ID:              "VELOCLOUD-LAG-002",
-			Title:           "LAG Hash Imbalance — Out-of-Order Packets",
-			TechnicalDesc:   fmt.Sprintf("%.0f%% out-of-order packet rate (%d/%d segments) with low retransmit count (%d) — consistent with per-packet LAG hashing causing reordering", oooRate*100, oooCount, len(stream.Segments), retransmitCount),
-			BusinessImpact:  "TCP performance degraded by reordering; applications experience increased latency and reduced throughput",
-			Severity:        SeverityHigh,
-			Confidence:      0.75,
-			Category:        CategorySDWANData,
-			RootCause:       "LAG configured for per-packet load balancing instead of per-flow; packets from same flow arriving via different members with different latencies",
-			AffectedService: "VMware VeloCloud Link Aggregation",
-			BaseFilter:      buildStreamFilter(stream),
-			ExpandedFilter:  buildExpandedFilter(stream) + " && tcp.analysis.out_of_order",
-			OptimizedFilter: buildOptimizedFilter(stream),
-			InvestigationSteps: []InvestigationStep{
-				{
-					Order:          1,
-					Purpose:        "Confirm out-of-order pattern",
-					DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.out_of_order",
-					ExpectedNormal: "< 1% out-of-order packets",
-					AbnormalSign:   "> 5% out-of-order without corresponding loss",
-					CustomColumns:  []string{"tcp.analysis.out_of_order", "tcp.seq", "frame.time_delta"},
-				},
-			},
-			ImmediateActions: []RemediationAction{
-				{
-					Description:    "Check LAG load-balancing mode",
-					Commands:       []string{"VCO: Edge > Device > Interfaces > LAG > Load Balance Mode", "Verify set to 'Layer 3+4' (per-flow) not 'Layer 2' (per-packet)"},
-					Verification:   "LAG using per-flow (L3+4) hashing",
-					EstimatedTime:  "3 minutes",
-					RequiresChange: false,
-					SuccessRate:    0.85,
-				},
-			},
-			ShortTermFixes: []RemediationAction{
-				{
-					Description:    "Change LAG hash mode to per-flow (Layer 3+4)",
-					Commands:       []string{"VCO: Edge > Device > Interfaces > LAG > Load Balance: Layer3+4", "Activate configuration"},
-					Verification:   "Out-of-order packet rate drops below 1%",
-					EstimatedTime:  "10 minutes",
-					RequiresChange: true,
-					SuccessRate:    0.90,
-					RollbackSteps:  []string{"Revert LAG hash mode to previous setting"},
-				},
-			},
-			KnowledgeBaseRef: "KB-VELOCLOUD-LAG-002",
-		})
-	}
+	// --- Detection 2: retired. (Phase 4.53) VELOCLOUD-LAG-002 was retired: out-of-order rate as a LAG hash-imbalance indicator.
+	// The evidence was TCP sequence classification, which cannot be evaluated for the UDP tunnel
+	// traffic this detector targets, and it did not establish the vendor-specific cause.
+	// See plans/phase-4.52-vendor-finding-validity-audit.md. Not replaced.
 
 	// --- Detection 3: LAG flapping — multiple resets in short window ---
 	resetCount := 0

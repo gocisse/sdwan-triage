@@ -98,105 +98,10 @@ func (aid *ArubaIssueDetector) detectPathConditioningIssues(stream *models.Strea
 
 	healthScore := aid.healthScorer.ScoreStream(stream)
 
-	// High retransmission rate on tunnel (path conditioning should mitigate loss)
-	retransmitCount := 0
-	for _, segment := range stream.Segments {
-		if segment.IsRetransmit {
-			retransmitCount++
-		}
-	}
-
-	if retransmitCount > 0 && stream.PacketCount > 0 {
-		retransmitRate := float64(retransmitCount) / float64(stream.PacketCount)
-		if retransmitRate > 0.05 { // >5% loss despite path conditioning
-			issue := DetectedIssue{
-				ID:              "ARUBA-PATH-001",
-				Title:           "Path Conditioning Ineffective",
-				TechnicalDesc:   "High TCP retransmission rate on EdgeConnect tunnel despite path conditioning enabled (loss itself is not established by retransmissions)",
-				BusinessImpact:  "Application performance degraded, real-time traffic quality poor",
-				Severity:        SeverityHigh,
-				Confidence:      0.85,
-				Category:        CategorySDWANData,
-				RootCause:       "Underlying WAN quality too poor for FEC/POC to compensate, or path conditioning disabled",
-				AffectedService: "Aruba EdgeConnect Path Conditioning",
-
-				BaseFilter:      buildStreamFilter(stream),
-				ExpandedFilter:  buildExpandedFilter(stream) + " || (udp.port == 4980)",
-				OptimizedFilter: buildOptimizedFilter(stream),
-
-				InvestigationSteps: []InvestigationStep{
-					{
-						Order:          1,
-						Purpose:        "Analyze tunnel retransmissions (then confirm whether loss occurred)",
-						DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.retransmission",
-						ExpectedNormal: "< 1% retransmission rate",
-						AbnormalSign:   "> 5% retransmission rate",
-						CustomColumns:  []string{"tcp.analysis.retransmission", "frame.time_delta"},
-					},
-					{
-						Order:          2,
-						Purpose:        "Check for FEC packets",
-						DisplayFilter:  "udp.port == 4980",
-						ExpectedNormal: "FEC packets present in stream",
-						AbnormalSign:   "No FEC packets or excessive FEC overhead",
-					},
-				},
-
-				ImmediateActions: []RemediationAction{
-					{
-						Description:    "Check path conditioning status in Orchestrator",
-						Commands:       []string{"Navigate to Appliance > Deployment > Path Conditioning", "Verify FEC and POC enabled"},
-						Verification:   "Path conditioning enabled and active",
-						EstimatedTime:  "3 minutes",
-						RequiresChange: false,
-						SuccessRate:    0.80,
-					},
-					{
-						Description:    "Check underlying WAN link quality",
-						Commands:       []string{"Review Tunnel Health in Orchestrator", "Check WAN interface error counters"},
-						Verification:   "WAN link quality within acceptable range",
-						EstimatedTime:  "5 minutes",
-						RequiresChange: false,
-						SuccessRate:    0.75,
-					},
-				},
-
-				ShortTermFixes: []RemediationAction{
-					{
-						Description:    "Increase FEC ratio for lossy link",
-						Commands:       []string{"Orchestrator: Configuration > Overlays > Tunnel > FEC Ratio", "Increase to 1:3 or 1:4"},
-						Verification:   "Packet loss reduced after FEC adjustment",
-						EstimatedTime:  "15 minutes",
-						RequiresChange: true,
-						SuccessRate:    0.80,
-						RollbackSteps:  []string{"Restore previous FEC ratio"},
-					},
-					{
-						Description:    "Enable Packet Order Correction (POC)",
-						Commands:       []string{"Orchestrator: Configuration > Overlays > Tunnel > Enable POC"},
-						Verification:   "Out-of-order packets reduced",
-						EstimatedTime:  "10 minutes",
-						RequiresChange: true,
-						SuccessRate:    0.75,
-					},
-				},
-
-				LongTermSolutions: []RemediationAction{
-					{
-						Description:     "Upgrade WAN link or add redundant path",
-						Verification:    "Baseline packet loss < 0.5%",
-						EstimatedTime:   "2-4 weeks",
-						RequiresChange:  true,
-						SuccessRate:     0.95,
-						EscalationPoint: "Engage WAN provider for link quality issues",
-					},
-				},
-
-				KnowledgeBaseRef: "KB-ARUBA-PATH-001",
-			}
-			issues = append(issues, issue)
-		}
-	}
+	// (Phase 4.53) ARUBA-PATH-001 was retired: retransmission rate on an EdgeConnect tunnel.
+	// The evidence was TCP sequence classification, which cannot be evaluated for the UDP tunnel
+	// traffic this detector targets, and it did not establish the vendor-specific cause.
+	// See plans/phase-4.52-vendor-finding-validity-audit.md. Not replaced.
 
 	// Tunnel connection failure
 	if healthScore.Status == HealthStatusCritical {
@@ -502,89 +407,10 @@ func (aid *ArubaIssueDetector) detectTunnelBondingIssues(stream *models.StreamDa
 		return issues
 	}
 
-	// --- Detection 1: Out-of-order packets indicating bonding asymmetry ---
-	// When bonded tunnels have different latencies, packets arrive OOO.
-	// POC (Packet Order Correction) should handle this, but if OOO rate is high,
-	// POC is overwhelmed or disabled.
-	oooCount := 0
-	retransmitCount := 0
-	for _, seg := range stream.Segments {
-		if seg.IsOutOfOrder {
-			oooCount++
-		}
-		if seg.IsRetransmit {
-			retransmitCount++
-		}
-	}
-	oooRate := float64(oooCount) / float64(len(stream.Segments))
-
-	if oooRate > ArubaBondingOOOThreshold {
-		severity := SeverityHigh
-		if oooRate > 0.15 {
-			severity = SeverityCritical
-		}
-		issues = append(issues, DetectedIssue{
-			ID:              "ARUBA-BOND-001",
-			Title:           "Tunnel Bonding Out-of-Order — POC Overwhelmed",
-			TechnicalDesc:   fmt.Sprintf("%.0f%% out-of-order packet rate (%d/%d segments) on bonded tunnel — Packet Order Correction (POC) not keeping up with bonding asymmetry", oooRate*100, oooCount, len(stream.Segments)),
-			BusinessImpact:  "TCP performance severely degraded; applications experience high latency and reduced throughput due to reordering",
-			Severity:        severity,
-			Confidence:      0.85,
-			Category:        CategorySDWANData,
-			RootCause:       "Large latency differential between bonded tunnel members (>30ms); POC buffer exhausted or disabled",
-			AffectedService: "Aruba EdgeConnect Tunnel Bonding",
-			BaseFilter:      buildStreamFilter(stream),
-			ExpandedFilter:  buildExpandedFilter(stream) + " && tcp.analysis.out_of_order",
-			OptimizedFilter: buildOptimizedFilter(stream),
-			InvestigationSteps: []InvestigationStep{
-				{
-					Order:          1,
-					Purpose:        "Confirm out-of-order pattern on bonded tunnel",
-					DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.out_of_order",
-					ExpectedNormal: "< 1% out-of-order with POC enabled",
-					AbnormalSign:   fmt.Sprintf("> 5%% out-of-order — currently %.0f%%", oooRate*100),
-					CustomColumns:  []string{"tcp.analysis.out_of_order", "tcp.seq", "frame.time_delta"},
-				},
-				{
-					Order:          2,
-					Purpose:        "Check latency differential between bonded members",
-					DisplayFilter:  fmt.Sprintf("udp.port == %d || udp.port == %d", ArubaEdgeConnectPort, ArubaEdgeConnectAltPort),
-					ExpectedNormal: "< 30ms latency difference between bonded members",
-					AbnormalSign:   "> 30ms differential causing excessive reordering",
-				},
-			},
-			ImmediateActions: []RemediationAction{
-				{
-					Description:    "Check tunnel bonding status and member latencies",
-					Commands:       []string{"show tunnel status", "show stats tunnel", "Orchestrator: Appliance > Tunnels — check per-member latency"},
-					Verification:   "Latency differential < 30ms between bonded members",
-					EstimatedTime:  "3 minutes",
-					RequiresChange: false,
-					SuccessRate:    0.80,
-				},
-			},
-			ShortTermFixes: []RemediationAction{
-				{
-					Description:    "Enable or increase POC buffer size",
-					Commands:       []string{"Orchestrator: Configuration > Overlays > Tunnel > Packet Order Correction > Enable", "Increase POC buffer to 100ms"},
-					Verification:   "Out-of-order rate drops below 1%",
-					EstimatedTime:  "10 minutes",
-					RequiresChange: true,
-					SuccessRate:    0.85,
-					RollbackSteps:  []string{"Disable POC if it increases latency unacceptably"},
-				},
-				{
-					Description:    "Remove high-latency member from bond or use path conditioning instead",
-					Commands:       []string{"Orchestrator: Configuration > Overlays > Tunnel > Remove high-latency member", "Or: Use FEC instead of bonding for lossy links"},
-					Verification:   "OOO rate drops, throughput maintained",
-					EstimatedTime:  "20 minutes",
-					RequiresChange: true,
-					SuccessRate:    0.80,
-				},
-			},
-			KnowledgeBaseRef: "KB-ARUBA-BOND-001",
-		})
-	}
+	// --- Detection 1: retired. (Phase 4.53) ARUBA-BOND-001 was retired: out-of-order rate as a POC/bonding indicator.
+	// The evidence was TCP sequence classification, which cannot be evaluated for the UDP tunnel
+	// traffic this detector targets, and it did not establish the vendor-specific cause.
+	// See plans/phase-4.52-vendor-finding-validity-audit.md. Not replaced.
 
 	// --- Detection 2: Tunnel bonding member failure — sudden throughput drop ---
 	// Split stream into halves and compare byte counts

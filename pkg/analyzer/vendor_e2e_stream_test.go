@@ -1,7 +1,6 @@
 package analyzer
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -9,7 +8,14 @@ import (
 	"github.com/gocisse/sdwan-triage/pkg/models"
 )
 
-// Phase 4.51 — end-to-end checks of the live vendor stream detectors.
+// Phase 4.51/4.53 — end-to-end checks of the live vendor stream detectors.
+//
+// Phase 4.53: ARUBA-PATH-001, ARUBA-BOND-001, VELOCLOUD-LAG-002 and VIPTELA-AAR-001
+// were retired (Phase 4.52: their evidence is TCP sequence classification, which
+// cannot be evaluated for the UDP tunnel traffic they target, and it did not
+// establish the vendor-specific causes). These tests now prove, through the real
+// pipeline, that the retired IDs are never emitted for the very scenarios that
+// used to raise them, and that unrelated findings of the same detectors still are.
 //
 // Packets are built with internal/testpcap, written to a temp pcap and run through
 // the real Processor (OpenCapture → detector registry → StreamReassembler →
@@ -70,122 +76,117 @@ func runVendor(t *testing.T, pk [][]byte, interval time.Duration) *models.Triage
 	return runGoldenInterval(t, pk, interval)
 }
 
-// ── Aruba EdgeConnect (tunnel bonding out-of-order, path conditioning) ──────
+// vSegSized is a client→server data segment of n bytes at stream offset off.
+func vSegSized(sp uint16, off uint32, n int) []byte {
+	return testpcap.TCPFrame(testpcap.ClientMAC, testpcap.ServerMAC, testpcap.ClientIP, testpcap.ServerIP,
+		vendorCliPort, sp, 1001+off, 2001, uint8(testpcap.PSH|testpcap.ACK), make([]byte, n))
+}
 
-func TestVendorE2E_ArubaBondingOutOfOrder(t *testing.T) {
-	sp := ArubaEdgeConnectPort
-	// Positive: 40 segments, 10 genuine adjacent swaps → 10 out-of-order of 40 (25% > 5%; > 15% = Critical).
-	r := runVendor(t, vFlow(sp, 40, 10, 0), 100*time.Millisecond)
-	ids := vendorIDs(r)
-	if ids["ARUBA-BOND-001"] != 1 {
-		t.Fatalf("reordering on the bonded tunnel must raise ARUBA-BOND-001, got %v", ids)
+// vSizedFlow builds a flow whose first `big` segments carry bigLen bytes and whose
+// next `small` segments carry smallLen bytes (a throughput drop mid-stream).
+func vSizedFlow(sp uint16, big, bigLen, small, smallLen int) [][]byte {
+	pk := vHandshake(sp)
+	off := uint32(0)
+	for i := 0; i < big; i++ {
+		pk = append(pk, vSegSized(sp, off, bigLen))
+		off += uint32(bigLen)
 	}
-	for _, v := range r.VendorDPIIssues {
-		if v.IssueID == "ARUBA-BOND-001" {
-			if v.Severity != string(SeverityCritical) {
-				t.Errorf("severity = %q, want Critical at 25%%", v.Severity)
-			}
-			if want := "25% out-of-order packet rate (10/40 segments)"; !strings.Contains(v.Description, want) {
-				t.Errorf("evidence = %q, want it to contain %q", v.Description, want)
-			}
+	for i := 0; i < small; i++ {
+		pk = append(pk, vSegSized(sp, off, smallLen))
+		off += uint32(smallLen)
+	}
+	return pk
+}
+
+var retiredVendorIDs = []string{"ARUBA-PATH-001", "ARUBA-BOND-001", "VELOCLOUD-LAG-002", "VIPTELA-AAR-001"}
+
+func assertNoRetired(t *testing.T, name string, r *models.TriageReport) {
+	t.Helper()
+	ids := vendorIDs(r)
+	for _, id := range retiredVendorIDs {
+		if ids[id] != 0 {
+			t.Errorf("%s: retired finding %s was emitted (issues: %v)", name, id, ids)
 		}
 	}
-	if ids["ARUBA-PATH-001"] != 0 {
-		t.Errorf("reordering must not look like retransmissions (PATH-001): %v", ids)
-	}
-
-	// Negative control 1: in-order traffic.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 40, 0, 0), 100*time.Millisecond)); ids["ARUBA-BOND-001"] != 0 || ids["ARUBA-PATH-001"] != 0 {
-		t.Errorf("in-order: %v", ids)
-	}
-	// Negative control 2: retransmissions only — not out-of-order, but they are the
-	// PATH-001 (retransmit rate) evidence: 6 of 46 segments = 13%.
-	ids = vendorIDs(runVendor(t, vFlow(sp, 40, 0, 6), 100*time.Millisecond))
-	if ids["ARUBA-BOND-001"] != 0 {
-		t.Errorf("retransmissions must not raise the bonding out-of-order finding: %v", ids)
-	}
-	if ids["ARUBA-PATH-001"] != 1 {
-		t.Errorf("retransmission rate above 5%% should raise ARUBA-PATH-001: %v", ids)
-	}
-	// Negative control 3: below the segment minimum (ArubaMinSegmentsForAnalysis = 5).
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 4, 2, 0), 100*time.Millisecond)); ids["ARUBA-BOND-001"] != 0 {
-		t.Errorf("4 segments are below the analysis minimum: %v", ids)
+	for _, v := range r.VendorDPIIssues {
+		if v.Severity == "Critical" && (v.IssueID == "ARUBA-BOND-001" || v.IssueID == "VELOCLOUD-LAG-002") {
+			t.Errorf("%s: retired Critical finding reached the report", name)
+		}
 	}
 }
 
-// ── VeloCloud LAG-002 (out-of-order without proportional retransmits) ───────
-
-func TestVendorE2E_VeloCloudLAGHashImbalance(t *testing.T) {
-	sp := VeloCloudHTTPSPort
-	// Positive: 30 segments, 6 swaps → 6 out-of-order (20% > 5%), 0 retransmissions.
-	r := runVendor(t, vFlow(sp, 30, 6, 0), 100*time.Millisecond)
-	ids := vendorIDs(r)
-	if ids["VELOCLOUD-LAG-002"] != 1 {
-		t.Fatalf("reordering without retransmissions must raise VELOCLOUD-LAG-002, got %v", ids)
+// The scenarios below are exactly the ones that used to raise each retired finding
+// (Phase 4.51 positives) plus their former negative controls.
+func TestVendorE2E_RetiredFindingsAreNeverEmitted(t *testing.T) {
+	slow := 250 * time.Millisecond
+	fast := 100 * time.Millisecond
+	cases := []struct {
+		name     string
+		pk       [][]byte
+		interval time.Duration
+	}{
+		// Aruba EdgeConnect port 4980
+		{"aruba reordering 10/40 (was BOND-001 Critical)", vFlow(ArubaEdgeConnectPort, 40, 10, 0), fast},
+		{"aruba retransmissions 6/46 (was PATH-001)", vFlow(ArubaEdgeConnectPort, 40, 0, 6), fast},
+		{"aruba in-order", vFlow(ArubaEdgeConnectPort, 40, 0, 0), fast},
+		{"aruba alt port 4981 reordering", vFlow(ArubaEdgeConnectAltPort, 40, 10, 0), fast},
+		// VeloCloud management TCP port 8443 and 8080
+		{"velocloud reordering 6/30 (was LAG-002)", vFlow(VeloCloudHTTPSPort, 30, 6, 0), fast},
+		{"velocloud 8080 reordering", vFlow(VeloCloudHTTPPort, 30, 6, 0), fast},
+		{"velocloud reordering + resends", vFlow(VeloCloudHTTPSPort, 30, 6, 8), fast},
+		{"velocloud resends only", vFlow(VeloCloudHTTPSPort, 30, 0, 8), fast},
+		// Viptela ports: control/data 12346 and NETCONF 830
+		{"viptela retransmissions 6/66 over >10 s (was AAR-001 High)", vFlow(ViptelaOMPPort, 60, 0, 6), slow},
+		{"viptela heavy retransmissions over >10 s (was AAR-001 Critical)", vFlow(ViptelaOMPPort, 60, 0, 12), slow},
+		{"viptela reordering over >10 s", vFlow(ViptelaOMPPort, 60, 12, 0), slow},
+		{"viptela NETCONF 830 retransmissions", vFlow(ViptelaNetconfPort, 60, 0, 6), slow},
 	}
-	for _, v := range r.VendorDPIIssues {
-		if v.IssueID == "VELOCLOUD-LAG-002" && !strings.Contains(v.Description, "20% out-of-order packet rate (6/30 segments) with low retransmit count (0)") {
-			t.Errorf("evidence = %q", v.Description)
-		}
-	}
-	// Negative 1: in-order.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 30, 0, 0), 100*time.Millisecond)); ids["VELOCLOUD-LAG-002"] != 0 {
-		t.Errorf("in-order: %v", ids)
-	}
-	// Negative 2: retransmissions only (the old classifier labelled resends/reordering
-	// interchangeably): no reordering evidence, so no LAG finding.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 30, 0, 8), 100*time.Millisecond)); ids["VELOCLOUD-LAG-002"] != 0 {
-		t.Errorf("retransmissions alone: %v", ids)
-	}
-	// Negative 3: reordering accompanied by at least as many retransmissions (6 swaps, 8 resends):
-	// the detector's own rule treats that as loss, not reordering.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 30, 6, 8), 100*time.Millisecond)); ids["VELOCLOUD-LAG-002"] != 0 {
-		t.Errorf("reordering with proportional retransmits: %v", ids)
-	}
-	// Negative 4: below the 10-segment minimum.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 8, 3, 0), 100*time.Millisecond)); ids["VELOCLOUD-LAG-002"] != 0 {
-		t.Errorf("8 segments are below the analysis minimum: %v", ids)
+	for _, c := range cases {
+		assertNoRetired(t, c.name, runVendor(t, c.pk, c.interval))
 	}
 }
 
-// ── Cisco Viptela AAR (retransmission ratio over a >10 s stream) ────────────
-
-func TestVendorE2E_ViptelaAARRetransmissionRatio(t *testing.T) {
-	sp := ViptelaOMPPort
-	slow := 250 * time.Millisecond // 70 packets → > 10 s between the first and last data segment
-
-	// Positive: 60 segments + 6 resends = 6/66 (9.1%) retransmissions over > 10 s → High.
-	r := runVendor(t, vFlow(sp, 60, 0, 6), slow)
-	ids := vendorIDs(r)
-	if ids["VIPTELA-AAR-001"] != 1 {
-		t.Fatalf("retransmission ratio above 5%% over >10 s must raise VIPTELA-AAR-001, got %v", ids)
+// Unrelated findings of the same detectors must keep working through the real
+// pipeline. (Plumbing controls only: they show the detectors still run; this
+// phase takes no position on the validity of those other findings.)
+func TestVendorE2E_UnrelatedFindingsStillEmitted(t *testing.T) {
+	// ARUBA-BOND-002: second-half throughput < 20% of the first half on port 4980.
+	r := runVendor(t, vSizedFlow(ArubaEdgeConnectPort, 10, 100, 10, 10), 100*time.Millisecond)
+	if vendorIDs(r)["ARUBA-BOND-002"] != 1 {
+		t.Errorf("ARUBA-BOND-002 should still be emitted, got %v", vendorIDs(r))
 	}
-	for _, v := range r.VendorDPIIssues {
-		if v.IssueID == "VIPTELA-AAR-001" {
-			if v.Severity != string(SeverityHigh) {
-				t.Errorf("severity = %q, want High at 9.1%%", v.Severity)
-			}
-			if !strings.Contains(v.Description, "9.1% of segments") || !strings.Contains(v.Description, "retransmissions alone do not confirm packet loss") {
-				t.Errorf("evidence = %q", v.Description)
+	assertNoRetired(t, "aruba throughput drop", r)
+
+	// VELOCLOUD-LAG-001: second-half throughput < 45% of the first half on port 8443.
+	r = runVendor(t, vSizedFlow(VeloCloudHTTPSPort, 15, 100, 15, 30), 100*time.Millisecond)
+	if vendorIDs(r)["VELOCLOUD-LAG-001"] != 1 {
+		t.Errorf("VELOCLOUD-LAG-001 should still be emitted, got %v", vendorIDs(r))
+	}
+	assertNoRetired(t, "velocloud throughput drop", r)
+
+	// VIPTELA-AAR-002 (inter-packet interval heuristic): 250 ms spacing over >5 s on port 12346.
+	r = runVendor(t, vFlow(ViptelaOMPPort, 60, 0, 0), 250*time.Millisecond)
+	if vendorIDs(r)["VIPTELA-AAR-002"] != 1 {
+		t.Errorf("VIPTELA-AAR-002 should still be emitted, got %v", vendorIDs(r))
+	}
+	assertNoRetired(t, "viptela interval", r)
+}
+
+// Consumers: the web integration counts Critical vendor issues and records one
+// customer-intelligence entry per VendorDPIIssue (pkg/web/handlers/analyzer.go).
+// Both iterate report.VendorDPIIssues, so a retired ID that is absent from that
+// slice cannot increment either counter. This asserts the property on the report
+// the production pipeline produces for the former Critical scenarios.
+func TestVendorE2E_RetiredCriticalScenariosAddNoVendorIssues(t *testing.T) {
+	for name, r := range map[string]*models.TriageReport{
+		"aruba":     runVendor(t, vFlow(ArubaEdgeConnectPort, 40, 10, 0), 100*time.Millisecond),
+		"viptela":   runVendor(t, vFlow(ViptelaOMPPort, 60, 0, 12), 250*time.Millisecond),
+		"velocloud": runVendor(t, vFlow(VeloCloudHTTPSPort, 30, 6, 0), 100*time.Millisecond),
+	} {
+		for _, v := range r.VendorDPIIssues {
+			if v.Severity == "Critical" {
+				t.Errorf("%s: unexpected Critical vendor issue %s", name, v.IssueID)
 			}
 		}
-	}
-	// Negative 1: in-order.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 60, 0, 0), slow)); ids["VIPTELA-AAR-001"] != 0 {
-		t.Errorf("in-order: %v", ids)
-	}
-	// Negative 2 (the point of Phase 4.50): genuine reordering is NOT retransmissions.
-	// The old classifier labelled every reordered segment a retransmission and
-	// would have raised AAR-001 here (12 of 60).
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 60, 12, 0), slow)); ids["VIPTELA-AAR-001"] != 0 {
-		t.Errorf("reordering raised the retransmission-ratio finding: %v", ids)
-	}
-	// Negative 3: same retransmissions but the stream lasts under 10 s.
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 60, 0, 6), 100*time.Millisecond)); ids["VIPTELA-AAR-001"] != 0 {
-		t.Errorf("stream shorter than 10 s: %v", ids)
-	}
-	// Negative 4: ratio at or below the threshold (2 of 62 = 3.2%).
-	if ids := vendorIDs(runVendor(t, vFlow(sp, 60, 0, 2), slow)); ids["VIPTELA-AAR-001"] != 0 {
-		t.Errorf("3.2%% is below the 5%% threshold: %v", ids)
 	}
 }

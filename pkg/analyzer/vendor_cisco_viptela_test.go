@@ -50,46 +50,22 @@ func TestDetectAARIssues_TooFewSegments_NoIssues(t *testing.T) {
 	}
 }
 
-func TestDetectAARIssues_SLAViolation_HighLoss(t *testing.T) {
+// Phase 4.53: VIPTELA-AAR-001 was retired (a TCP retransmission ratio is not an AAR SLA
+// measurement and says nothing about path switchover). The same inputs that used to
+// raise it, at both severity levels, must no longer produce it.
+func TestDetectAARIssues_HighRetransmitFlags_RetiredAAR001NotEmitted(t *testing.T) {
 	det := NewViptelaIssueDetector()
-	stream := makeViptelaStream(12345, 443, "TCP")
-	stream.Duration = 15.0
-	// 80% normal + 20% retransmit = 20% loss rate (> 5% threshold)
-	addViptelaSegments(stream, 16, "client_to_server", 0.01, false, false, false)
-	addViptelaSegments(stream, 4, "client_to_server", 0.01, false, true, false)
+	for _, retransmits := range []int{4, 5} { // 20% and 25% of 20 / ~33% of 15+5
+		stream := makeViptelaStream(12345, 443, "TCP")
+		stream.Duration = 15.0
+		addViptelaSegments(stream, 20-retransmits, "client_to_server", 0.01, false, false, false)
+		addViptelaSegments(stream, retransmits, "client_to_server", 0.01, false, true, false)
 
-	issues := det.detectAARIssues(stream)
-	found := false
-	for _, iss := range issues {
-		if iss.ID == "VIPTELA-AAR-001" {
-			found = true
-			if iss.Severity != SeverityHigh && iss.Severity != SeverityCritical {
-				t.Errorf("expected High or Critical severity for SLA violation, got %s", iss.Severity)
+		for _, iss := range det.detectAARIssues(stream) {
+			if iss.ID == "VIPTELA-AAR-001" {
+				t.Errorf("retired finding VIPTELA-AAR-001 was emitted (%d retransmits): %+v", retransmits, iss)
 			}
 		}
-	}
-	if !found {
-		t.Error("expected VIPTELA-AAR-001 SLA violation issue for high loss stream")
-	}
-}
-
-func TestDetectAARIssues_SLAViolation_CriticalLoss(t *testing.T) {
-	det := NewViptelaIssueDetector()
-	stream := makeViptelaStream(12345, 443, "TCP")
-	stream.Duration = 15.0
-	// >10% loss = critical
-	addViptelaSegments(stream, 15, "client_to_server", 0.01, false, false, false)
-	addViptelaSegments(stream, 5, "client_to_server", 0.01, false, true, false) // 25% retransmit
-
-	issues := det.detectAARIssues(stream)
-	found := false
-	for _, iss := range issues {
-		if iss.ID == "VIPTELA-AAR-001" && iss.Severity == SeverityCritical {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected VIPTELA-AAR-001 with Critical severity for >10% loss")
 	}
 }
 

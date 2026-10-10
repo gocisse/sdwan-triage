@@ -221,7 +221,9 @@ func TestDetectLAGIssues_MemberFailure_ThroughputDrop(t *testing.T) {
 	}
 }
 
-func TestDetectLAGIssues_HashImbalance_OOO(t *testing.T) {
+// Phase 4.53: VELOCLOUD-LAG-002 was retired (TCP-only out-of-order evidence that did
+// not establish LAG hashing). The same inputs must no longer produce it.
+func TestDetectLAGIssues_HighOOO_RetiredLAG002NotEmitted(t *testing.T) {
 	det := NewVeloCloudIssueDetector()
 	stream := makeVeloStream(12345, VeloCloudVCMPPort, "UDP")
 	stream.Duration = 10.0
@@ -241,14 +243,10 @@ func TestDetectLAGIssues_HashImbalance_OOO(t *testing.T) {
 	stream.PacketCount = uint64(len(stream.Segments))
 
 	issues := det.detectLAGIssues(stream)
-	found := false
 	for _, iss := range issues {
 		if iss.ID == "VELOCLOUD-LAG-002" {
-			found = true
+			t.Errorf("retired finding VELOCLOUD-LAG-002 was emitted: %+v", iss)
 		}
-	}
-	if !found {
-		t.Error("expected VELOCLOUD-LAG-002 LAG hash imbalance issue")
 	}
 }
 
