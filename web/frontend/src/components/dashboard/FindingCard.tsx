@@ -516,7 +516,7 @@ function getRiskWarning(findingKey: string): string | null {
     arp_conflict: 'Do not clear ARP on production routers during business hours — it causes brief packet loss for all connected devices.',
     tcp_retransmission: 'Enabling FEC (Forward Error Correction) adds ~10% overhead. Only enable on lossy links, not clean paths.',
     tcp_handshake_failure: 'Do not assume the server is down — a firewall may be silently dropping SYN packets. Check path firewalls first.',
-    packet_loss: 'Do not increase interface buffers excessively — this trades loss for latency, which harms real-time applications.',
+    packet_loss: 'Do not assume the retransmissions mean loss on the WAN — confirm loss first. Do not increase interface buffers excessively — this trades loss for latency, which harms real-time applications.',
     high_latency: 'Do not change SD-WAN path selection policy during peak hours — failover may cause a brief outage.',
     vrrp_flapping: 'Do not change VRRP priority on the active router without planning — it will trigger a failover.',
     hsrp_instability: 'Do not modify HSRP on both routers simultaneously — change one, verify, then change the other.',

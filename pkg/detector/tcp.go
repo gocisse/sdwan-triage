@@ -320,7 +320,10 @@ func (t *TCPAnalyzer) calculateRTT(tcp *layers.TCP, reverseFlowKey string, times
 	// Look for the original packet this ACK is responding to (using bounded cache)
 	reverseState := state.GetTCPFlow(reverseFlowKey)
 	if reverseState != nil {
-		if sentTime, ok := reverseState.Seq.Lookup(tcp.Ack - 1); ok && !reverseState.Seq.WasRetransmitted(tcp.Ack-1) {
+		if sentTime, ok := reverseState.Seq.Lookup(tcp.Ack - 1); ok && !reverseState.Seq.WasRetransmitted(tcp.Ack-1) && reverseState.Seq.ConsumeSample(tcp.Ack-1) {
+			// ConsumeSample: one transmission yields one sample; repeated ACKs
+			// for the same acknowledgment number are not re-timed against the
+			// original send time (Phase 4.44).
 			rtt := timestamp.Sub(sentTime).Seconds() * 1000 // Convert to milliseconds
 			if rtt > 0 && rtt < 10000 {                     // Sanity check: RTT should be < 10 seconds
 				reverseState.AddRTTSample(rtt)

@@ -90,7 +90,6 @@ FEATURES:
     • Malware Indicators (IOC checking with custom databases)
     • TLS Security Analysis (weak ciphers, outdated protocols)
     • BGP Hijack Heuristics
-    • GeoIP Analysis with country-based traffic distribution
 
   Performance Monitoring:
     • TCP Handshake Analysis (SYN → SYN-ACK → ACK tracking with color-coded states)

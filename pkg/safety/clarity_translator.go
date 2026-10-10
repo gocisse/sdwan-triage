@@ -132,13 +132,13 @@ var IssueTranslationLibrary = map[string]IssueTranslation{
 
 	"TCP-002": {
 		IssueID:               "TCP-002",
-		TechnicalDescription:  "High TCP retransmission rate (>5%) detected. Significant packet loss on network path causing performance degradation.",
-		CustomerFacingSummary: "Network is losing packets and having to resend them, slowing everything down.",
+		TechnicalDescription:  "High TCP retransmission rate (>5%) observed. Retransmissions do not by themselves establish packet loss; the cause (loss, congestion, delayed ACKs) must be determined.",
+		CustomerFacingSummary: "Data is having to be sent again, which slows everything down. The cause still needs to be found.",
 		UserExperience:        "Everything feels slow - websites, file transfers, applications.",
-		BusinessImpact:        "Data packets are getting lost on the way to their destination, so they have to be sent again. This makes everything slower.",
+		BusinessImpact:        "Data is being sent more than once, which makes everything slower. It may be because packets were lost or acknowledgments were late; the capture alone does not say which.",
 		UserSymptoms:          "• Everything network-related is slow\n• File transfers take much longer than expected\n• Video calls are choppy",
 		SafeFirstStep:         "Ask coworkers: 'Is the network slow for you too?' - this tells us if it's widespread.",
-		CommonMistake:         "Don't restart individual applications - this is a network path issue.",
+		CommonMistake:         "Don't restart individual applications - the resending points to the network path, though the exact cause is not yet known.",
 		EscalationTrigger:     "If multiple people experience slowness, escalate to network team immediately.",
 		ValidationSteps:       []string{"Verify scope of impact", "Check SD-WAN tunnel health", "Review network utilization"},
 	},

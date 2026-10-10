@@ -91,9 +91,6 @@ func TestProcessorInitialization(t *testing.T) {
 	if p.icmpAnalyzer == nil {
 		t.Error("icmpAnalyzer not initialized")
 	}
-	if p.geoipAnalyzer == nil {
-		t.Error("geoipAnalyzer not initialized")
-	}
 	if p.sdwanAnalyzer == nil {
 		t.Error("sdwanAnalyzer not initialized")
 	}

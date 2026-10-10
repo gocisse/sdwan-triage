@@ -4,7 +4,6 @@
   "event_counts": {
     "dns.anomaly": 11,
     "tcp.handshake_failed": 3,
-    "tcp.rtt_spike": 6,
     "tcp.syn_retransmission": 6,
     "tunnel.observed": 16
   },

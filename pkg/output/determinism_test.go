@@ -2,8 +2,6 @@ package output
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"testing"
 
@@ -20,32 +18,6 @@ func TestDeterminism_MapKeysToSlice(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		if got := mapKeysToSlice(m); !sort.StringsAreSorted(got) || len(got) != 30 {
 			t.Fatalf("run %d: not sorted: %v", i, got)
-		}
-	}
-}
-
-func TestDeterminism_GeoLocationsCSVAndView(t *testing.T) {
-	loc := map[string]int{}
-	ips := map[string][]string{}
-	for i := 0; i < 25; i++ { // all counts tie
-		c := fmt.Sprintf("Country%02d", i)
-		loc[c] = 3
-		ips[c] = []string{"192.0.2.1"}
-	}
-	var first, firstView string
-	for run := 0; run < 60; run++ {
-		path := filepath.Join(t.TempDir(), "geo.csv")
-		if err := generateGeoLocationsCSV(loc, path); err != nil {
-			t.Fatal(err)
-		}
-		b, _ := os.ReadFile(path)
-		view := fmt.Sprint(convertGeoLocations(loc, ips))
-		if run == 0 {
-			first, firstView = string(b), view
-			continue
-		}
-		if string(b) != first || view != firstView {
-			t.Fatalf("run %d: geo output differs", run)
 		}
 	}
 }

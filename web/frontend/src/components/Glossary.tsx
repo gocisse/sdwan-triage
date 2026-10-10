@@ -172,7 +172,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
   // Analysis Terms
   retransmission: {
     term: 'Retransmission',
-    definition: 'When TCP resends a segment because the original was lost or the acknowledgment was not received in time. Retransmissions indicate packet loss or network congestion.',
+    definition: 'When TCP resends a segment because the original was lost or the acknowledgment was not received in time. A retransmission shows that data was sent again; possible causes include packet loss, congestion, or delayed acknowledgments, and the retransmission alone does not show which.',
     category: 'tcp',
     relatedTerms: ['rto', 'fast_retransmit'],
     example: 'Fast retransmit occurs after 3 duplicate ACKs, without waiting for RTO.',
@@ -183,7 +183,7 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     definition: 'An acknowledgment for a sequence number that has already been acknowledged. Three or more duplicate ACKs trigger fast retransmit.',
     category: 'tcp',
     relatedTerms: ['retransmission', 'fast_retransmit'],
-    example: 'Duplicate ACKs indicate out-of-order delivery or packet loss.',
+    example: 'Duplicate ACKs can result from out-of-order delivery or packet loss; they do not by themselves prove either.',
     wiresharkFilter: 'tcp.analysis.duplicate_ack',
   },
   zero_window: {

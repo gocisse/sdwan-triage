@@ -132,6 +132,9 @@ func (d *PacketLossDetector) GetMetrics() *models.PacketLossMetrics {
 		return nil
 	}
 
+	// NOTE: PacketsLost / LossPercentage are legacy field names kept for
+	// compatibility. They hold OBSERVED RETRANSMISSIONS (see models.PacketLossMetrics),
+	// which are not proof that a packet was lost.
 	metrics := &models.PacketLossMetrics{
 		TotalPacketsSent:     d.totalPackets,
 		TotalPacketsReceived: d.totalPackets - d.retransmissions,

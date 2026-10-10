@@ -47,7 +47,7 @@ func (id *IssueDetector) DetectIssues(stream *models.StreamData) []StreamIssue {
 					Description: "RETRY - Packet retransmission",
 					Severity:    "Warning",
 					Timestamp:   seg.Timestamp.Format("15:04:05.000"),
-					Details:     "Network congestion or packet loss",
+					Details:     "Segment sent again; the capture does not show whether the original was lost or merely delayed",
 				})
 			}
 		}
@@ -136,7 +136,7 @@ func (id *IssueDetector) DetectIssues(stream *models.StreamData) []StreamIssue {
 			Icon:        "🔄",
 			Description: fmt.Sprintf("HIGH_RETRANSMIT - %d retransmissions total", retransmitCount),
 			Severity:    "Warning",
-			Details:     "Significant packet loss on this flow. Check SD-WAN path quality.",
+			Details:     "Many segments were sent again on this flow. Loss is not established by retransmissions alone; check SD-WAN path quality to find the cause.",
 		})
 	}
 

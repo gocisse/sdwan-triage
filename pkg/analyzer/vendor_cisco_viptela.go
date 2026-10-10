@@ -494,9 +494,9 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 		}
 		issues = append(issues, DetectedIssue{
 			ID:              "VIPTELA-AAR-001",
-			Title:           "AAR SLA Violation — High Loss, No Path Switchover",
-			TechnicalDesc:   fmt.Sprintf("%.1f%% packet loss on flow %s:%d→%s:%d over %.1fs — AAR SLA threshold (5%%) exceeded but traffic remains on degraded path", lossRate*100, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort, stream.Duration),
-			BusinessImpact:  "Business-critical application traffic experiencing packet loss; AAR policy not steering to backup path as configured",
+			Title:           "AAR SLA Violation — High Retransmission Rate, No Path Switchover",
+			TechnicalDesc:   fmt.Sprintf("%.1f%% of segments on flow %s:%d→%s:%d were retransmissions over %.1fs — above the 5%% retransmission threshold used as an AAR SLA proxy; retransmissions alone do not confirm packet loss or that traffic remains on a degraded path", lossRate*100, stream.SrcIP, stream.SrcPort, stream.DstIP, stream.DstPort, stream.Duration),
+			BusinessImpact:  "Business-critical application traffic shows a high retransmission rate; if the path is degraded, AAR may not be steering to a backup path as configured",
 			Severity:        severity,
 			Confidence:      0.85,
 			Category:        CategorySDWANData,
@@ -508,7 +508,7 @@ func (vid *ViptelaIssueDetector) detectAARIssues(stream *models.StreamData) []De
 			InvestigationSteps: []InvestigationStep{
 				{
 					Order:          1,
-					Purpose:        "Confirm packet loss on primary path",
+					Purpose:        "Check retransmissions on primary path (then confirm whether loss occurred)",
 					DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.retransmission",
 					ExpectedNormal: "< 1% retransmission rate",
 					AbnormalSign:   fmt.Sprintf("> 5%% retransmission — currently %.1f%%", lossRate*100),

@@ -388,7 +388,7 @@ function getWiresharkTips(findingKey: string): string[] {
       'Check the "Info" column for "[TCP Retransmission]" tags',
       'Right-click → Follow TCP Stream to see the full conversation',
       'Use Statistics → TCP Stream Graphs → Time-Sequence to visualize retransmits',
-      'High retransmission = packet loss between these two endpoints',
+      'High retransmission means data was re-sent between these two endpoints; confirm whether it was lost, delayed, or sent unnecessarily',
     ],
     tcp_handshake_failure: [
       'Look for SYN packets with no corresponding SYN-ACK reply',
@@ -399,10 +399,10 @@ function getWiresharkTips(findingKey: string): string[] {
     ],
     packet_loss: [
       'Look for "[TCP Previous segment not captured]" in the Info column',
-      'These indicate gaps in the sequence numbers — packets were lost',
+      'These indicate gaps in the sequence numbers — the missing packets were lost, or the capture point never saw them',
       'Use Statistics → TCP Stream Graphs → Throughput to spot drop points',
       'Check for duplicate ACKs (3+ dupes = fast retransmit triggered)',
-      'Lost segments often cluster during high-bandwidth bursts',
+      'Gaps and retransmissions often cluster during high-bandwidth bursts',
     ],
     high_latency: [
       'Use Statistics → TCP Stream Graphs → Round Trip Time',

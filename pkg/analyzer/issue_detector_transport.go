@@ -112,7 +112,7 @@ func detectTCPIssues(stream *models.StreamData, classification ServiceClassifica
 				Severity:        SeverityHigh,
 				Confidence:      0.85,
 				Category:        CategoryTCPIssues,
-				RootCause:       "Network packet loss, congestion, or path instability",
+				RootCause:       "Not determined by retransmissions alone; candidates include packet loss, congestion, delayed acknowledgments or path instability",
 				AffectedService: "TCP Connection",
 
 				BaseFilter:      buildStreamFilter(stream),

@@ -44,7 +44,6 @@ type Processor struct {
 	tlsSecurityAnalyzer  *detector.TLSSecurityAnalyzer
 	icmpAnalyzer         *detector.ICMPAnalyzer
 	icmpv6Analyzer       *detector.ICMPv6Analyzer
-	geoipAnalyzer        *detector.GeoIPAnalyzer
 	sdwanAnalyzer        *detector.SDWANVendorAnalyzer
 	sipAnalyzer          *detector.SIPAnalyzer
 	rtpAnalyzer          *detector.RTPAnalyzer
@@ -110,7 +109,6 @@ func NewProcessorWithOptions(qosEnabled bool, verbose bool) *Processor {
 		tlsSecurityAnalyzer:  detector.NewTLSSecurityAnalyzer(),
 		icmpAnalyzer:         detector.NewICMPAnalyzer(),
 		icmpv6Analyzer:       detector.NewICMPv6Analyzer(),
-		geoipAnalyzer:        detector.NewGeoIPAnalyzer(),
 		sdwanAnalyzer:        detector.NewSDWANVendorAnalyzer(),
 		sipAnalyzer:          detector.NewSIPAnalyzer(),
 		rtpAnalyzer:          detector.NewRTPAnalyzer(),
@@ -420,7 +418,6 @@ func (p *Processor) buildDetectorRegistry() *DetectorRegistry {
 		NewAnalyzerFunc("ICMPv6", p.icmpv6Analyzer.Analyze),
 
 		// Advanced network analysis
-		NewAnalyzerFunc("GeoIP", p.geoipAnalyzer.Analyze),
 		NewAnalyzerFunc("SDWAN-Vendor", p.sdwanAnalyzer.Analyze),
 		NewAnalyzerFunc("SIP", p.sipAnalyzer.Analyze),
 		NewAnalyzerFunc("RTP", p.rtpAnalyzer.Analyze),
@@ -910,9 +907,9 @@ func (p *Processor) generateRecommendations(report *models.TriageReport, issues 
 
 	// Warning actions
 	if issues["TCP Retransmissions"] > 50 {
-		actions = append(actions, "HIGH: Excessive TCP retransmissions indicate network congestion or hardware issues. Check links between affected hosts.")
+		actions = append(actions, "HIGH: Excessive TCP retransmissions observed. The capture does not establish the cause (packet loss, congestion, delayed ACKs or hardware); investigate the links between affected hosts.")
 	} else if issues["TCP Retransmissions"] > 10 {
-		actions = append(actions, "MEDIUM: TCP retransmissions detected. Monitor network links for potential issues.")
+		actions = append(actions, "MEDIUM: TCP retransmissions observed. Monitor network links; the cause is not determined from the capture.")
 	}
 	if issues["Failed Handshakes"] > 0 {
 		actions = append(actions, "MEDIUM: Failed TCP handshakes may indicate firewall blocks, service unavailability, or network issues.")
@@ -1059,11 +1056,6 @@ func (p *Processor) buildTrafficSummary(state *models.AnalysisState, report *mod
 
 	// Finalize SD-WAN vendor detection
 	p.finalizeSDWANAnalysis(report)
-
-	// Finalize GeoIP analysis
-	report.LocationSummary = p.geoipAnalyzer.GetLocationSummary()
-	report.LocationIPs = p.geoipAnalyzer.GetCountryIPs()
-	report.LocationDetails = p.geoipAnalyzer.GetLocationDetails()
 }
 
 // finalizeVoIPAnalysis populates VoIP analysis results

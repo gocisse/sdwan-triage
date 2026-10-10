@@ -185,16 +185,16 @@ func generateTopIssues(report *models.TriageReport) []PrioritizedIssue {
 			Severity:        "medium",
 			Category:        "performance",
 			Title:           "High Packet Retransmissions",
-			PlainEnglish:    "Packets are being lost and need to be resent, slowing everything down.",
+			PlainEnglish:    "Data is being sent again. The capture does not show whether packets were lost, delayed or acknowledged late, but repeated resending slows transfers.",
 			BusinessImpact:  "Applications feel slow. File transfers take longer. Video calls may stutter.",
 			AffectedCount:   len(report.TCPRetransmissions),
 			WiresharkFilter: "tcp.analysis.retransmission",
-			QuickFix:        "Check for network congestion, cable issues, or overloaded switches.",
+			QuickFix:        "Find out why data is being resent: check the path between the hosts for congestion, interface errors or overloaded devices.",
 			DetailedSteps: []string{
 				"1. Identify which flows have the most retransmissions",
 				"2. Check the network path between source and destination",
 				"3. Look for interface errors: show interface [name] (on switches)",
-				"4. Check for duplex mismatches or cable problems",
+				"4. If interface errors are present, check for duplex mismatches or cable problems",
 				"5. Review QoS policies - is traffic being dropped?",
 			},
 			Icon:  "fa-redo",
@@ -450,10 +450,10 @@ func generateEnhancedProtocolGuides(report *models.TriageReport) []ProtocolGuide
 		}
 
 		impactLevel := "low"
-		impactDetails := "Minor TCP retransmissions detected"
+		impactDetails := "Minor TCP retransmissions observed"
 		if len(report.TCPRetransmissions) > 500 {
 			impactLevel = "critical"
-			impactDetails = fmt.Sprintf("Severe network issues: %d TCP retransmissions - major packet loss or congestion", len(report.TCPRetransmissions))
+			impactDetails = fmt.Sprintf("%d TCP retransmissions observed - a high number; cause (loss, congestion, delayed ACKs) not determined from the capture", len(report.TCPRetransmissions))
 		} else if len(report.TCPRetransmissions) > 100 {
 			impactLevel = "high"
 			impactDetails = fmt.Sprintf("%d TCP retransmissions - significant performance degradation expected", len(report.TCPRetransmissions))
@@ -466,8 +466,8 @@ func generateEnhancedProtocolGuides(report *models.TriageReport) []ProtocolGuide
 			Protocol:        "TCP Retransmissions",
 			Icon:            "fa-exchange-alt",
 			Color:           "#ef4444",
-			CommonIssues:    []string{"Packet loss", "Network congestion", "Routing issues", "Firewall problems"},
-			TroubleshootTip: "Analyze retransmission patterns, check for packet loss, verify network path MTU",
+			CommonIssues:    []string{"Packet loss (possible, not established by retransmissions alone)", "Network congestion", "Delayed acknowledgments", "Routing issues", "Firewall problems"},
+			TroubleshootTip: "Analyze retransmission patterns, determine whether the originals were lost (look for sequence gaps and duplicate ACKs) or merely delayed, verify network path MTU",
 			WiresharkFilter: "tcp.analysis.retransmission",
 			LearnMoreURL:    "https://wiki.wireshark.org/TCP_Analyze_Sequence_Numbers",
 			PacketCount:     len(report.TCPRetransmissions),
@@ -490,9 +490,9 @@ func generateEnhancedProtocolGuides(report *models.TriageReport) []ProtocolGuide
 				},
 				{
 					Name:        "Fast Retransmissions",
-					Description: "Fast retransmissions indicate packet loss",
+					Description: "Fast retransmissions follow duplicate ACKs, which suggest a missing segment (not proof of loss)",
 					Filter:      "tcp.analysis.fast_retransmission",
-					UseCase:     "Identifying packet loss events",
+					UseCase:     "Identifying likely loss-triggered retransmissions",
 				},
 				{
 					Name:        "Spurious Retransmissions",

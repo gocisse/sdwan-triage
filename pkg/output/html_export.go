@@ -92,8 +92,8 @@ func generateFindingsSection(report interface{}) string {
     <div class="card-body">
         <p style="margin-bottom: 15px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
             <strong><i class="fas fa-info-circle"></i> What are TCP Retransmissions?</strong>
-            TCP retransmissions occur when packets are lost or corrupted in transit, requiring resending. 
-            High retransmission rates indicate network congestion, faulty equipment, or poor link quality.
+            TCP retransmissions occur when a sender sends data again, for example after packet loss or corruption, a delayed acknowledgment or a timeout.
+            A high retransmission rate warrants finding the cause (congestion, faulty equipment or poor link quality are possible); the retransmissions alone do not show which.
         </p>
         <div id="tcp-retransmissions-content">
             <p class="empty-state">No significant TCP retransmissions detected.</p>

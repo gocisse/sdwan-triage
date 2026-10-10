@@ -702,28 +702,6 @@ func generateNetworkPage(data *ReportData, outputPath string) error {
                     </div>
                     {{end}}
 
-                    {{if .GeoLocations}}
-                    <div class="card">
-                        <div class="card-header">
-                            <i class="fas fa-globe-americas"></i>
-                            <h2>Geographic Distribution ({{len .GeoLocations}})</h2>
-                        </div>
-                        <div class="card-body">
-                            <table class="data-table">
-                                <thead><tr><th>Country</th><th>Connections</th></tr></thead>
-                                <tbody>
-                                    {{range .GeoLocations}}
-                                    <tr>
-                                        <td>{{.Country}}</td>
-                                        <td>{{.Count}}</td>
-                                    </tr>
-                                    {{end}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {{end}}
-
                     {{if .VoIPAnalysis}}
                     <div class="card">
                         <div class="card-header">

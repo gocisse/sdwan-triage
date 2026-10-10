@@ -293,13 +293,6 @@ export function filterResults(results: AnalysisResults, filters: GlobalFilters):
     );
   }
 
-  // ─── GeoIP Details ─────────────────────────────────────────
-  if (results.location_details) {
-    filtered.location_details = results.location_details.filter(f =>
-      flowMatchesIPs(f.ip, undefined, srcIP, dstIP)
-    );
-  }
-
   // ─── Stability Findings ────────────────────────────────────
   if (results.stability_findings) {
     filtered.stability_findings = results.stability_findings.filter(f =>

@@ -68,15 +68,18 @@ func GenerateSimpleReport(report *models.TriageReport, pcapFile string) {
 	fmt.Println("🔍 WHAT'S HAPPENING ON YOUR NETWORK")
 	fmt.Println(strings.Repeat("─", 60))
 
+	// PacketLoss.PacketsLost / LossPercentage are legacy field names: they count
+	// TCP retransmissions (see detectors/packet_loss.go), which show that a
+	// segment was sent again, not that it was lost. Say what was measured.
 	if report.PacketLoss != nil && report.PacketLoss.LossPercentage > 0 {
 		if report.PacketLoss.LossPercentage > 5 {
-			red.Printf("• %.1f%% of your data is being lost in transmission\n", report.PacketLoss.LossPercentage)
-			fmt.Println("  This means: Some of your data isn't reaching its destination")
-			fmt.Println("  Impact: Slow performance, failed downloads, choppy video calls")
+			red.Printf("• TCP retransmissions observed: %d (%.1f%% of captured packets)\n", report.PacketLoss.PacketsLost, report.PacketLoss.LossPercentage)
+			fmt.Println("  This means: Data was sent again. The capture alone does not show whether it was lost, delayed or acknowledged late")
+			fmt.Println("  Impact: Possible slow performance, stalled downloads or choppy video calls")
 		} else if report.PacketLoss.LossPercentage > 1 {
-			yellow.Printf("• %.1f%% packet loss detected\n", report.PacketLoss.LossPercentage)
-			fmt.Println("  This means: Minor data loss is occurring")
-			fmt.Println("  Impact: Occasional slowdowns or glitches")
+			yellow.Printf("• TCP retransmissions observed: %d (%.1f%% of captured packets)\n", report.PacketLoss.PacketsLost, report.PacketLoss.LossPercentage)
+			fmt.Println("  This means: Some data was sent again; the cause is not determined from the capture")
+			fmt.Println("  Impact: Occasional slowdowns or glitches are possible")
 		}
 	}
 

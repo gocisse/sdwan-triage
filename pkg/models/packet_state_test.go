@@ -301,3 +301,25 @@ func TestSeqHistory_MarkRetransmitted(t *testing.T) {
 		t.Fatal("re-recorded seq must start unflagged")
 	}
 }
+
+func TestSeqHistory_ConsumeSample(t *testing.T) {
+	h := NewSeqHistory(2)
+	ts := time.Unix(100, 0)
+	if h.ConsumeSample(1) {
+		t.Fatal("unremembered seq must not yield a sample")
+	}
+	h.Record(1, ts)
+	if !h.ConsumeSample(1) {
+		t.Fatal("first use must be allowed")
+	}
+	if h.ConsumeSample(1) {
+		t.Fatal("second use must be refused")
+	}
+	// Eviction drops the used-mark with the entry; a re-recorded seq is fresh.
+	h.Record(2, ts)
+	h.Record(3, ts) // evicts 1
+	h.Record(1, ts) // evicts 2
+	if !h.ConsumeSample(1) {
+		t.Fatal("re-recorded seq must be sampleable again")
+	}
+}

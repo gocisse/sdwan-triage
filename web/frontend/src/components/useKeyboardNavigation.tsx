@@ -174,7 +174,7 @@ export function getPacketRowColor(packet: ColorablePacket): PacketColorInfo {
     };
   }
   
-  // Duplicate ACKs — potential packet loss
+  // Duplicate ACKs — possible missing segment (not proof of loss)
   if (packet.is_duplicate_ack) {
     return {
       rowClass: 'bg-yellow-900/20 hover:bg-yellow-900/30 border-l-2 border-yellow-500',

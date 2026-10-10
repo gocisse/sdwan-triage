@@ -488,7 +488,7 @@ func extractActiveFindings(results map[string]interface{}) []WizardFinding {
 	if retrans, ok := results["tcp_retransmissions"].([]interface{}); ok && len(retrans) > 0 {
 		findings = append(findings, WizardFinding{
 			FindingKey: "tcp_retransmission", Label: "TCP Retransmissions", Count: len(retrans), Severity: "Warning", Confidence: "high",
-			Explanation: "High TCP retransmission rate indicating packet loss.",
+			Explanation: "TCP retransmissions observed; the capture does not establish whether the original segments were lost, delayed or retransmitted unnecessarily.",
 		})
 	}
 

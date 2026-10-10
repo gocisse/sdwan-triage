@@ -6,7 +6,7 @@
     "tcp.duplicate_ack_run": 5,
     "tcp.handshake_failed": 101,
     "tcp.retransmission": 9,
-    "tcp.rtt_spike": 6,
+    "tcp.rtt_spike": 3,
     "tcp.sequence_gap": 2349,
     "tcp.syn_retransmission": 2,
     "tunnel.observed": 4

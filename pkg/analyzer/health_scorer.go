@@ -297,8 +297,8 @@ func (hs *HealthScorer) evaluateVoIP(stream *models.StreamData, classification *
 			score.PerformanceFlags = append(score.PerformanceFlags, PerformanceFlag{
 				Type:        "voip_packet_loss",
 				Severity:    "critical",
-				Description: "VoIP packet loss detected",
-				Metric:      "Packet Loss",
+				Description: "High retransmission rate on VoIP stream (loss not established by retransmissions alone)",
+				Metric:      "Retransmission Rate",
 				Expected:    "< 1%",
 				Actual:      fmtPercent(retransmitRate),
 			})

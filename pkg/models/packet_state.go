@@ -131,6 +131,7 @@ type SeqHistory struct {
 	head     int
 	index    map[uint32]time.Time
 	retx     map[uint32]struct{} // sequence numbers observed retransmitted (bounded with index)
+	sampled  map[uint32]struct{} // sequence numbers already used for an RTT sample (bounded with index)
 }
 
 // NewSeqHistory creates a history remembering up to capacity sequence numbers.
@@ -143,6 +144,7 @@ func NewSeqHistory(capacity int) *SeqHistory {
 		ring:     make([]uint32, 0, minInt(capacity, 16)),
 		index:    make(map[uint32]time.Time, minInt(capacity, 16)),
 		retx:     make(map[uint32]struct{}),
+		sampled:  make(map[uint32]struct{}),
 	}
 }
 
@@ -158,6 +160,7 @@ func (h *SeqHistory) Record(seq uint32, ts time.Time) {
 	} else {
 		delete(h.index, h.ring[h.head])
 		delete(h.retx, h.ring[h.head])
+		delete(h.sampled, h.ring[h.head])
 		h.ring[h.head] = seq
 		h.head = (h.head + 1) % h.capacity
 	}
@@ -171,6 +174,22 @@ func (h *SeqHistory) MarkRetransmitted(seq uint32) {
 	if _, ok := h.index[seq]; ok {
 		h.retx[seq] = struct{}{}
 	}
+}
+
+// ConsumeSample reports whether seq may still be used as an RTT sample and, if
+// so, marks it used. One transmission yields at most one sample: later ACKs
+// carrying the same acknowledgment number (duplicate ACKs, repeated pure ACKs)
+// are not new measurements and must not be timed against the original send
+// time. Returns false for unremembered seqs.
+func (h *SeqHistory) ConsumeSample(seq uint32) bool {
+	if _, ok := h.index[seq]; !ok {
+		return false
+	}
+	if _, used := h.sampled[seq]; used {
+		return false
+	}
+	h.sampled[seq] = struct{}{}
+	return true
 }
 
 // WasRetransmitted reports whether seq was flagged by MarkRetransmitted.

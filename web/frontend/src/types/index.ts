@@ -152,11 +152,6 @@ export interface AnalysisResults {
 
   // QoS Analysis
   qos_analysis?: QoSReport;
-
-  // GeoIP
-  location_summary?: Record<string, number>;
-  location_ips?: Record<string, string[]>;
-  location_details?: GeoIPDetail[];
 }
 
 // Security analysis container
@@ -515,23 +510,6 @@ export interface DeviceFingerprint {
   os_type: string;
   os_name: string;
   confidence: string;
-}
-
-export interface GeoLocation {
-  country: string;
-  country_code: string;
-  ip_count: number;
-  bytes: number;
-  percent: number;
-}
-
-export interface GeoIPDetail {
-  ip: string;
-  country: string;
-  country_code: string;
-  city?: string;
-  latitude: number;
-  longitude: number;
 }
 
 // DHCP finding

@@ -20,9 +20,21 @@ type StreamReassembler struct {
 	state           *models.StreamReassemblyState
 	maxBytesPerFlow int
 	verbose         bool
-	lastSeqNum      map[string]uint32 // Track last sequence number per flow for retransmit detection
-	lastTimestamp   map[string]int64  // Track last timestamp per flow for gap detection
-	mu              sync.RWMutex      // Protects state and maps for concurrent access
+	seqState        map[string]*streamSeqState // Per flow+direction sequence history for retransmit / out-of-sequence classification
+	lastTimestamp   map[string]int64           // Track last timestamp per flow for gap detection
+	mu              sync.RWMutex               // Protects state and maps for concurrent access
+}
+
+// streamSeqState is the bounded per flow+direction sequence state used to label
+// stream segments. It deliberately reuses the shared retransmission rule
+// (models.ClassifyTCPSegment) so the stream view agrees with the TCP analyzer,
+// instead of comparing against the previous packet only.
+type streamSeqState struct {
+	seq          *models.SeqHistory // recently seen start sequence numbers (bounded)
+	highestNext  uint32             // highest seq+len seen (keep-alive recognition)
+	highestValid bool
+	highestSeq   uint32 // highest START sequence seen (out-of-sequence reference)
+	seqValid     bool
 }
 
 // NewStreamReassembler creates a new stream reassembler
@@ -31,7 +43,7 @@ func NewStreamReassembler(verbose bool) *StreamReassembler {
 		state:           models.NewStreamReassemblyState(),
 		maxBytesPerFlow: 10 * 1024, // 10KB per direction
 		verbose:         verbose,
-		lastSeqNum:      make(map[string]uint32),
+		seqState:        make(map[string]*streamSeqState),
 		lastTimestamp:   make(map[string]int64),
 	}
 }
@@ -55,21 +67,21 @@ func (sr *StreamReassembler) CleanupStaleFlows(maxAge time.Duration, now time.Ti
 	for flowID, stream := range sr.state.Streams {
 		if now.Sub(stream.LastSeen) > maxAge {
 			delete(sr.state.Streams, flowID)
-			delete(sr.lastSeqNum, flowID)
+			delete(sr.seqState, flowID)
 			delete(sr.lastTimestamp, flowID)
 			evicted++
 		}
 	}
 
 	// Also clean up direction-specific entries in tracking maps
-	for dirFlowKey := range sr.lastSeqNum {
+	for dirFlowKey := range sr.seqState {
 		// Extract base flowID (remove direction suffix)
 		baseFlowID := dirFlowKey
 		if idx := strings.LastIndex(dirFlowKey, "/"); idx > 0 {
 			baseFlowID = dirFlowKey[:idx]
 		}
 		if _, exists := sr.state.Streams[baseFlowID]; !exists {
-			delete(sr.lastSeqNum, dirFlowKey)
+			delete(sr.seqState, dirFlowKey)
 		}
 	}
 
@@ -186,18 +198,41 @@ func (sr *StreamReassembler) ProcessPacket(packet gopacket.Packet) {
 	var gapFromPrev float64
 	var anomalyReason string
 
-	// Check for retransmission (same or lower seq num for TCP)
+	// Classify against the direction's bounded sequence history (modular
+	// arithmetic, shared rule):
+	//   - retransmission: payload whose start sequence was already seen;
+	//   - keep-alive probe (1 byte at highest_next-1): neither label;
+	//   - out-of-order: first-seen segment that starts BEFORE the highest start
+	//     sequence seen. That is out-of-sequence arrival (reordering, or a
+	//     hole-fill / resend of an original this capture did not see); a single
+	//     capture cannot tell them apart and it is not evidence of loss.
+	// A forward jump (gap) is no longer labelled: the missing range is reported
+	// by the tcp.sequence_gap evidence, not as out-of-order data.
 	if protocol == "TCP" && seqNum > 0 {
-		if lastSeq, ok := sr.lastSeqNum[dirFlowKey]; ok {
-			if seqNum <= lastSeq && seqNum != 0 {
-				isRetransmit = true
-				anomalyReason = "Retransmission detected"
-			} else if seqNum > lastSeq+uint32(len(payload))+1000 {
+		st := sr.seqState[dirFlowKey]
+		if st == nil {
+			st = &streamSeqState{seq: models.NewSeqHistory(models.DefaultSeqHistorySize)}
+			sr.seqState[dirFlowKey] = st
+		}
+		switch models.ClassifyTCPSegment(st.seq, st.highestNext, st.highestValid, seqNum, len(payload)) {
+		case models.SegmentKeepAliveShape:
+			// not data: no label, no history update
+		case models.SegmentRetransmission:
+			isRetransmit = true
+			anomalyReason = "Retransmission detected"
+		default:
+			st.seq.Record(seqNum, time.Time{})
+			if st.seqValid && int32(seqNum-st.highestSeq) < 0 {
 				isOutOfOrder = true
 				anomalyReason = "Out-of-order packet"
+			} else {
+				st.highestSeq, st.seqValid = seqNum, true
+			}
+			next := seqNum + uint32(len(payload))
+			if !st.highestValid || models.SeqAfterOrEqual(next, st.highestNext) {
+				st.highestNext, st.highestValid = next, true
 			}
 		}
-		sr.lastSeqNum[dirFlowKey] = seqNum
 	}
 
 	// Check for time gaps (>1 second gap is notable)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/gocisse/sdwan-triage/pkg/events"
 	"github.com/gocisse/sdwan-triage/pkg/models"
@@ -96,6 +97,15 @@ type tcpOOOTracker struct {
 	TotalPackets int
 	OOOCount     int
 	Initialized  bool
+
+	// seq remembers recently seen start sequence numbers of this direction and
+	// highestNext/highestValid its highest next sequence number. They feed the
+	// shared models.ClassifyTCPSegment so a retransmission or keep-alive is not
+	// mistaken for out-of-order data (Phase 4.49). Bounded like every other
+	// per-flow SeqHistory.
+	seq          *models.SeqHistory
+	highestNext  uint32
+	highestValid bool
 }
 
 // NewTCPAdvancedAnalyzer creates a new TCP advanced analyzer
@@ -277,8 +287,26 @@ func (t *TCPAdvancedAnalyzer) analyzeOutOfOrder(tcp *layers.TCP, ipInfo *PacketI
 			DstIP:   ipInfo.DstIP,
 			SrcPort: srcPort,
 			DstPort: dstPort,
+			seq:     models.NewSeqHistory(models.DefaultSeqHistorySize),
 		}
 		t.oooFlows[flowKey] = tracker
+	}
+
+	// Retransmissions and keep-alive probes are decided by the same shared rule
+	// the retransmission consumers use. They are not out-of-order data and do not
+	// take part in the out-of-order denominator or the highest-sequence marker.
+	// Genuine reordering (a first-seen segment below the highest sequence) is NOT
+	// a retransmission by that rule and is still counted below.
+	switch models.ClassifyTCPSegment(tracker.seq, tracker.highestNext, tracker.highestValid, tcp.Seq, len(tcp.Payload)) {
+	case models.SegmentKeepAliveShape:
+		return
+	case models.SegmentRetransmission:
+		return
+	}
+	tracker.seq.Record(tcp.Seq, time.Time{})
+	next := tcp.Seq + uint32(len(tcp.Payload))
+	if !tracker.highestValid || models.SeqAfterOrEqual(next, tracker.highestNext) {
+		tracker.highestNext, tracker.highestValid = next, true
 	}
 
 	tracker.TotalPackets++
@@ -289,18 +317,16 @@ func (t *TCPAdvancedAnalyzer) analyzeOutOfOrder(tcp *layers.TCP, ipInfo *PacketI
 		return
 	}
 
-	// Detect out-of-order: sequence number is less than expected
-	// (accounting for wraparound)
-	expectedSeq := tracker.LastSeq + uint32(len(tcp.Payload))
-	if tcp.Seq < tracker.LastSeq && (tracker.LastSeq-tcp.Seq) < 0x80000000 {
+	// Out-of-order: a first-seen segment whose sequence number is before the
+	// highest start sequence seen (modular, so correct across wrap-around).
+	// This is an out-of-sequence observation; it does not by itself show
+	// reordering in the network or packet loss (a hole-filling segment also
+	// qualifies, and a single capture point cannot tell the two apart).
+	if d := int32(tcp.Seq - tracker.LastSeq); d < 0 {
 		tracker.OOOCount++
-	}
-
-	// Update last seen sequence
-	if tcp.Seq > tracker.LastSeq || (tcp.Seq < tracker.LastSeq && (tracker.LastSeq-tcp.Seq) > 0x80000000) {
+	} else if d > 0 {
 		tracker.LastSeq = tcp.Seq
 	}
-	_ = expectedSeq
 }
 
 // Finalize generates findings from accumulated out-of-order data

@@ -52,13 +52,10 @@ type TriageReport struct {
 	Security SecurityAnalysis `json:"security"`
 
 	// Network Analysis
-	ICMPAnalysis    []ICMPFinding       `json:"icmp_analysis,omitempty"`
-	VoIPAnalysis    *VoIPAnalysis       `json:"voip_analysis,omitempty"`
-	TunnelAnalysis  []TunnelFinding     `json:"tunnel_analysis,omitempty"`
-	SDWANVendors    []SDWANVendor       `json:"sdwan_vendors,omitempty"`
-	LocationSummary map[string]int      `json:"location_summary,omitempty"`
-	LocationIPs     map[string][]string `json:"location_ips,omitempty"`
-	LocationDetails []GeoIPDetail       `json:"location_details,omitempty"`
+	ICMPAnalysis   []ICMPFinding   `json:"icmp_analysis,omitempty"`
+	VoIPAnalysis   *VoIPAnalysis   `json:"voip_analysis,omitempty"`
+	TunnelAnalysis []TunnelFinding `json:"tunnel_analysis,omitempty"`
+	SDWANVendors   []SDWANVendor   `json:"sdwan_vendors,omitempty"`
 
 	// Packet Loss Metrics
 	PacketLoss *PacketLossMetrics `json:"packet_loss,omitempty"`
@@ -723,7 +720,17 @@ type TunnelFinding struct {
 	SDWANPath string `json:"sdwan_path,omitempty"` // Wireshark filter for this tunnel
 }
 
-// PacketLossMetrics contains packet loss analysis
+// PacketLossMetrics contains the TCP retransmission statistics gathered by
+// pkg/detectors/packet_loss.go.
+//
+// LEGACY NAMES: PacketsLost, LossPercentage (and TotalPacketsReceived, which is
+// TotalPacketsSent - PacketsLost) are kept for JSON/API compatibility, but they
+// are derived from OBSERVED TCP RETRANSMISSIONS, not from confirmed loss. A
+// retransmission shows a segment was sent again; it does not establish that the
+// original was lost, where, or why (it may be a delayed ACK or a spurious
+// retransmission). LossPercentage equals RetransmissionRate: retransmitted data
+// segments as a percentage of ALL captured packets. User-facing text must say
+// "retransmissions observed", not "packets lost".
 type PacketLossMetrics struct {
 	TotalPacketsSent     uint64           `json:"total_packets_sent"`
 	TotalPacketsReceived uint64           `json:"total_packets_received"`
@@ -735,7 +742,9 @@ type PacketLossMetrics struct {
 	PerFlowLoss          []FlowPacketLoss `json:"per_flow_loss,omitempty"`
 }
 
-// FlowPacketLoss represents packet loss for a specific flow
+// FlowPacketLoss holds per-flow TCP retransmission counts under the same legacy
+// names as PacketLossMetrics: PacketsLost is the flow's observed retransmission
+// count, not confirmed loss.
 type FlowPacketLoss struct {
 	SrcIP          string  `json:"src_ip"`
 	DstIP          string  `json:"dst_ip"`
@@ -845,16 +854,6 @@ type SDWANVendor struct {
 	PacketCount int     `json:"packet_count"`
 	FirstSeen   float64 `json:"first_seen"`
 	LastSeen    float64 `json:"last_seen"`
-}
-
-// GeoIPDetail represents per-IP geographic location for the map visualization
-type GeoIPDetail struct {
-	IP          string  `json:"ip"`
-	Country     string  `json:"country"`
-	CountryCode string  `json:"country_code"`
-	City        string  `json:"city,omitempty"`
-	Latitude    float64 `json:"latitude"`
-	Longitude   float64 `json:"longitude"`
 }
 
 // LANProtocolFindings contains all LAN protocol detection results

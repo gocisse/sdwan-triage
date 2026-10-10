@@ -335,7 +335,7 @@ func (ba *BandwidthAnalyzer) GetPlainEnglishSummary(report *models.TriageReport,
 	// TCP retransmissions
 	if len(report.TCPRetransmissions) > 10 {
 		summary.PerformanceIssues = append(summary.PerformanceIssues,
-			fmt.Sprintf("🟡 %d TCP retransmissions detected — indicates packet loss or congestion",
+			fmt.Sprintf("🟡 %d TCP retransmissions observed — cause (packet loss, congestion, delayed ACKs) not determined from the capture",
 				len(report.TCPRetransmissions)))
 	}
 

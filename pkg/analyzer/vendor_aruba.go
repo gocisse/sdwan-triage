@@ -98,7 +98,7 @@ func (aid *ArubaIssueDetector) detectPathConditioningIssues(stream *models.Strea
 
 	healthScore := aid.healthScorer.ScoreStream(stream)
 
-	// High packet loss on tunnel (path conditioning should mitigate)
+	// High retransmission rate on tunnel (path conditioning should mitigate loss)
 	retransmitCount := 0
 	for _, segment := range stream.Segments {
 		if segment.IsRetransmit {
@@ -112,7 +112,7 @@ func (aid *ArubaIssueDetector) detectPathConditioningIssues(stream *models.Strea
 			issue := DetectedIssue{
 				ID:              "ARUBA-PATH-001",
 				Title:           "Path Conditioning Ineffective",
-				TechnicalDesc:   "High packet loss on EdgeConnect tunnel despite path conditioning enabled",
+				TechnicalDesc:   "High TCP retransmission rate on EdgeConnect tunnel despite path conditioning enabled (loss itself is not established by retransmissions)",
 				BusinessImpact:  "Application performance degraded, real-time traffic quality poor",
 				Severity:        SeverityHigh,
 				Confidence:      0.85,
@@ -127,7 +127,7 @@ func (aid *ArubaIssueDetector) detectPathConditioningIssues(stream *models.Strea
 				InvestigationSteps: []InvestigationStep{
 					{
 						Order:          1,
-						Purpose:        "Analyze tunnel packet loss",
+						Purpose:        "Analyze tunnel retransmissions (then confirm whether loss occurred)",
 						DisplayFilter:  buildStreamFilter(stream) + " && tcp.analysis.retransmission",
 						ExpectedNormal: "< 1% retransmission rate",
 						AbnormalSign:   "> 5% retransmission rate",
@@ -902,12 +902,12 @@ func (aid *ArubaIssueDetector) detectSaaSOptimizationIssues(stream *models.Strea
 		issues = append(issues, DetectedIssue{
 			ID:              "ARUBA-SAAS-003",
 			Title:           "SaaS Path Quality Degraded — High Retransmit Rate",
-			TechnicalDesc:   fmt.Sprintf("SaaS flow to %s (matched: %s) showing %.1f%% retransmit rate — internet path to SaaS is lossy, SaaS optimization not protecting quality", stream.ServerName, matchedSaaS, retransmitRate*100),
-			BusinessImpact:  "SaaS application experiencing packet loss; file uploads/downloads slow, video calls dropping",
+			TechnicalDesc:   fmt.Sprintf("SaaS flow to %s (matched: %s) showing %.1f%% retransmit rate — the internet path to SaaS may be lossy or delayed (not established by retransmissions alone); SaaS optimization may not be protecting quality", stream.ServerName, matchedSaaS, retransmitRate*100),
+			BusinessImpact:  "SaaS application shows a high retransmission rate; file uploads/downloads may be slow",
 			Severity:        SeverityHigh,
 			Confidence:      0.80,
 			Category:        CategorySDWANData,
-			RootCause:       "Internet path to SaaS experiencing packet loss; no alternate path configured in BIO, or FEC not enabled for SaaS overlay",
+			RootCause:       "Internet path to SaaS possibly experiencing loss or delay (to be confirmed); no alternate path configured in BIO, or FEC not enabled for SaaS overlay",
 			AffectedService: "Aruba EdgeConnect SaaS Optimization",
 			BaseFilter:      buildStreamFilter(stream),
 			ExpandedFilter:  buildExpandedFilter(stream) + " && tcp.analysis.retransmission",

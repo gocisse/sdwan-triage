@@ -895,12 +895,12 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
       findings.push(
         <FindingCard
           key="packet-loss"
-          title="Packet Loss Detected"
+          title="TCP Retransmissions Observed"
           findingKey="packet_loss"
           detectedVendors={detectedVendors}
           severity={lossSeverity}
           count={pktLoss.packets_lost}
-          description={`${lossPct.toFixed(1)}% packet loss (${pktLoss.packets_lost.toLocaleString()} of ${pktLoss.total_packets_sent.toLocaleString()} packets lost)`}
+          description={`${pktLoss.packets_lost.toLocaleString()} TCP retransmissions observed (${lossPct.toFixed(1)}% of ${pktLoss.total_packets_sent.toLocaleString()} captured packets); a retransmission does not by itself show the original packet was lost`}
           knowledge={issueKnowledgeBase.packet_loss}
           eli5Mode={eli5Mode}
           details={
@@ -912,11 +912,11 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
                 </div>
                 <div className="bg-slate-900/40 rounded-lg p-3 text-center">
                   <p className="text-lg font-bold text-red-400">{pktLoss.packets_lost.toLocaleString()}</p>
-                  <p className="text-xs text-slate-500">Packets Lost</p>
+                  <p className="text-xs text-slate-500">Retransmissions Observed</p>
                 </div>
                 <div className="bg-slate-900/40 rounded-lg p-3 text-center">
                   <p className={`text-lg font-bold ${lossPct > 5 ? 'text-red-400' : lossPct > 1 ? 'text-amber-400' : 'text-green-400'}`}>{lossPct.toFixed(2)}%</p>
-                  <p className="text-xs text-slate-500">Loss Rate</p>
+                  <p className="text-xs text-slate-500">Retransmissions / Captured Packets</p>
                 </div>
                 <div className="bg-slate-900/40 rounded-lg p-3 text-center">
                   <p className="text-lg font-bold text-amber-400">{pktLoss.retransmission_rate.toFixed(2)}%</p>
@@ -931,8 +931,8 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
                         <th className="px-3 py-2 text-left text-slate-500 font-medium">Source</th>
                         <th className="px-3 py-2 text-left text-slate-500 font-medium">Destination</th>
                         <th className="px-3 py-2 text-right text-slate-500 font-medium">Sent</th>
-                        <th className="px-3 py-2 text-right text-slate-500 font-medium">Lost</th>
-                        <th className="px-3 py-2 text-right text-slate-500 font-medium">Loss %</th>
+                        <th className="px-3 py-2 text-right text-slate-500 font-medium">Retransmissions</th>
+                        <th className="px-3 py-2 text-right text-slate-500 font-medium">Retransmit %</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1778,7 +1778,7 @@ function FindingsPanel({ results, category, eli5Mode, detectedVendors, onFollowS
                         <th className="px-3 py-2 text-left text-slate-500 font-medium">Codec</th>
                         <th className="px-3 py-2 text-left text-slate-500 font-medium">Packets</th>
                         <th className="px-3 py-2 text-left text-slate-500 font-medium">Jitter</th>
-                        <th className="px-3 py-2 text-left text-slate-500 font-medium">Lost</th>
+                        <th className="px-3 py-2 text-left text-slate-500 font-medium">Retransmissions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/30">

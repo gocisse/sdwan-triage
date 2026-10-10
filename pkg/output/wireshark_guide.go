@@ -265,7 +265,7 @@ func (g *WiresharkGuideGenerator) enrichStep(check analyzer.WiresharkCheck, issu
 		}
 
 	case "Analyze Retransmissions":
-		description = "Retransmissions indicate packet loss. High rates (>5%) suggest network congestion or errors."
+		description = "Retransmissions show that data was sent again; they do not by themselves show the original was lost. High rates (>5%) warrant finding the cause (loss, congestion, delayed ACKs or errors)."
 		tips = []string{
 			"Statistics → TCP Stream Graphs → Throughput shows impact",
 			"Look for patterns - bursts vs random",

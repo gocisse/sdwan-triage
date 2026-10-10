@@ -52,7 +52,7 @@ var IssueKnowledgeBase = map[string]IssueType{
 			{Order: 1, Title: "Verify TCP Handshake", Filter: "tcp.flags.syn==1", WhatToLook: "SYN→SYN-ACK→ACK timing", GoodSign: "Complete in <500ms", BadSign: "SYN retransmissions or >1s delay"},
 			{Order: 2, Title: "Measure TLS Latency", Filter: "tls.handshake.type==1 || tls.handshake.type==2", WhatToLook: "ClientHello to ServerHello time", GoodSign: "<1 second", BadSign: ">5 seconds (your issue)"},
 			{Order: 3, Title: "Check Path Issues", Filter: "icmp || tcp.flags.reset==1", WhatToLook: "ICMP errors or unexpected RSTs", GoodSign: "None present", BadSign: "ICMP unreachable or RST from middlebox"},
-			{Order: 4, Title: "Analyze Retransmissions", Filter: "tcp.analysis.retransmission", WhatToLook: "Packet loss indicators", GoodSign: "None or minimal", BadSign: "Multiple retransmissions during handshake"},
+			{Order: 4, Title: "Analyze Retransmissions", Filter: "tcp.analysis.retransmission", WhatToLook: "Retransmissions (possible loss indicators; confirm loss separately)", GoodSign: "None or minimal", BadSign: "Multiple retransmissions during handshake"},
 		},
 		Remediation: RemediationPlan{
 			Immediate: "Check SD-WAN tunnel health to destination subnet. Verify tunnel is UP and latency is acceptable.",
@@ -100,9 +100,9 @@ var IssueKnowledgeBase = map[string]IssueType{
 		Icon:        "🔄",
 		Severity:    "Warning",
 		Title:       "Burst of TCP retransmissions detected",
-		Description: "Multiple packets required retransmission, indicating packet loss on the network path.",
+		Description: "Multiple packets were retransmitted. Retransmissions do not by themselves establish packet loss; the original segments may have been lost, delayed or retransmitted unnecessarily.",
 		RootCauses: []string{
-			"SD-WAN tunnel packet loss",
+			"SD-WAN tunnel packet loss (possible, to be confirmed)",
 			"ISP link congestion",
 			"Interface errors (CRC, collisions)",
 			"QoS policy dropping packets",
@@ -110,8 +110,8 @@ var IssueKnowledgeBase = map[string]IssueType{
 		},
 		Impact: "Degraded throughput, increased latency, possible application timeouts.",
 		WiresharkChecks: []WiresharkCheck{
-			{Order: 1, Title: "Count Retransmissions", Filter: "tcp.analysis.retransmission", WhatToLook: "Total retransmission count", GoodSign: "<1% of total packets", BadSign: ">5% indicates serious loss"},
-			{Order: 2, Title: "Identify Loss Pattern", Filter: "tcp.analysis.lost_segment", WhatToLook: "Where packets are being lost", GoodSign: "Random distribution", BadSign: "Concentrated bursts"},
+			{Order: 1, Title: "Count Retransmissions", Filter: "tcp.analysis.retransmission", WhatToLook: "Total retransmission count", GoodSign: "<1% of total packets", BadSign: ">5% is a high retransmission rate; find the cause"},
+			{Order: 2, Title: "Check for Missing Segments", Filter: "tcp.analysis.lost_segment", WhatToLook: "Sequence gaps seen by Wireshark (a gap can also be capture loss; confirm where segments went missing)", GoodSign: "Random distribution", BadSign: "Concentrated bursts"},
 			{Order: 3, Title: "Check for Duplicates", Filter: "tcp.analysis.duplicate_ack", WhatToLook: "Duplicate ACK patterns", GoodSign: "Occasional", BadSign: "Triple+ duplicates (fast retransmit trigger)"},
 		},
 		Remediation: RemediationPlan{

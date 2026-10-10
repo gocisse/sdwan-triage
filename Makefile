@@ -7,8 +7,6 @@ VERSION      ?= 6.3.0.1
 BUILD_DIR    := build
 DIST_DIR     := cmd/sdwan-triage/dist
 FRONTEND_DIR := web/frontend
-GEOIP_DIR    := data
-GEOIP_DB     := $(GEOIP_DIR)/GeoLite2-City.mmdb
 GO           := go
 COMMIT       := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE         := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
@@ -22,7 +20,7 @@ GOFLAGS      := -ldflags '$(LDFLAGS)'
         build-linux build-darwin build-windows release \
         clean clean-all test test-coverage test-race \
         lint fmt vet run run-web help \
-        setup-geoip check-geoip frontend-dev install
+        frontend-dev install
 
 # ─── DEFAULT ────────────────────────────────────────────────
 all: build
@@ -40,21 +38,8 @@ copy-dist: build-frontend
 	cp -r $(FRONTEND_DIR)/dist/* $(DIST_DIR)/
 	@echo "✓ Frontend copied to $(DIST_DIR)"
 
-# ─── GEOIP EMBED ──────────────────────────────────────────
-copy-geoip:
-	@if [ -f "$(GEOIP_DB)" ]; then \
-		echo "🌍 Embedding GeoIP database into binary..."; \
-		mkdir -p cmd/sdwan-triage/data; \
-		cp $(GEOIP_DB) cmd/sdwan-triage/data/GeoLite2-City.mmdb; \
-		echo "✓ GeoIP database staged for embed"; \
-	else \
-		echo "⚠️  GeoIP database not found at $(GEOIP_DB) — binary will use disk fallback"; \
-		mkdir -p cmd/sdwan-triage/data; \
-		touch cmd/sdwan-triage/data/.gitkeep; \
-	fi
-
 # ─── BACKEND ───────────────────────────────────────────────
-build-backend: copy-geoip
+build-backend:
 	@echo "🔨 Building $(BINARY_NAME) v$(VERSION) ($(COMMIT))..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 $(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/sdwan-triage
@@ -178,22 +163,6 @@ vet:
 lint: fmt vet
 	@echo "✓ Code quality checks passed"
 
-# ─── GEOIP DATABASE ────────────────────────────────────────
-setup-geoip:
-	@echo "Setting up GeoIP database..."
-	@mkdir -p $(GEOIP_DIR)
-	@chmod +x scripts/download_geoip.sh
-	@scripts/download_geoip.sh $(GEOIP_DIR)
-	@echo "✓ GeoIP database ready"
-
-check-geoip:
-	@if [ -f "$(GEOIP_DB)" ]; then \
-		echo "✓ GeoIP database found: $(GEOIP_DB)"; \
-		ls -lh $(GEOIP_DB); \
-	else \
-		echo "✗ GeoIP database not found. Run: make setup-geoip"; \
-	fi
-
 # ─── FRONTEND DEV ──────────────────────────────────────────
 frontend-dev:
 	cd $(FRONTEND_DIR) && npm run dev
@@ -214,7 +183,6 @@ clean:
 	@echo "✓ Clean"
 
 clean-all: clean
-	rm -rf $(GEOIP_DIR)/*.mmdb
 
 # ─── HELP ───────────────────────────────────────────────────
 help:
@@ -238,10 +206,6 @@ help:
 	@echo "    make vet              Run go vet"
 	@echo "    make lint             Run all linters"
 	@echo ""
-	@echo "  GeoIP:"
-	@echo "    make setup-geoip      Download GeoIP database"
-	@echo "    make check-geoip      Check if GeoIP database exists"
-	@echo ""
 	@echo "  Run:"
 	@echo "    make run ARGS='...'   Run CLI mode with arguments"
 	@echo "    make run-web          Run web application mode"
@@ -249,6 +213,6 @@ help:
 	@echo ""
 	@echo "  Clean:"
 	@echo "    make clean            Remove build artifacts"
-	@echo "    make clean-all        Remove build artifacts and GeoIP data"
+	@echo "    make clean-all        Remove build artifacts"
 	@echo ""
 	@echo "  Version: $(VERSION) | Commit: $(COMMIT) | Date: $(DATE)"

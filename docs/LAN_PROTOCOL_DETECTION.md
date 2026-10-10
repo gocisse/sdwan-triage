@@ -331,7 +331,6 @@ The LAN protocol analyzer integrates seamlessly with:
 - **Timeline**: All events appear chronologically
 - **Risk Scoring**: Can be extended to include LAN protocol issues
 - **Bandwidth Analysis**: Correlates with traffic patterns
-- **GeoIP**: Associates IPs with locations
 - **SD-WAN Detection**: Identifies control plane protocols
 
 ## Support

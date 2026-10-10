@@ -255,7 +255,7 @@ export default function LatencyMatrix({ results, onFilterApply }: LatencyMatrixP
           <p className={`text-lg font-bold ${matrix.maxLoss > 5 ? 'text-red-400' : matrix.maxLoss > 1 ? 'text-amber-400' : 'text-green-400'}`}>
             {matrix.maxLoss.toFixed(1)}%
           </p>
-          <p className="text-[10px] text-slate-400">Worst Loss</p>
+          <p className="text-[10px] text-slate-400">Worst Loss Estimate (from retransmissions)</p>
         </div>
       </div>
 
@@ -388,7 +388,7 @@ export default function LatencyMatrix({ results, onFilterApply }: LatencyMatrixP
             </div>
             <div><span className="text-slate-500">Min/Max:</span> {hoveredData.min_rtt_ms.toFixed(1)}ms / {hoveredData.max_rtt_ms.toFixed(1)}ms</div>
             <div>
-              <span className="text-slate-500">Loss:</span>{' '}
+              <span className="text-slate-500">Loss estimate (from retransmissions):</span>{' '}
               <span style={{ color: lossColor(hoveredData.loss_pct) }} className="font-semibold">
                 {hoveredData.loss_pct.toFixed(2)}%
               </span>
@@ -414,7 +414,7 @@ export default function LatencyMatrix({ results, onFilterApply }: LatencyMatrixP
                   <th className="px-3 py-2 font-medium text-right">Avg RTT</th>
                   <th className="px-3 py-2 font-medium text-right">Min</th>
                   <th className="px-3 py-2 font-medium text-right">Max</th>
-                  <th className="px-3 py-2 font-medium text-right">Loss %</th>
+                  <th className="px-3 py-2 font-medium text-right" title="Estimated from TCP retransmissions; retransmissions do not by themselves confirm loss">Loss est. %</th>
                   <th className="px-3 py-2 font-medium text-right">Flows</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                 </tr>

@@ -61,7 +61,7 @@ function computeIssues(results: AnalysisResults): IssueSummary[] {
 
   const pktLoss = results.packet_loss;
   if (pktLoss && pktLoss.packets_lost > 0) {
-    issues.push({ label: 'Packet Loss', count: pktLoss.packets_lost, severity: pktLoss.loss_percentage > 5 ? 'Critical' : 'Warning', icon: AlertTriangle });
+    issues.push({ label: 'TCP Retransmissions Observed', count: pktLoss.packets_lost, severity: pktLoss.loss_percentage > 5 ? 'Critical' : 'Warning', icon: AlertTriangle });
   }
 
   return issues.sort((a, b) => {
@@ -99,7 +99,7 @@ function generateSummary(results: AnalysisResults, issues: IssueSummary[]): stri
   }
 
   if (retrans > 100) {
-    parts.push(`${retrans.toLocaleString()} retransmissions indicating packet loss`);
+    parts.push(`${retrans.toLocaleString()} TCP retransmissions observed (cause not determined)`);
   }
 
   return parts.join('. ') + '.';

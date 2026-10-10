@@ -256,7 +256,7 @@ func GenerateFindingSpecificActions(findingType, detail string) string {
 					<strong>Action for this retransmission:</strong>
 					<p style="margin-top: 5px;">%s</p>
 					<ul style="margin-top: 5px; margin-left: 20px;">
-						<li>Check network path for congestion or packet loss</li>
+						<li>Check the network path to find why data was sent again (loss, congestion or delayed ACKs are all possible)</li>
 						<li>Verify physical connections and interface statistics</li>
 						<li>Review QoS policies for this traffic class</li>
 					</ul>

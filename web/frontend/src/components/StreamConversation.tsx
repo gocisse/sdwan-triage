@@ -760,7 +760,7 @@ function classifyPacketEvent(d: Discrepancy): PacketEvent {
       bgColor: 'bg-yellow-900/15',
       borderColor: 'border-yellow-700/30',
       icon: <AlertTriangle className="w-3 h-3 text-yellow-400" />,
-      explanation: 'This packet is a retransmission — the original was lost or the ACK was delayed. TCP automatically resends data when it doesn\'t receive acknowledgment within the retransmission timeout (RTO). Frequent retransmissions indicate network congestion or packet loss.',
+      explanation: 'This packet is a retransmission — the sender sent this data again. The original may have been lost, or the ACK may have been delayed; the capture alone does not say which. TCP resends data when it doesn\'t receive acknowledgment within the retransmission timeout (RTO). Frequent retransmissions warrant finding the cause (packet loss, congestion, delayed ACKs).',
     };
   }
 

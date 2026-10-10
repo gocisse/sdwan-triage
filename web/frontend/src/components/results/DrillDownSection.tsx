@@ -7,10 +7,9 @@ import type { ParsedFilter } from '../../hooks';
 import { ForensicFilterContext, type ForensicFilterContextValue } from '../../hooks';
 import { ProtocolStats, ConversationsView, ExpertInfo, IOGraphView, QosDashboard, LatencyMatrix } from '../../components';
 import PacketSearchBar from '../../components/PacketSearchBar';
-import { GeoIPMap } from '../visualizations/GeoIPMap';
 import { DrillDownSkeleton } from '../ui/Skeletons';
 
-type ForensicSubTab = 'iograph' | 'protocols' | 'conversations' | 'expert' | 'qos' | 'latency' | 'geoip' | 'search';
+type ForensicSubTab = 'iograph' | 'protocols' | 'conversations' | 'expert' | 'qos' | 'latency' | 'search';
 
 export interface DrillDownSectionProps {
   results: AnalysisResults;
@@ -53,7 +52,6 @@ export function DrillDownSection({
             { key: 'expert' as const, label: 'Expert Info' },
             { key: 'qos' as const, label: 'QoS Analysis' },
             { key: 'latency' as const, label: 'Latency Matrix' },
-            { key: 'geoip' as const, label: 'GeoIP Map' },
             { key: 'search' as const, label: 'Packet Search' },
           ]).map(tab => (
             <button
@@ -104,13 +102,6 @@ export function DrillDownSection({
           <LatencyMatrix
             results={effectiveResults}
             onFilterApply={(expr) => onFilterChange(expr)}
-          />
-        )}
-        {forensicSubTab === 'geoip' && (
-          <GeoIPMap
-            details={effectiveResults.location_details ?? []}
-            trafficFlows={effectiveResults.traffic_analysis}
-            timeline={effectiveResults.timeline}
           />
         )}
         {forensicSubTab === 'search' && (

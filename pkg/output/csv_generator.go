@@ -3,10 +3,8 @@ package output
 import (
 	"encoding/csv"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -199,15 +197,6 @@ func GenerateCSVReports(r *models.TriageReport, baseFilename string) (*CSVExport
 		result.Files = append(result.Files, voipFile)
 	}
 
-	// Generate GeoIP summary CSV if any exist
-	if len(r.LocationSummary) > 0 {
-		geoFile := filepath.Join(dir, baseName+"_geo_locations.csv")
-		if err := generateGeoLocationsCSV(r.LocationSummary, geoFile); err != nil {
-			return nil, fmt.Errorf("failed to generate geo locations CSV: %w", err)
-		}
-		result.Files = append(result.Files, geoFile)
-	}
-
 	// Generate DNS details CSV if any exist
 	if len(r.DNSDetails) > 0 {
 		dnsDetailsFile := filepath.Join(dir, baseName+"_dns_details.csv")
@@ -306,7 +295,6 @@ func generateSummaryCSV(r *models.TriageReport, filename string) error {
 		{"Tunnels Detected", fmt.Sprintf("%d", len(r.TunnelAnalysis)), "Encapsulation protocols detected (VXLAN, GRE, IPsec, etc.)"},
 		{"SD-WAN Vendors Detected", fmt.Sprintf("%d", len(r.SDWANVendors)), "SD-WAN vendor signatures identified"},
 		{"VoIP Calls", fmt.Sprintf("%d", voipCallCount), "SIP/RTP voice calls detected"},
-		{"Geographic Locations", fmt.Sprintf("%d", len(r.LocationSummary)), "Unique geographic locations observed"},
 		// Protocol Analysis metrics
 		{"BGP Hijack Indicators", fmt.Sprintf("%d", len(r.BGPHijackIndicators)), "Potential BGP hijack indicators"},
 		{"DNS Queries Recorded", fmt.Sprintf("%d", len(r.DNSDetails)), "Total DNS queries captured"},
@@ -412,7 +400,7 @@ func generateTCPRetransmissionsCSV(flows []models.TCPFlow, filename string) erro
 
 	// Write data rows
 	for _, f := range flows {
-		description := fmt.Sprintf("TCP retransmission detected from %s:%d to %s:%d indicating packet loss or congestion",
+		description := fmt.Sprintf("TCP retransmission observed from %s:%d to %s:%d (cause not determined; the original segment may have been lost, delayed or retransmitted unnecessarily)",
 			f.SrcIP, f.SrcPort, f.DstIP, f.DstPort)
 		action := "Check network path for congestion; review QoS settings; verify MTU configuration"
 
@@ -1366,34 +1354,6 @@ func generateVoIPAnalysisCSV(voip *models.VoIPAnalysis, filename string) error {
 				fmt.Sprintf("%d", stream.LostPackets),
 				jitterCSV(stream.Jitter),
 			})
-		}
-	}
-
-	return nil
-}
-
-// generateGeoLocationsCSV creates a CSV for geographic location summary
-func generateGeoLocationsCSV(locations map[string]int, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	header := []string{"Location", "IP Count"}
-	if err := writer.Write(header); err != nil {
-		return err
-	}
-
-	// Sorted keys: row order must not depend on Go map iteration order.
-	for _, location := range slices.Sorted(maps.Keys(locations)) {
-		count := locations[location]
-		row := []string{location, fmt.Sprintf("%d", count)}
-		if err := writer.Write(row); err != nil {
-			return err
 		}
 	}
 

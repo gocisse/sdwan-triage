@@ -41,7 +41,7 @@ export function AnalysisBadges({
       icon: <RefreshCw className="w-3 h-3" />,
       color: 'bg-red-500/15 text-red-400 border-red-500/40',
       tooltip:
-        'Retransmission — the sender re-sent a segment that had already been transmitted. Usually indicates packet loss or delayed ACK.',
+        'Retransmission — the sender re-sent a segment that had already been transmitted. Possible causes include packet loss or a delayed ACK; the retransmission alone does not show which.',
     });
   }
   if (d.is_duplicate_ack) {

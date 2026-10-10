@@ -355,9 +355,13 @@ func TestSeqChar_Advanced_ReorderedSegmentsAreCounted(t *testing.T) {
 	}
 }
 
-// LEGACY QUIRK: exact retransmissions are ALSO "out-of-order" here (and are also
-// retransmission events elsewhere), so the two signals double-count one cause.
-func TestSeqChar_Advanced_RetransmissionsAreCountedAsOutOfOrder(t *testing.T) {
+// Phase 4.49 (was a LEGACY QUIRK pinned in 4.30a): exact retransmissions used to
+// be ALSO counted as "out-of-order" here, double-counting one cause. The advanced
+// tracker now applies the shared retransmission rule and excludes them (and
+// keep-alives) from the out-of-order count and denominator. The retransmission
+// events themselves are unchanged. Genuine reordering is still counted (see
+// TestSeqChar_Advanced_ReorderedSegmentsAreCounted).
+func TestSeqChar_Advanced_RetransmissionsAreNotCountedAsOutOfOrder(t *testing.T) {
 	var specs [][]byte
 	specs = append(specs, frames(seqCliPort, hs...)...)
 	for i := 0; i < 12; i++ { // data segment i then an exact repeat of the PREVIOUS one
@@ -366,16 +370,15 @@ func TestSeqChar_Advanced_RetransmissionsAreCountedAsOutOfOrder(t *testing.T) {
 			specs = append(specs, seqFrame(seqCliPort, cData(1001+uint32(i-1)*100, 100)))
 		}
 	}
-	got := advancedOOO(specs)
-	if len(got) != 1 || got[0].OutOfOrderCount != 11 {
-		t.Fatalf("out-of-order flows = %+v, want 11 counted retransmissions", got)
+	if got := advancedOOO(specs); len(got) != 0 {
+		t.Fatalf("out-of-order flows = %+v, want none: these are only retransmissions", got)
 	}
 	r := runGolden(t, specs)
 	if n := len(retxEvents(r)); n != 11 {
-		t.Errorf("the same scenario yields %d tcp.retransmission events, want 11", n)
+		t.Errorf("the same scenario yields %d tcp.retransmission events, want 11 (unchanged)", n)
 	}
-	if len(r.TCPOutOfOrderFlows) != 1 {
-		t.Errorf("full pipeline TCPOutOfOrderFlows = %d, want 1", len(r.TCPOutOfOrderFlows))
+	if len(r.TCPOutOfOrderFlows) != 0 {
+		t.Errorf("full pipeline TCPOutOfOrderFlows = %d, want 0", len(r.TCPOutOfOrderFlows))
 	}
 }
 
@@ -391,7 +394,8 @@ func TestSeqChar_Advanced_ForwardGapIsNotOutOfOrder(t *testing.T) {
 	}
 }
 
-// ─── 3. stream_reassembly.go: R = seq <= previous seq, O = jump > 1000 B ──
+// ─── 3. stream_reassembly.go: R = seen start seq, O = first-seen below highest ──
+// (Phase 4.50: previously R = seq <= previous packet's seq, O = forward jump > 1000 B.)
 
 func TestSeqChar_Stream_InOrder(t *testing.T) {
 	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(1101, 100), cData(1201, 100)); got != "---" {
@@ -399,34 +403,30 @@ func TestSeqChar_Stream_InOrder(t *testing.T) {
 	}
 }
 
-// A gap smaller than 1000 bytes is not flagged at all; a larger forward jump is
-// labelled "Out-of-order" (it is a gap) and, once flagged, is never resolved.
-func TestSeqChar_Stream_ForwardGap_ThresholdIs1000Bytes(t *testing.T) {
-	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(1201, 100)); got != "--" {
-		t.Errorf("200-byte gap flags = %q, want -- (not flagged)", got)
-	}
-	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(6001, 100)); got != "-O" {
-		t.Errorf("4.9 kB jump flags = %q, want -O", got)
-	}
-	// The rule is seq > previousSeq + len(CURRENT payload) + 1000 (note: the previous
-	// packet's START, not its end): with previous seq 1001 and a 100-byte segment the
-	// boundary is 2101, strictly greater than.
-	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(2102, 100)); got != "-O" {
-		t.Errorf("seq 2102 flags = %q, want -O", got)
-	}
-	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(2101, 100)); got != "--" {
-		t.Errorf("seq 2101 (exactly at the boundary) flags = %q, want --", got)
+// Phase 4.50 (was a LEGACY QUIRK pinned in 4.30a): a forward jump used to be
+// labelled "Out-of-order" when it exceeded 1000 bytes. A forward jump is a
+// sequence gap (missing range at the capture point), not out-of-order data, and
+// is reported by the tcp.sequence_gap evidence. The stream view no longer labels
+// it, whatever its size.
+func TestSeqChar_Stream_ForwardGapIsNotLabelled(t *testing.T) {
+	for _, next := range []uint32{1201, 2101, 2102, 6001, 1001 + 1<<20} {
+		if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(next, 100)); got != "--" {
+			t.Errorf("forward gap to %d flags = %q, want -- (a gap is not out-of-order or a retransmission)", next, got)
+		}
 	}
 }
 
-// LEGACY QUIRK: a segment that fills a gap, and a plain reordered segment, are
-// both labelled "Retransmission" (seq <= previous packet's seq).
-func TestSeqChar_Stream_GapFillAndReordering_LabelledRetransmission(t *testing.T) {
-	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(1201, 100), cData(1101, 100)); got != "--R" {
-		t.Errorf("gap then fill flags = %q, want --R", got)
+// Phase 4.50 (was a LEGACY QUIRK pinned in 4.30a): a segment that fills a gap,
+// and a plain reordered segment, were both labelled "Retransmission" because their
+// seq was <= the previous packet's seq. Neither repeats data already seen, so they
+// are now out-of-sequence arrivals ("O"). From one capture point a hole-fill and
+// reordering cannot be told apart, and neither is evidence of loss.
+func TestSeqChar_Stream_GapFillAndReordering_AreOutOfSequenceNotRetransmission(t *testing.T) {
+	if got := streamFlags(t, seqCliPort, cData(1001, 100), cData(1201, 100), cData(1101, 100)); got != "--O" {
+		t.Errorf("gap then fill flags = %q, want --O", got)
 	}
-	if got := streamFlags(t, seqCliPort, cData(1101, 100), cData(1001, 100)); got != "-R" {
-		t.Errorf("reordered pair flags = %q, want -R", got)
+	if got := streamFlags(t, seqCliPort, cData(1101, 100), cData(1001, 100)); got != "-O" {
+		t.Errorf("reordered pair flags = %q, want -O", got)
 	}
 }
 
@@ -549,12 +549,18 @@ func TestSeqChar_RealCaptures_CurrentSequenceSignals(t *testing.T) {
 		advFlows, advCount    int
 		streamRetx, streamOOO int // over the top-50 reassembled streams
 	}{
-		{"Lab 3-TCP Retrans", 1, 10, 0, 1},
+		// Phase 4.49/4.50: values re-measured after the advanced-tracker fix (4.49)
+		// and the stream classifier fix (4.50). The corpus files were since renamed
+		// (hyphenated), so the "Lab 3"/"Lab 4"/"user1" rows below are skipped by name:
+		// Lab-3-TCP-Retrans measured advanced 0/0 and stream 0/0 after the fixes
+		// (was 1/10 and 0/1); "user1" is no longer in the corpus and its pinned
+		// values predate both fixes (unverified).
+		{"Lab 3-TCP Retrans", 0, 0, 0, 0},
 		{"Lab 4-NetworkCongestion", 0, 0, 1, 0},
 		{"user1", 0, 0, 3, 17},
-		{"Velocloud-Lan", 0, 0, 0, 57},
-		{"Velocloud-Wan", 0, 0, 0, 38},
-		{"cisco-example-lan", 0, 0, 4, 377},
+		{"Velocloud-Lan", 0, 0, 0, 0},     // was 0/57: forward jumps were labelled out-of-order
+		{"Velocloud-Wan", 0, 0, 0, 0},     // was 0/38
+		{"cisco-example-lan", 0, 0, 3, 1}, // was 4/377
 		{"The-Ultimate-PCAP", 0, 0, 0, 0},
 	}
 	for _, c := range cases {

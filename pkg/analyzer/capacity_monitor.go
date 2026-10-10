@@ -348,7 +348,7 @@ func (cm *CapacityMonitor) analyzeRetransmissions(streams []*models.StreamData) 
 			Type:           WarningRetransmitsHigh,
 			Severity:       severity,
 			Title:          "High Retransmission Rate",
-			Description:    "Network experiencing significant packet loss",
+			Description:    "High TCP retransmission rate observed (retransmissions do not by themselves establish packet loss)",
 			CurrentValue:   retransmitRate,
 			ThresholdValue: cm.config.RetransmitWarningPercent,
 			TrendDirection: "stable",

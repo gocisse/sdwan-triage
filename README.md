@@ -35,9 +35,6 @@ Cross-reference every packet against **STIX 2.1** threat feeds. Load directories
 ### 🔍 LAN vs WAN Comparison
 Automated **streaming packet correlation** across two capture files. Identifies dropped packets, TTL/DSCP modifications, NAT translations, failed handshakes, retransmission storms, and latency spikes. Produces a **Forensic Comparison Summary** with one-way latency percentiles and flow-level drop analysis.
 
-### 🗺️ GeoIP Visualization
-Every external IP is geolocated using an **embedded MaxMind GeoLite2 database** (compiled into the binary). The web dashboard renders an interactive world map of traffic flows with country, city, and coordinate data.
-
 ### 🔐 JA3/JA3S Fingerprinting
 Extracts TLS client (JA3) and server (JA3S) fingerprints from handshakes. Matches against known malware, bot, and application fingerprint databases. Displays hashes with one-click copy and direct links to abuse.ch lookup.
 
@@ -173,7 +170,7 @@ A sample feed is included at `feeds/example-threat-feed.json`. Supported indicat
 | macOS | Apple Silicon (arm64) | `sdwan-triage-darwin-arm64` |
 | Windows | amd64 | `sdwan-triage-windows-amd64.exe` |
 
-All binaries are statically linked (`CGO_ENABLED=0`) and include the embedded React frontend + GeoIP database (~97MB).
+All binaries are statically linked (`CGO_ENABLED=0`) and include the embedded React frontend.
 
 ---
 
@@ -189,7 +186,7 @@ All binaries are statically linked (`CGO_ENABLED=0`) and include the embedded Re
 │  │  STIX Parser     │  │  D3.js Maps + Timeline      │  │
 │  │  Streaming       │  │  Wireshark Academy          │  │
 │  │  Comparator      │  │  Global Filtering           │  │
-│  │  GeoIP (embed)   │  │  Forensic Workflows         │  │
+│  │                  │  │  Forensic Workflows         │  │
 │  └──────────────────┘  └─────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────┤
 │  │  Gin HTTP Server  │  SQLite Auth  │  Redis Storage  │

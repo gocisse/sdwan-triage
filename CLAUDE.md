@@ -342,13 +342,11 @@ make lint
 make run ARGS='capture.pcap'
 make run-web
 make frontend-dev
-make setup-geoip
 ```
 
 Build gotchas:
 
 * `make build`/`build-backend` require the frontend to be built and copied into `cmd/sdwan-triage/dist` first (`copy-dist`, which runs `npm install` + `npm run build`); that directory is what gets embedded in the binary. Plain `go build ./cmd/sdwan-triage` uses whatever is already there.
-* GeoIP DB is embedded from `cmd/sdwan-triage/data/` if present (`make setup-geoip` downloads it); otherwise the binary falls back to a disk lookup.
 * `make test` uses `-v -timeout 60s`; `make lint` is only `go fmt` + `go vet`.
 * `build/`, `sdwan-triage`, `cmd/sdwan-triage/dist/`, `releases/` are build artifacts and show up as modified in `git status` after builds — don't include them in diffs/commits of source work.
 

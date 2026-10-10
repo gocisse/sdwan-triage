@@ -190,7 +190,6 @@ type ReportData struct {
 	VoIPAnalysis    *VoIPAnalysisView
 	TunnelFindings  []TunnelFindingView
 	SDWANVendors    []SDWANVendorView
-	GeoLocations    []GeoLocationView
 	BandwidthReport *BandwidthReportView
 
 	// LAN Protocol Detection
@@ -601,12 +600,6 @@ type SDWANVendorView struct {
 	LastSeen    float64
 }
 
-type GeoLocationView struct {
-	Country string
-	Count   int
-	IPs     []string
-}
-
 type BandwidthReportView struct {
 	TopByBytes   []BandwidthFlowView
 	TopByPackets []BandwidthFlowView
@@ -936,7 +929,6 @@ func prepareReportData(r *models.TriageReport, pcapFile string) *ReportData {
 	data.VoIPAnalysis = convertVoIPAnalysis(r.VoIPAnalysis)
 	data.TunnelFindings = convertTunnelFindings(r.TunnelAnalysis)
 	data.SDWANVendors = convertSDWANVendors(r.SDWANVendors)
-	data.GeoLocations = convertGeoLocations(r.LocationSummary, r.LocationIPs)
 	data.BandwidthReport = convertBandwidthReport(r.BandwidthReport)
 
 	// LAN Protocol Detection
@@ -1060,7 +1052,7 @@ func generateNextSteps(r *models.TriageReport) []string {
 		steps = append(steps, "Review suspicious traffic - potential malware or unauthorized access detected")
 	}
 	if len(r.TCPRetransmissions) > 10 {
-		steps = append(steps, "Address network performance issues - high TCP retransmission rate indicates congestion or packet loss")
+		steps = append(steps, "Investigate the cause of the high TCP retransmission rate - retransmissions alone do not show whether packets were lost, delayed or retransmitted unnecessarily")
 	}
 	if len(r.FailedHandshakes) > 0 {
 		steps = append(steps, "Investigate failed TCP handshakes - possible connectivity or firewall issues")
@@ -2076,32 +2068,6 @@ func convertSDWANVendors(vendors []models.SDWANVendor) []SDWANVendorView {
 			LastSeen:    v.LastSeen,
 		}
 	}
-	return result
-}
-
-func convertGeoLocations(locations map[string]int, locationIPs map[string][]string) []GeoLocationView {
-	if locations == nil {
-		return nil
-	}
-	result := make([]GeoLocationView, 0, len(locations))
-	for _, country := range slices.Sorted(maps.Keys(locations)) {
-		count := locations[country]
-		ips := locationIPs[country]
-		// Escape IPs for HTML safety
-		escapedIPs := make([]string, len(ips))
-		for i, ip := range ips {
-			escapedIPs[i] = html.EscapeString(ip)
-		}
-		result = append(result, GeoLocationView{
-			Country: html.EscapeString(country),
-			Count:   count,
-			IPs:     escapedIPs,
-		})
-	}
-	// Sort by count descending (stable: ties keep the sorted-key order)
-	sort.SliceStable(result, func(i, j int) bool {
-		return result[i].Count > result[j].Count
-	})
 	return result
 }
 
@@ -3438,28 +3404,9 @@ func getTemplateContent() string {
                     </details>
                     {{end}}
 
-                    {{if .GeoLocations}}
-                    <details>
-                        <summary><i class="fas fa-globe-americas"></i> Geographic Distribution ({{len .GeoLocations}} locations)</summary>
-                        <div>
-                            <table class="data-table">
-                                <thead><tr><th>Location</th><th>IP Count</th></tr></thead>
-                                <tbody>
-                                    {{range .GeoLocations}}
-                                    <tr>
-                                        <td><strong>{{.Country}}</strong></td>
-                                        <td>{{.Count}}</td>
-                                    </tr>
-                                    {{end}}
-                                </tbody>
-                            </table>
-                        </div>
-                    </details>
-                    {{end}}
-
-                    {{if not .SDWANVendors}}{{if not .TunnelFindings}}{{if not .VoIPAnalysis}}{{if not .GeoLocations}}
+                    {{if not .SDWANVendors}}{{if not .TunnelFindings}}{{if not .VoIPAnalysis}}
                     <div class="alert alert-info"><i class="fas fa-info-circle"></i> No advanced network features detected in this capture</div>
-                    {{end}}{{end}}{{end}}{{end}}
+                    {{end}}{{end}}{{end}}
                 </div>
 
                 <div id="tab-traffic" class="tab-content">
